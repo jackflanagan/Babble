@@ -1725,14 +1725,86 @@
     }
   };
 
-  var players, enemies, bubbles, collectibles, particles, popups;
+  var players, enemies, bubbles, collectibles, particles, popups, powerups;
   var score = 0, lives = 3, gameState = 'ready', enemiesLeft = 0, startTime = 0;
   var shakeT = 0;
   var CHASE_DELAY = 15; // seconds before enemies start chasing players
+  var POWERUP_TYPES = ['speed','rapid','shield'];
+  var chaseAlertPlayed = false;
+
+  /* ---------- audio ---------- */
+  var audioCtx = null;
+  function ac(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+  function playSound(type){
+    try{
+      var c = ac(), now = c.currentTime;
+      var g = c.createGain(); g.connect(c.destination);
+      var o = c.createOscillator(); o.connect(g);
+      if(type==='jump'){
+        o.type='sine'; o.frequency.setValueAtTime(280,now); o.frequency.linearRampToValueAtTime(520,now+0.12);
+        g.gain.setValueAtTime(0.22,now); g.gain.linearRampToValueAtTime(0,now+0.14);
+        o.start(now); o.stop(now+0.14);
+      } else if(type==='shoot'){
+        o.type='square'; o.frequency.setValueAtTime(700,now); o.frequency.linearRampToValueAtTime(400,now+0.08);
+        g.gain.setValueAtTime(0.12,now); g.gain.linearRampToValueAtTime(0,now+0.1);
+        o.start(now); o.stop(now+0.1);
+      } else if(type==='trap'){
+        o.type='sawtooth'; o.frequency.setValueAtTime(180,now); o.frequency.linearRampToValueAtTime(90,now+0.18);
+        g.gain.setValueAtTime(0.25,now); g.gain.linearRampToValueAtTime(0,now+0.2);
+        o.start(now); o.stop(now+0.2);
+      } else if(type==='pop'){
+        o.type='sine'; o.frequency.setValueAtTime(420,now); o.frequency.linearRampToValueAtTime(80,now+0.15);
+        g.gain.setValueAtTime(0.35,now); g.gain.linearRampToValueAtTime(0,now+0.18);
+        o.start(now); o.stop(now+0.18);
+        // noise burst
+        var buf = c.createBuffer(1,c.sampleRate*0.08,c.sampleRate);
+        var d = buf.getChannelData(0); for(var ni=0;ni<d.length;ni++) d[ni]=Math.random()*2-1;
+        var ns = c.createBufferSource(); ns.buffer=buf;
+        var ng = c.createGain(); ng.gain.setValueAtTime(0.18,now); ng.gain.linearRampToValueAtTime(0,now+0.08);
+        ns.connect(ng); ng.connect(c.destination); ns.start(now); ns.stop(now+0.08);
+      } else if(type==='collect'){
+        o.type='sine'; o.frequency.setValueAtTime(660,now); o.frequency.linearRampToValueAtTime(880,now+0.12);
+        g.gain.setValueAtTime(0.2,now); g.gain.linearRampToValueAtTime(0,now+0.15);
+        o.start(now); o.stop(now+0.15);
+      } else if(type==='lose'){
+        o.type='sine'; o.frequency.setValueAtTime(440,now); o.frequency.linearRampToValueAtTime(180,now+0.45);
+        g.gain.setValueAtTime(0.3,now); g.gain.linearRampToValueAtTime(0,now+0.5);
+        o.start(now); o.stop(now+0.5);
+      } else if(type==='powerup'){
+        [0,0.08,0.16].forEach(function(t,i){
+          var po=c.createOscillator(), pg=c.createGain();
+          po.connect(pg); pg.connect(c.destination);
+          po.type='sine'; po.frequency.value=[523,659,784][i];
+          pg.gain.setValueAtTime(0.22,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.1);
+          po.start(now+t); po.stop(now+t+0.1);
+        });
+        o.stop(now); // unused
+      } else if(type==='win'){
+        [[523,0],[659,0.1],[784,0.2],[1047,0.32]].forEach(function(f){
+          var po=c.createOscillator(), pg=c.createGain();
+          po.connect(pg); pg.connect(c.destination);
+          po.type='sine'; po.frequency.value=f[0];
+          pg.gain.setValueAtTime(0.25,now+f[1]); pg.gain.linearRampToValueAtTime(0,now+f[1]+0.18);
+          po.start(now+f[1]); po.stop(now+f[1]+0.2);
+        });
+        o.stop(now);
+      } else if(type==='chase'){
+        [0,0.15,0.3].forEach(function(t){
+          var po=c.createOscillator(), pg=c.createGain();
+          po.connect(pg); pg.connect(c.destination);
+          po.type='sawtooth'; po.frequency.value=t%0.3===0?880:440;
+          pg.gain.setValueAtTime(0.18,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.12);
+          po.start(now+t); po.stop(now+t+0.14);
+        });
+        o.stop(now);
+      }
+    } catch(e){}
+  }
 
   function makePlayer(id, x, palette){
     return { id:id, x:x, y:400, w:30, h:34, vx:0, vy:0, onGround:false, facing:1,
-      walkPhase:Math.random()*TAU, invuln:0, shootCooldown:0, palette:palette };
+      walkPhase:Math.random()*TAU, invuln:0, shootCooldown:0, palette:palette,
+      speedBoost:0, rapidFire:0, shield:0 };
   }
 
   function resetGame(){
@@ -1747,6 +1819,8 @@
     bubbles = [];
     particles = [];
     popups = [];
+    powerups = [];
+    chaseAlertPlayed = false;
     collectibles = COLLECTIBLE_SPOTS.map(function(c){ return {x:c.x,y:c.y,slot:c.slot,taken:false,bob:Math.random()*TAU}; });
     score = 0;
     lives = 3;
@@ -1836,11 +1910,13 @@
     if(gameState==='playing' && p && p.onGround){
       p.vy = -560;
       p.onGround = false;
+      playSound('jump');
     }
   }
   function tryShoot(p){
     if(gameState==='playing' && p && p.shootCooldown<=0){
-      p.shootCooldown = 0.42;
+      p.shootCooldown = p.rapidFire>0 ? 0.12 : 0.42;
+      playSound('shoot');
       bubbles.push({
         x: p.x + p.w/2 + p.facing*10, y: p.y+6,
         vx: p.facing*260, vy:-40, r:4, grown:false, age:0,
@@ -1852,8 +1928,12 @@
   function update(dt){
     if(gameState !== 'playing') return;
 
-    var accel = 900, maxSpeed = 220, fric = 1300;
+    var accel = 900, fric = 1300;
     players.forEach(function(p){
+      if(p.speedBoost>0) p.speedBoost -= dt;
+      if(p.rapidFire>0) p.rapidFire -= dt;
+      if(p.shield>0) p.shield -= dt;
+      var maxSpeed = p.speedBoost>0 ? 340 : 220;
       var left, right, jump, bubble;
       if(numPlayers===1){
         left = keys.p1Left || keys.p2Left;
@@ -1901,6 +1981,7 @@
           score += v;
           spawnPopup(c.x,c.y,'+'+v,'#ffd166');
           spawnParticles(c.x,c.y,'#ffd166',10);
+          playSound('collect');
           break;
         }
       }
@@ -1927,6 +2008,7 @@
             b.trapped = en;
             b.r = 20;
             spawnParticles(b.x,b.y,'#7fe3ff',8);
+            playSound('trap');
             break;
           }
         }
@@ -1954,6 +2036,12 @@
           spawnPopup(b.x, b.y-10, '+'+level.values.pop, '#ff9c7a');
           spawnParticles(b.x,b.y,'#ff9c7a',14);
           score += level.values.pop;
+          playSound('pop');
+          // 35% chance to drop a power-up
+          if(Math.random()<0.35){
+            var ptype = POWERUP_TYPES[Math.floor(Math.random()*POWERUP_TYPES.length)];
+            powerups.push({x:b.x, y:b.y, type:ptype, bob:0, life:7});
+          }
           var idx = enemies.indexOf(en2);
           if(idx>-1){ enemies.splice(idx,1); enemiesLeft--; }
           bubbles.splice(bi,1);
@@ -2027,12 +2115,41 @@
     }
     if(shakeT>0) shakeT -= dt;
 
+    // chase alert sound
+    if(!chaseAlertPlayed && elapsed >= CHASE_DELAY){ chaseAlertPlayed = true; playSound('chase'); }
+
+    // power-ups: bob, expire, pickup
+    for(var pui=powerups.length-1; pui>=0; pui--){
+      var pu = powerups[pui];
+      pu.bob += dt*3;
+      pu.life -= dt;
+      if(pu.life<=0){ powerups.splice(pui,1); continue; }
+      var puBox = {x:pu.x-12, y:pu.y-12, w:24, h:24};
+      var picked = false;
+      for(var ppi=0; ppi<players.length && !picked; ppi++){
+        var pp2 = players[ppi];
+        if(rectsOverlap(pp2, puBox)){
+          picked = true;
+          if(pu.type==='speed') pp2.speedBoost = 6;
+          else if(pu.type==='rapid') pp2.rapidFire = 6;
+          else if(pu.type==='shield') pp2.shield = 6;
+          playSound('powerup');
+          var puNames = {speed:'FAST!', rapid:'RAPID!', shield:'SHIELD!'};
+          spawnPopup(pu.x, pu.y-10, puNames[pu.type], '#b0f0ff');
+          spawnParticles(pu.x, pu.y, '#b0f0ff', 10);
+          powerups.splice(pui,1);
+        }
+      }
+    }
+
     if(enemiesLeft<=0){ winLevel(); }
   }
 
   function loseLife(p){
+    if(p.shield>0){ p.invuln = 0.5; return; } // shield absorbs hit
     lives--;
     p.invuln = 1.6;
+    playSound('lose');
     p.x = p.id===0 ? (numPlayers===2 ? 320 : 360) : 420;
     p.y = 400; p.vx=0; p.vy=0;
     shakeT = 0.3;
@@ -2047,6 +2164,7 @@
   function winLevel(){
     if(gameState !== 'playing') return;
     gameState = 'won';
+    playSound('win');
     var elapsed = (performance.now()-startTime)/1000;
     var collected = collectibles.filter(function(c){return c.taken;}).length;
     var stars = 1;
@@ -2176,6 +2294,36 @@
     ctx.lineWidth = 1.4;
     ctx.stroke();
     if(b.state==='carrying' && b.trapped) LEVELS[currentLocationId].enemyDraw(b.trapped);
+    ctx.restore();
+  }
+
+  /* ---------- drawing: power-ups ---------- */
+  function drawPowerup(pu){
+    var y = pu.y + Math.sin(pu.bob)*5;
+    ctx.save(); ctx.translate(pu.x, y);
+    var pulse = 0.85 + Math.sin(pu.bob*2)*0.15;
+    ctx.scale(pulse, pulse);
+    // glow
+    var glowCol = pu.type==='speed'?'rgba(255,220,0,0.35)':pu.type==='rapid'?'rgba(255,120,0,0.35)':'rgba(80,160,255,0.35)';
+    var grd = ctx.createRadialGradient(0,0,4,0,0,18);
+    grd.addColorStop(0,glowCol); grd.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(0,0,18,0,TAU); ctx.fill();
+    // icon bg
+    ctx.fillStyle = pu.type==='speed'?'#ffd700':pu.type==='rapid'?'#ff7800':'#4499ff';
+    ctx.beginPath(); ctx.arc(0,0,10,0,TAU); ctx.fill();
+    ctx.fillStyle='#fff';
+    if(pu.type==='speed'){
+      // lightning bolt
+      ctx.beginPath(); ctx.moveTo(2,-8); ctx.lineTo(-2,0); ctx.lineTo(1,0); ctx.lineTo(-2,8); ctx.lineTo(3,0); ctx.lineTo(0,0); ctx.closePath(); ctx.fill();
+    } else if(pu.type==='rapid'){
+      // triple dots
+      [-5,0,5].forEach(function(ox){ ctx.beginPath(); ctx.arc(ox,0,2.2,0,TAU); ctx.fill(); });
+    } else {
+      // shield shape
+      ctx.beginPath(); ctx.moveTo(0,-7); ctx.lineTo(6,-4); ctx.lineTo(6,2); ctx.quadraticCurveTo(0,8,-6,2); ctx.lineTo(-6,-4); ctx.closePath(); ctx.fill();
+    }
+    // expiry fade
+    if(pu.life<2) ctx.globalAlpha = pu.life/2;
     ctx.restore();
   }
 
@@ -2484,9 +2632,19 @@
 
     collectibles.forEach(level.collectibleDraw);
     enemies.forEach(function(en){ if(en.state==='free') level.enemyDraw(en); });
+    powerups.forEach(drawPowerup);
     players.forEach(function(p){
       var visible = p.invuln<=0 || Math.floor(performance.now()/80)%2===0;
       if(visible){
+        // shield glow
+        if(p.shield>0){
+          ctx.save();
+          ctx.globalAlpha = 0.45 + Math.sin(performance.now()*0.008)*0.2;
+          var sg = ctx.createRadialGradient(p.x+p.w/2,p.y+p.h/2,8,p.x+p.w/2,p.y+p.h/2,28);
+          sg.addColorStop(0,'rgba(80,180,255,0.6)'); sg.addColorStop(1,'rgba(80,180,255,0)');
+          ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(p.x+p.w/2,p.y+p.h/2,28,0,TAU); ctx.fill();
+          ctx.globalAlpha=1; ctx.restore();
+        }
         if(p.id===0){ drawFox(p); } else { drawChicken(p); }
         // name label above character
         var label = p.id===0 ? 'Leti' : 'Jack';
