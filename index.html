@@ -633,7 +633,7 @@
     try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ /* ignore */ }
   }
 
-  var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false } });
+  var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false } });
 
   /* =========================================================
      Ambient starfield (behind everything)
@@ -688,7 +688,10 @@
 
   var LOCATIONS = [
     { id:'glasgow', name:'Glasgow', lat:55.86, lon:-4.25, unlocked:true },
-    { id:'modena', name:'Modena', lat:44.65, lon:10.93, unlocked:true }
+    { id:'modena', name:'Modena', lat:44.65, lon:10.93, unlocked:true },
+    { id:'kenya', name:'Kenya', lat:-1.28, lon:36.82, unlocked:false },
+    { id:'paris', name:'Paris', lat:48.85, lon:2.35, unlocked:false },
+    { id:'ireland', name:'Ireland', lat:53.33, lon:-6.25, unlocked:false }
   ];
 
   // Real, simplified world coastlines (Natural Earth 110m land polygons,
@@ -908,6 +911,25 @@
   });
 
   function refreshClearedPin(){
+    // Unlock Kenya, Paris, Ireland once both Glasgow and Modena are cleared
+    var bothCleared = progress.glasgow && progress.glasgow.cleared && progress.modena && progress.modena.cleared;
+    ['kenya','paris','ireland'].forEach(function(id){
+      var loc = LOCATIONS.filter(function(l){ return l.id===id; })[0];
+      if(loc && bothCleared && !loc.unlocked){
+        loc.unlocked = true;
+        var btn = pinEls[id];
+        if(btn){
+          btn.classList.remove('locked');
+          btn.setAttribute('aria-label', loc.name);
+          btn.querySelector('.label').textContent = loc.name;
+          btn.disabled = false;
+          btn.addEventListener('click', function(){
+            if(netRole==='guest' && netConnected) return;
+            enterLocation(loc);
+          });
+        }
+      }
+    });
     LOCATIONS.forEach(function(loc){
       var pr = progress[loc.id];
       if(pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add('cleared');
@@ -1565,6 +1587,141 @@
       },
       enemyDraw:drawBariloRef,
       collectibleDraw:drawModenaCollectibleRef
+    },
+    kenya:{
+      name:'Kenya',
+      blurb:'Trap every hyena in a bubble, then bump it to pop it. Grab a coffee bean, Maasai bead and a baobab fruit for bonus points. Walk off either edge to wrap around the map.',
+      values:{ a:100, b:60, c:250, pop:150 },
+      theme:{
+        skyTop:'#c05a10', skyMid:'#e88a30', skyBottom:'#f5c98a',
+        sunColor:'rgba(255,200,60,0.95)',
+        groundBase:'#a05c28', groundEdge:'#c87c40', detailColor:['#8a7a50','#6a6038'],
+        platformTop:'#c8a060', platformBody:'#8a6030', platformDetail:'#3a2a10',
+        drawBackdrop:function(){
+          // acacia trees silhouette
+          ctx.fillStyle = 'rgba(40,25,10,0.55)';
+          [[80,300,40],[160,310,30],[530,295,50],[640,308,36]].forEach(function(t){
+            ctx.fillRect(t[0]-3,t[1]-t[2],6,t[2]);
+            ctx.beginPath(); ctx.ellipse(t[0],t[1]-t[2],t[2]*0.9,t[2]*0.35,0,0,TAU); ctx.fill();
+          });
+          // distant Kilimanjaro
+          ctx.fillStyle = 'rgba(90,70,50,0.35)';
+          ctx.beginPath(); ctx.moveTo(240,300); ctx.lineTo(360,180); ctx.lineTo(480,300); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.beginPath(); ctx.moveTo(340,195); ctx.lineTo(360,180); ctx.lineTo(380,195); ctx.fill();
+        },
+        drawCenterpiece:function(x,y){
+          ctx.save(); ctx.translate(x,y);
+          // giraffe
+          ctx.fillStyle = '#d4902a';
+          // body
+          ctx.beginPath(); ctx.ellipse(0,0,14,10,0,0,TAU); ctx.fill();
+          // neck
+          ctx.beginPath(); ctx.moveTo(-4,-10); ctx.lineTo(4,-10); ctx.lineTo(2,-55); ctx.lineTo(-2,-55); ctx.closePath(); ctx.fill();
+          // head
+          ctx.beginPath(); ctx.ellipse(0,-60,7,5,0,0,TAU); ctx.fill();
+          // ossicones
+          ctx.fillRect(-4,-68,3,10); ctx.fillRect(2,-68,3,10);
+          // patches
+          ctx.fillStyle = '#8a5010';
+          [[0,0,5,4],[-8,-4,4,3],[7,-3,4,3],[0,-30,3,4],[-2,-45,3,3]].forEach(function(p){
+            ctx.beginPath(); ctx.ellipse(p[0],p[1],p[2],p[3],0,0,TAU); ctx.fill();
+          });
+          // legs
+          ctx.fillStyle = '#d4902a';
+          [-8,8].forEach(function(lx){ ctx.fillRect(lx-2,8,4,20); });
+          // eye
+          ctx.fillStyle = '#1c1330';
+          ctx.beginPath(); ctx.arc(4,-61,1.4,0,TAU); ctx.fill();
+          ctx.restore();
+        }
+      },
+      enemyDraw:drawHyenaRef,
+      collectibleDraw:drawKenyaCollectibleRef
+    },
+    paris:{
+      name:'Paris',
+      blurb:'Trap every mime in a bubble, then bump it to pop it. Grab a baguette, croissant and a beret for bonus points. Walk off either edge to wrap around the map.',
+      values:{ a:100, b:60, c:250, pop:150 },
+      theme:{
+        skyTop:'#7ab2e8', skyMid:'#b8d4f0', skyBottom:'#f0e8d8',
+        sunColor:'rgba(255,220,150,0.9)',
+        groundBase:'#8a8070', groundEdge:'#b0a090', detailColor:['#c0b090','#a09070'],
+        platformTop:'#b0a080', platformBody:'#807060', platformDetail:'#404030',
+        drawBackdrop:function(){
+          // Parisian rooftops
+          drawSkylineRow([
+            {x:0,w:72,h:68},{x:68,w:56,h:96},{x:120,w:48,h:52},{x:164,w:60,h:80},
+            {x:500,w:52,h:64},{x:548,w:64,h:92},{x:608,w:50,h:56},{x:654,w:66,h:76}
+          ],'rgba(80,70,60,0.5)',300);
+          // mansard roofs
+          ctx.fillStyle = 'rgba(60,55,50,0.5)';
+          [[34,232,36,24],[94,204,28,26],[540,236,26,24],[580,208,32,28]].forEach(function(r){
+            ctx.beginPath(); ctx.moveTo(r[0],r[1]); ctx.lineTo(r[0]+r[2]/2,r[1]-r[3]); ctx.lineTo(r[0]+r[2],r[1]); ctx.fill();
+          });
+        },
+        drawCenterpiece:function(x,y){
+          ctx.save(); ctx.translate(x,y);
+          // Eiffel Tower
+          ctx.fillStyle = '#8a7a5a';
+          // base legs
+          ctx.beginPath(); ctx.moveTo(-46,0); ctx.lineTo(-28,-50); ctx.lineTo(-10,-50); ctx.lineTo(-6,0); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(46,0); ctx.lineTo(28,-50); ctx.lineTo(10,-50); ctx.lineTo(6,0); ctx.fill();
+          // middle section
+          ctx.fillRect(-18,-50,36,30);
+          // upper section
+          ctx.beginPath(); ctx.moveTo(-16,-50); ctx.lineTo(-6,-95); ctx.lineTo(6,-95); ctx.lineTo(16,-50); ctx.fill();
+          // spire
+          ctx.beginPath(); ctx.moveTo(-4,-95); ctx.lineTo(0,-118); ctx.lineTo(4,-95); ctx.fill();
+          // horizontal girders
+          ctx.strokeStyle = '#6a5a3a'; ctx.lineWidth=2;
+          [-10,-30,-50,-70,-90].forEach(function(ty){ ctx.beginPath(); ctx.moveTo(-20+ty*0.2,ty); ctx.lineTo(20-ty*0.2,ty); ctx.stroke(); });
+          ctx.restore();
+        }
+      },
+      enemyDraw:drawMimeRef,
+      collectibleDraw:drawParisCollectibleRef
+    },
+    ireland:{
+      name:'Ireland',
+      blurb:'Trap every banshee in a bubble, then bump it to pop it. Grab a shamrock, golden harp and a pot of gold for bonus points. Walk off either edge to wrap around the map.',
+      values:{ a:100, b:60, c:250, pop:150 },
+      theme:{
+        skyTop:'#4a7a9a', skyMid:'#7ab0c0', skyBottom:'#c8e0cc',
+        sunColor:'rgba(220,230,200,0.7)',
+        groundBase:'#3a7a3a', groundEdge:'#5aa05a', detailColor:['#2a6a2a','#4a8a4a'],
+        platformTop:'#6aaa5a', platformBody:'#4a7a3a', platformDetail:'#2a4a2a',
+        drawBackdrop:function(){
+          // rolling green hills
+          ctx.fillStyle = 'rgba(40,100,40,0.45)';
+          ctx.beginPath(); ctx.moveTo(0,300); ctx.quadraticCurveTo(120,230,240,300); ctx.lineTo(0,300); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(200,300); ctx.quadraticCurveTo(360,210,520,300); ctx.lineTo(200,300); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(480,300); ctx.quadraticCurveTo(600,240,720,300); ctx.lineTo(480,300); ctx.fill();
+          // ruined castle
+          ctx.fillStyle = 'rgba(90,80,70,0.5)';
+          ctx.fillRect(580,230,50,70); ctx.fillRect(610,200,20,30);
+          ctx.fillStyle = 'rgba(60,55,50,0.5)';
+          ctx.fillRect(580,230,8,20); ctx.fillRect(622,230,8,20);
+        },
+        drawCenterpiece:function(x,y){
+          ctx.save(); ctx.translate(x,y);
+          // Round Tower
+          ctx.fillStyle = '#8a8070';
+          ctx.beginPath(); ctx.moveTo(-12,0); ctx.lineTo(-10,-80); ctx.lineTo(10,-80); ctx.lineTo(12,0); ctx.fill();
+          // conical roof
+          ctx.fillStyle = '#6a6050';
+          ctx.beginPath(); ctx.moveTo(-14,-80); ctx.lineTo(0,-108); ctx.lineTo(14,-80); ctx.fill();
+          // door arch
+          ctx.fillStyle = '#4a4038';
+          ctx.beginPath(); ctx.arc(0,-12,5,Math.PI,0); ctx.fillRect(-5,-12,10,12); ctx.fill();
+          // stone lines
+          ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth=1;
+          [-20,-40,-60].forEach(function(ty){ ctx.beginPath(); ctx.moveTo(-12+ty*0.08,ty); ctx.lineTo(12-ty*0.08,ty); ctx.stroke(); });
+          ctx.restore();
+        }
+      },
+      enemyDraw:drawBansheeRef,
+      collectibleDraw:drawIrelandCollectibleRef
     }
   };
 
@@ -1583,8 +1740,8 @@
     if(numPlayers===2) players.push(makePlayer(1, 420, PALETTES[1]));
 
     enemies = ENEMY_SPAWNS.map(function(s){
-      return { x:s.x, y:s.y, w:28, h:26, vx:60, dir: Math.random()<0.5?1:-1, platform:s.platform,
-        state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0 };
+      return { x:s.x, y:s.y, w:28, h:26, vx:60, vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
+        state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false };
     });
     enemiesLeft = enemies.length;
     bubbles = [];
@@ -1817,24 +1974,37 @@
       if(chasing && players.length > 0){
         // find nearest player
         var nearest = players[0];
-        var bestDist = Math.abs(players[0].x - en.x);
+        var bestDist = Math.abs(players[0].x - en.x) + Math.abs(players[0].y - en.y);
         for(var cp=1; cp<players.length; cp++){
-          var d = Math.abs(players[cp].x - en.x);
+          var d = Math.abs(players[cp].x - en.x) + Math.abs(players[cp].y - en.y);
           if(d < bestDist){ bestDist = d; nearest = players[cp]; }
         }
-        // steer dir toward nearest player
+        // move horizontally toward player
         en.dir = nearest.x > en.x ? 1 : -1;
-        // roam across full canvas width when chasing
-        var speed = en.vx * (en.angry>0 ? 1.6 : 1) * 1.4;
+        var speed = en.vx * (en.angry>0 ? 1.8 : 1.3);
         en.x += speed * en.dir * dt;
+        // wrap horizontally
         if(en.x < -en.w) en.x = W;
         if(en.x > W) en.x = -en.w;
+        // apply gravity
+        en.vy += GRAVITY * dt;
+        en.y += en.vy * dt;
+        // platform collision (so they land and can jump from platforms)
+        resolvePlatformCollision(en);
+        // jump to reach player if on ground and player is significantly higher
+        if(en.onGround && nearest.y < en.y - 40){
+          en.vy = -520;
+          en.onGround = false;
+        }
+        // clamp so they don't fall off bottom
+        if(en.y > H - en.h){ en.y = H - en.h; en.vy = 0; en.onGround = true; }
       } else {
         en.x += en.vx*en.dir*dt*(en.angry>0?1.6:1);
         if(en.x < plat.x+4){ en.x = plat.x+4; en.dir = 1; }
         if(en.x+en.w > plat.x+plat.w-4){ en.x = plat.x+plat.w-4-en.w; en.dir = -1; }
+        en.y = plat.y - en.h;
+        en.vy = 0;
       }
-      en.y = plat.y - en.h;
 
       players.forEach(function(p){
         if(p.invuln<=0 && rectsOverlap(p, en)){
@@ -2116,6 +2286,177 @@
       ctx.fillStyle = '#1c1330';
       ctx.beginPath(); ctx.arc(-7,6,3.4,0,TAU); ctx.fill();
       ctx.beginPath(); ctx.arc(7,6,3.4,0,TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* ---------- drawing: Kenya creature/collectibles ---------- */
+  function drawHyenaRef(en){
+    ctx.save();
+    var wob = Math.sin(performance.now()*0.007 + en.x*0.05)*2;
+    ctx.translate(en.x+en.w/2, en.y+en.h/2+wob);
+    var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
+    ctx.fillStyle = en.state==='trapped' ? '#e8d8a0' : (flash ? '#ff8a8a' : '#b08840');
+    ctx.beginPath(); ctx.ellipse(0,4,13,10,0,0,TAU); ctx.fill();
+    // spots
+    ctx.fillStyle = 'rgba(60,40,10,0.4)';
+    [[-5,2,3,2],[5,0,2.5,2],[0,6,2,1.5]].forEach(function(s){ ctx.beginPath(); ctx.ellipse(s[0],s[1],s[2],s[3],0,0,TAU); ctx.fill(); });
+    // head
+    ctx.fillStyle = en.state==='trapped' ? '#e8d8a0' : (flash ? '#ff8a8a' : '#b08840');
+    ctx.beginPath(); ctx.ellipse(10,0,8,7,0.2,0,TAU); ctx.fill();
+    // ears
+    ctx.fillStyle = '#7a5820';
+    ctx.beginPath(); ctx.moveTo(8,-7); ctx.lineTo(5,-14); ctx.lineTo(13,-9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(14,-5); ctx.lineTo(12,-12); ctx.lineTo(18,-7); ctx.fill();
+    // snout
+    ctx.fillStyle = '#8a6030';
+    ctx.beginPath(); ctx.ellipse(16,2,4,3,0,0,TAU); ctx.fill();
+    // eyes
+    ctx.fillStyle = '#1c1330';
+    ctx.beginPath(); ctx.arc(11,-2,1.6,0,TAU); ctx.fill();
+    ctx.restore();
+  }
+  function drawKenyaCollectibleRef(c){
+    if(c.taken) return;
+    var y = c.y + Math.sin(c.bob)*4;
+    ctx.save(); ctx.translate(c.x,y);
+    if(c.slot==='a'){ // coffee bean
+      ctx.fillStyle = '#4a2810';
+      ctx.beginPath(); ctx.ellipse(0,0,9,7,0,0,TAU); ctx.fill();
+      ctx.strokeStyle = '#2a1408'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(0,-6); ctx.quadraticCurveTo(4,0,0,6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,-6); ctx.quadraticCurveTo(-4,0,0,6); ctx.stroke();
+    } else if(c.slot==='b'){ // Maasai bead necklace
+      ctx.strokeStyle = '#1c1330'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(0,0,9,0,TAU); ctx.stroke();
+      ['#e83030','#f0d020','#2060e0','#30a030'].forEach(function(col,i){
+        ctx.fillStyle = col;
+        var a = i*Math.PI/2;
+        ctx.beginPath(); ctx.arc(Math.cos(a)*9, Math.sin(a)*9, 2.5, 0, TAU); ctx.fill();
+      });
+    } else { // baobab fruit
+      ctx.fillStyle = '#c89040';
+      ctx.beginPath(); ctx.ellipse(0,2,7,9,0,0,TAU); ctx.fill();
+      ctx.fillStyle = '#6a4820';
+      ctx.fillRect(-1,-8,2,5);
+      ctx.fillStyle = '#4a8020';
+      [-0.5,0,0.5].forEach(function(a){ ctx.save(); ctx.rotate(a); ctx.beginPath(); ctx.ellipse(0,-12,3,5,0,0,TAU); ctx.fill(); ctx.restore(); });
+    }
+    ctx.restore();
+  }
+
+  /* ---------- drawing: Paris creature/collectibles ---------- */
+  function drawMimeRef(en){
+    ctx.save();
+    var wob = Math.sin(performance.now()*0.006 + en.x*0.05)*2;
+    ctx.translate(en.x+en.w/2, en.y+en.h/2+wob);
+    var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
+    // body (striped)
+    ctx.fillStyle = en.state==='trapped' ? '#ddeeff' : (flash ? '#ff8a8a' : '#fff');
+    ctx.beginPath(); ctx.ellipse(0,4,10,12,0,0,TAU); ctx.fill();
+    ctx.fillStyle = flash ? '#ff8a8a' : '#222';
+    [-4,0,4].forEach(function(ty){ ctx.fillRect(-10,ty,20,3); });
+    // white face
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(0,-10,7,0,TAU); ctx.fill();
+    // beret
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.ellipse(-1,-17,7,3,0,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(4,-17,4,Math.PI,0); ctx.fill();
+    // eyes + smile
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(-3,-11,1.4,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(3,-11,1.4,0,TAU); ctx.fill();
+    ctx.strokeStyle = '#e83030'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.arc(0,-8,2.5,0,Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function drawParisCollectibleRef(c){
+    if(c.taken) return;
+    var y = c.y + Math.sin(c.bob)*4;
+    ctx.save(); ctx.translate(c.x,y);
+    if(c.slot==='a'){ // baguette
+      ctx.fillStyle = '#d4a050';
+      ctx.save(); ctx.rotate(-0.3);
+      ctx.beginPath(); ctx.roundRect(-14,-4,28,8,4); ctx.fill();
+      ctx.fillStyle = '#a87030';
+      ctx.beginPath(); ctx.moveTo(-10,-4); ctx.lineTo(-6,-4); ctx.lineTo(-8,4); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0,-4); ctx.lineTo(4,-4); ctx.lineTo(2,4); ctx.fill();
+      ctx.restore();
+    } else if(c.slot==='b'){ // croissant
+      ctx.fillStyle = '#c88840';
+      ctx.save(); ctx.rotate(0.2);
+      ctx.beginPath(); ctx.moveTo(-10,4); ctx.quadraticCurveTo(-8,-8,0,-6); ctx.quadraticCurveTo(8,-8,10,4); ctx.quadraticCurveTo(0,8,-10,4); ctx.fill();
+      ctx.fillStyle = '#a06820';
+      ctx.beginPath(); ctx.arc(0,0,4,0,TAU); ctx.fill();
+      ctx.restore();
+    } else { // beret
+      ctx.fillStyle = '#8a1010';
+      ctx.beginPath(); ctx.ellipse(0,2,12,8,0,0,TAU); ctx.fill();
+      ctx.fillStyle = '#6a0808';
+      ctx.beginPath(); ctx.ellipse(0,-2,7,4,0,0,TAU); ctx.fill();
+      ctx.fillStyle = '#cccccc';
+      ctx.beginPath(); ctx.arc(0,-5,3,0,TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* ---------- drawing: Ireland creature/collectibles ---------- */
+  function drawBansheeRef(en){
+    ctx.save();
+    var wob = Math.sin(performance.now()*0.009 + en.x*0.05)*3;
+    ctx.translate(en.x+en.w/2, en.y+en.h/2+wob);
+    var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
+    ctx.globalAlpha = 0.85;
+    // flowing ghostly form
+    ctx.fillStyle = en.state==='trapped' ? '#cceecc' : (flash ? '#ff8a8a' : '#7acc7a');
+    ctx.beginPath(); ctx.ellipse(0,-2,11,13,0,0,TAU); ctx.fill();
+    // wispy bottom
+    ctx.fillStyle = en.state==='trapped' ? '#aaddaa' : (flash ? '#ff6666' : '#5aaa5a');
+    [-6,0,6].forEach(function(wx){
+      ctx.beginPath(); ctx.ellipse(wx,12,3,5,wx*0.05,0,TAU); ctx.fill();
+    });
+    // hair
+    ctx.strokeStyle = en.state==='trapped' ? '#88ccaa' : '#3a883a';
+    ctx.lineWidth=2; ctx.lineCap='round';
+    [-4,0,4].forEach(function(hx){
+      ctx.beginPath(); ctx.moveTo(hx,-13); ctx.quadraticCurveTo(hx+4,-20,hx+2,-26); ctx.stroke();
+    });
+    // eyes (hollow)
+    ctx.fillStyle = '#1c1330';
+    ctx.beginPath(); ctx.arc(-4,-4,2.5,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(4,-4,2.5,0,TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  function drawIrelandCollectibleRef(c){
+    if(c.taken) return;
+    var y = c.y + Math.sin(c.bob)*4;
+    ctx.save(); ctx.translate(c.x,y);
+    if(c.slot==='a'){ // shamrock
+      ctx.fillStyle = '#20a030';
+      [0,1,2].forEach(function(i){
+        ctx.save(); ctx.rotate(i*Math.PI*2/3);
+        ctx.beginPath(); ctx.ellipse(0,-6,4,5,0,0,TAU); ctx.fill();
+        ctx.restore();
+      });
+      ctx.strokeStyle = '#20a030'; ctx.lineWidth=2; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,9); ctx.stroke();
+    } else if(c.slot==='b'){ // golden harp
+      ctx.strokeStyle = '#e8b820'; ctx.lineWidth=2; ctx.lineCap='round';
+      ctx.beginPath(); ctx.arc(-2,0,9,Math.PI*1.1,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-10,-6); ctx.lineTo(-10,9); ctx.stroke();
+      [0,1,2,3].forEach(function(i){
+        ctx.beginPath();
+        ctx.moveTo(-10,-4+i*3); ctx.lineTo(5+Math.sin(i*0.6)*2,-7+i*5);
+        ctx.stroke();
+      });
+    } else { // pot of gold
+      ctx.fillStyle = '#2a2a2a';
+      ctx.beginPath(); ctx.ellipse(0,4,9,7,0,0,TAU); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(-8,-2,16,6,2); ctx.fill();
+      ctx.fillStyle = '#f0c020';
+      [-4,0,4].forEach(function(cx){ ctx.beginPath(); ctx.arc(cx,-1,2.5,0,TAU); ctx.fill(); });
     }
     ctx.restore();
   }
