@@ -515,6 +515,10 @@
           <div>
             <button class="btn btn-ghost" id="btnPause" style="padding:4px 10px;font-size:12px;">⏸ Pause</button>
           </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="btn btn-ghost" id="btnMute" style="padding:4px 8px;font-size:14px;" title="Mute">🔊</button>
+            <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.5" style="width:60px;accent-color:var(--coral);" title="Volume">
+          </div>
         </div>
       </div>
 
@@ -530,6 +534,10 @@
               <button class="mode-btn active" type="button" data-players="1">1 Player</button>
               <button class="mode-btn" type="button" data-players="2">Same device</button>
               <button class="mode-btn" type="button" data-players="net">Two phones</button>
+            </div>
+
+            <div style="margin-top:8px;">
+              <button class="mode-btn" id="btnSurvival" type="button">☠ Survival</button>
             </div>
 
             <div class="controls-cols" id="localControls">
@@ -717,6 +725,7 @@
     unlockedAchievements.push(id);
     safeSet('gh_achievements_v1', unlockedAchievements);
     achievementQueue.push(a);
+    runAchievements.push(a);
     renderAchievements();
   }
 
@@ -1262,6 +1271,15 @@
     }
   }
   document.getElementById('btnPause').addEventListener('click', togglePause);
+  document.getElementById('volSlider').addEventListener('input', function(){
+    if(masterGain) masterGain.gain.value = parseFloat(this.value);
+  });
+  var muted = false;
+  document.getElementById('btnMute').addEventListener('click', function(){
+    muted = !muted;
+    if(masterGain) masterGain.gain.value = muted ? 0 : parseFloat(document.getElementById('volSlider').value);
+    this.textContent = muted ? '🔇' : '🔊';
+  });
 
   /* =========================================================
      ONLINE MULTIPLAYER (two separate phones)
@@ -1988,14 +2006,27 @@
   var CHASE_DELAY = 12;
   var POWERUP_TYPES = ['speed','rapid','shield'];
   var chaseAlertPlayed = false;
+  var survivalMode = false, survivalWave = 0, survivalEnemyTimer = 0;
+  var countdownT = 0;
+  var runAchievements = [];
+  var confettiParticles = [];
 
   /* ---------- audio ---------- */
   var audioCtx = null;
   function ac(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+  var masterGain = null;
+  function getMasterGain(){
+    if(!masterGain){
+      masterGain = ac().createGain();
+      masterGain.gain.value = parseFloat(document.getElementById('volSlider').value);
+      masterGain.connect(ac().destination);
+    }
+    return masterGain;
+  }
   function playSound(type){
     try{
       var c = ac(), now = c.currentTime;
-      var g = c.createGain(); g.connect(c.destination);
+      var g = c.createGain(); g.connect(getMasterGain());
       var o = c.createOscillator(); o.connect(g);
       if(type==='jump'){
         o.type='sine'; o.frequency.setValueAtTime(280,now); o.frequency.linearRampToValueAtTime(520,now+0.12);
@@ -2018,7 +2049,7 @@
         var d = buf.getChannelData(0); for(var ni=0;ni<d.length;ni++) d[ni]=Math.random()*2-1;
         var ns = c.createBufferSource(); ns.buffer=buf;
         var ng = c.createGain(); ng.gain.setValueAtTime(0.18,now); ng.gain.linearRampToValueAtTime(0,now+0.08);
-        ns.connect(ng); ng.connect(c.destination); ns.start(now); ns.stop(now+0.08);
+        ns.connect(ng); ng.connect(getMasterGain()); ns.start(now); ns.stop(now+0.08);
       } else if(type==='collect'){
         o.type='sine'; o.frequency.setValueAtTime(660,now); o.frequency.linearRampToValueAtTime(880,now+0.12);
         g.gain.setValueAtTime(0.2,now); g.gain.linearRampToValueAtTime(0,now+0.15);
@@ -2030,7 +2061,7 @@
       } else if(type==='powerup'){
         [0,0.08,0.16].forEach(function(t,i){
           var po=c.createOscillator(), pg=c.createGain();
-          po.connect(pg); pg.connect(c.destination);
+          po.connect(pg); pg.connect(getMasterGain());
           po.type='sine'; po.frequency.value=[523,659,784][i];
           pg.gain.setValueAtTime(0.22,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.1);
           po.start(now+t); po.stop(now+t+0.1);
@@ -2039,7 +2070,7 @@
       } else if(type==='win'){
         [[523,0],[659,0.1],[784,0.2],[1047,0.32]].forEach(function(f){
           var po=c.createOscillator(), pg=c.createGain();
-          po.connect(pg); pg.connect(c.destination);
+          po.connect(pg); pg.connect(getMasterGain());
           po.type='sine'; po.frequency.value=f[0];
           pg.gain.setValueAtTime(0.25,now+f[1]); pg.gain.linearRampToValueAtTime(0,now+f[1]+0.18);
           po.start(now+f[1]); po.stop(now+f[1]+0.2);
@@ -2048,7 +2079,7 @@
       } else if(type==='chase'){
         [0,0.15,0.3].forEach(function(t){
           var po=c.createOscillator(), pg=c.createGain();
-          po.connect(pg); pg.connect(c.destination);
+          po.connect(pg); pg.connect(getMasterGain());
           po.type='sawtooth'; po.frequency.value=t%0.3===0?880:440;
           pg.gain.setValueAtTime(0.18,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.12);
           po.start(now+t); po.stop(now+t+0.14);
@@ -2092,7 +2123,7 @@
     if(!freq) return;
     try{
       var c=ac(), o=c.createOscillator(), g=c.createGain();
-      o.connect(g); g.connect(c.destination);
+      o.connect(g); g.connect(getMasterGain());
       o.type=type||'square'; o.frequency.value=freq;
       g.gain.setValueAtTime(vol,time); g.gain.linearRampToValueAtTime(0,time+dur*0.75);
       o.start(time); o.stop(time+dur);
@@ -2183,6 +2214,24 @@
     resetGame._diffMult = diffMult;
     resetGame._playCount = playCount;
 
+    /* Survival mode overrides */
+    if(survivalMode){
+      waveNumber = 99;
+      survivalWave = 0;
+      enemiesLeft = 999;
+      enemies = [];
+      for(var si=0; si<3; si++){
+        var ss = ENEMY_SPAWNS[si % ENEMY_SPAWNS.length];
+        enemies.push({ x:ss.x, y:ss.y, w:28, h:26, vx:70, vy:0,
+          dir:Math.random()<0.5?1:-1, platform:ss.platform,
+          state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false, hits:1 });
+      }
+    }
+
+    countdownT = 3;
+    runAchievements = [];
+    confettiParticles = [];
+
     score = 0;
     lives = 3;
     gameState = 'ready';
@@ -2210,6 +2259,7 @@
   });
   document.getElementById('btnRetry').addEventListener('click', function(){
     if(netRole==='guest') return;
+    survivalMode = false;
     resetGame();
     gameState = 'playing';
     startMusic();
@@ -2217,10 +2267,19 @@
   });
   document.getElementById('btnWinAgain').addEventListener('click', function(){
     if(netRole==='guest') return;
+    survivalMode = false;
     resetGame();
     gameState = 'playing';
     startMusic();
     netBroadcastScene('winAgain');
+  });
+  document.getElementById('btnSurvival').addEventListener('click', function(){
+    survivalMode = true;
+    resetGame();
+    document.getElementById('howto').hidden = true;
+    gameState = 'playing';
+    startTime = performance.now();
+    startMusic();
   });
 
   // Name entry for best score
@@ -2351,6 +2410,31 @@
 
   function update(dt){
     if(gameState !== 'playing') return;
+    if(countdownT > 0){ countdownT -= dt; return; }
+    /* Survival spawner */
+    if(survivalMode && gameState==='playing'){
+      var freeEnemies = enemies.filter(function(e){ return e.state==='free' || e.state==='trapped'; });
+      if(freeEnemies.length === 0){
+        survivalWave++;
+        var count = Math.min(3 + survivalWave, 8);
+        var sp = Math.min(70 + survivalWave*15, 220);
+        for(var si=0; si<count; si++){
+          var s = ENEMY_SPAWNS[si % ENEMY_SPAWNS.length];
+          enemies.push({ x:s.x, y:s.y, w:28, h:26, vx:sp, vy:0,
+            dir:Math.random()<0.5?1:-1, platform:s.platform,
+            state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false, hits:1 });
+        }
+        spawnPopup(W/2, 60, 'WAVE '+survivalWave+'!', '#ff5470');
+      }
+    }
+    /* Confetti update */
+    if(gameState==='won'){
+      for(var ci=confettiParticles.length-1;ci>=0;ci--){
+        var cp=confettiParticles[ci];
+        cp.t+=dt; cp.x+=cp.vx*dt; cp.y+=cp.vy*dt; cp.vy+=200*dt; cp.rot+=cp.rotV*dt;
+        if(cp.t>cp.life || cp.y>H+20) confettiParticles.splice(ci,1);
+      }
+    }
     if(comboTimer>0) comboTimer -= dt; else comboCount = 0;
     if(waveFlash>0) waveFlash -= dt;
 
@@ -2633,7 +2717,7 @@
         startTime = performance.now(); // reset chase timer for new wave
         var speedMult = 1 + waveNumber*0.3;
         enemies = ENEMY_SPAWNS.map(function(s){
-          return { x:s.x, y:s.y, w:28, h:26, vx:85*speedMult, vy:0,
+          return { x:s.x, y:s.y, w:32, h:30, vx:85*speedMult, vy:0,
             dir: Math.random()<0.5?1:-1, platform:s.platform,
             state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false };
         });
@@ -2659,12 +2743,17 @@
     if(lives<=0){
       gameState = 'lost';
       stopMusic();
-      document.getElementById('loseSummary').textContent = 'Score ' + score + ' · try trapping enemies before they reach you.';
+      if(survivalMode){
+        document.getElementById('loseSummary').textContent = 'Reached wave ' + survivalWave + ' · Score: ' + score;
+      } else {
+        document.getElementById('loseSummary').textContent = 'Score ' + score + ' · try trapping enemies before they reach you.';
+      }
       document.getElementById('overlayLose').hidden = false;
     }
   }
 
   function winLevel(){
+    if(survivalMode) return;
     if(gameState !== 'playing') return;
     gameState = 'won';
     stopMusic();
@@ -2718,6 +2807,18 @@
       setTimeout(function(){ nameInput.focus(); }, 100);
     } else {
       nameEntryRow.hidden = true;
+    }
+    if(runAchievements.length > 0){
+      var acEl = document.getElementById('winSummary');
+      acEl.textContent += ' · Unlocked: ' + runAchievements.map(function(a){ return a.icon+' '+a.label; }).join(', ');
+    }
+    for(var ci=0; ci<60; ci++){
+      confettiParticles.push({
+        x: rand(0,W), y: rand(-20,0),
+        vx: rand(-60,60), vy: rand(80,200),
+        color: ['#ff5470','#ffd700','#7fe3ff','#b0f0ff','#ff9c7a'][Math.floor(Math.random()*5)],
+        r: rand(4,9), rot: rand(0,TAU), rotV: rand(-3,3), life:3, t:0
+      });
     }
     document.getElementById('overlayWin').hidden = false;
     updateHud();
@@ -3253,7 +3354,19 @@
         level.collectibleDraw(c);
       }
     });
-    enemies.forEach(function(en){ if(en.state==='free') level.enemyDraw(en); });
+    enemies.forEach(function(en){
+      if(en.state==='free'){
+        level.enemyDraw(en);
+        if(waveNumber >= 2){
+          ctx.save();
+          ctx.globalAlpha = 0.35;
+          ctx.fillStyle = '#ff2040';
+          ctx.beginPath(); ctx.arc(en.x+en.w/2, en.y+en.h/2, en.w*0.7, 0, TAU); ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.restore();
+        }
+      }
+    });
     powerups.forEach(drawPowerup);
     players.forEach(function(p){
       var visible = p.invuln<=0 || Math.floor(performance.now()/80)%2===0;
@@ -3409,6 +3522,44 @@
       ctx.font = '18px "Nunito",sans-serif';
       ctx.fillText('Here they come — faster!', W/2, H/2+24);
       ctx.globalAlpha = 1;
+    }
+
+    // countdown overlay
+    if(gameState==='playing' && countdownT > 0){
+      var cn = Math.ceil(countdownT);
+      var scale = 1 + (countdownT - Math.floor(countdownT)) * 0.5;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, countdownT - Math.floor(countdownT) + 0.3);
+      ctx.fillStyle = cn > 1 ? '#ff5470' : '#ffd700';
+      ctx.font = 'bold ' + Math.round(80*scale) + 'px "Fredoka",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(cn <= 0 ? 'GO!' : String(cn), W/2, H/2+20);
+      ctx.restore();
+    }
+    if(gameState==='playing' && countdownT > -0.5 && countdownT <= 0){
+      ctx.save(); ctx.globalAlpha = Math.max(0, 1+countdownT*2);
+      ctx.fillStyle='#ffd700'; ctx.font='bold 90px "Fredoka",sans-serif'; ctx.textAlign='center';
+      ctx.fillText('GO!', W/2, H/2+20); ctx.restore();
+    }
+
+    // survival HUD
+    if(survivalMode && gameState==='playing'){
+      ctx.save();
+      ctx.fillStyle='rgba(255,84,112,0.85)';
+      ctx.font='bold 13px "Fredoka",sans-serif'; ctx.textAlign='center';
+      ctx.fillText('SURVIVAL · Wave '+survivalWave, W/2, 26);
+      ctx.restore();
+    }
+
+    // confetti (win screen)
+    if(gameState==='won'){
+      confettiParticles.forEach(function(c){
+        ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.rot);
+        ctx.globalAlpha = Math.max(0, 1-c.t/c.life);
+        ctx.fillStyle = c.color;
+        ctx.fillRect(-c.r/2,-c.r/4,c.r,c.r/2);
+        ctx.restore();
+      });
     }
 
     // paused overlay
