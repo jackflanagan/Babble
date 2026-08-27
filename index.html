@@ -480,8 +480,14 @@
       <!-- pins injected by JS -->
     </div>
     <p class="globe-caption">Hi Bab this is a game for you and me :)</p>
+    <div id="streakBadge" style="text-align:center;font-size:13px;color:var(--gold);font-weight:700;min-height:18px;"></div>
+    <div id="dailyChallenge" style="display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="btnDaily" style="font-size:13px;padding:8px 18px;">⭐ Daily Challenge</button>
+      <span id="dailyStatus" style="font-size:12px;color:var(--dim-text);"></span>
+    </div>
     <div class="roster" id="roster"></div>
     <div class="best-score" id="bestScoreLine" hidden></div>
+    <div id="achievementBadges" style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:520px;margin-top:4px;"></div>
   </section>
 
   <!-- GAME SCENE -->
@@ -649,6 +655,91 @@
   }
 
   var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
+
+  /* ---------- Feature 1: Streak Counter ---------- */
+  function updateStreak(){
+    var s = safeGet('gh_streak_v1', {count:0, lastDate:''});
+    var today = new Date().toDateString();
+    var yesterday = new Date(Date.now()-86400000).toDateString();
+    if(s.lastDate === today){ /* already counted today */ }
+    else if(s.lastDate === yesterday){ s.count++; s.lastDate = today; safeSet('gh_streak_v1', s); }
+    else if(s.lastDate !== today){ s.count = 1; s.lastDate = today; safeSet('gh_streak_v1', s); }
+    var el = document.getElementById('streakBadge');
+    if(el) el.textContent = s.count > 1 ? '🔥 ' + s.count + ' day streak!' : '';
+  }
+
+  /* ---------- Feature 2: Daily Challenge ---------- */
+  function getDailyLocationId(){
+    var today = new Date().toDateString();
+    var hash = 0;
+    for(var i=0;i<today.length;i++) hash = (hash*31 + today.charCodeAt(i)) & 0xfffffff;
+    var unlocked = LOCATIONS.filter(function(l){ return l.unlocked && l.id !== 'boss'; });
+    if(unlocked.length === 0) return 'glasgow';
+    return unlocked[hash % unlocked.length].id;
+  }
+
+  function refreshDailyUI(){
+    var d = safeGet('gh_daily_v1', {date:'',score:0,done:false});
+    var today = new Date().toDateString();
+    var statusEl = document.getElementById('dailyStatus');
+    if(d.date === today && d.done){
+      statusEl.textContent = 'Done today! Score: ' + d.score;
+      document.getElementById('btnDaily').textContent = '✓ Completed';
+      document.getElementById('btnDaily').disabled = false;
+    } else {
+      statusEl.textContent = 'Location: ' + (LOCATIONS.filter(function(l){ return l.id===getDailyLocationId(); })[0]||{name:'?'}).name;
+      document.getElementById('btnDaily').textContent = '⭐ Daily Challenge';
+      document.getElementById('btnDaily').disabled = false;
+    }
+  }
+
+  /* ---------- Feature 3: Achievements ---------- */
+  var ACHIEVEMENTS = [
+    {id:'first_pop',   label:'First Pop',     desc:'Pop your first enemy',          icon:'💥', unlocked:false},
+    {id:'combo3',      label:'Combo King',    desc:'Get a x3 combo',                icon:'🔥', unlocked:false},
+    {id:'speedrun',    label:'Speed Runner',  desc:'Clear a level in under 40s',    icon:'⚡', unlocked:false},
+    {id:'survivor',    label:'Survivor',      desc:'Survive 60s of chasing',        icon:'🛡', unlocked:false},
+    {id:'globetrotter',label:'Globetrotter', desc:'Clear all 5 locations',         icon:'🌍', unlocked:false},
+    {id:'treasure',    label:'Treasure Hunt', desc:'Collect all treasures in a run',icon:'💎', unlocked:false},
+    {id:'powerup_all', label:'Power Mad',     desc:'Use all 3 power-up types',      icon:'⚡', unlocked:false},
+    {id:'rat_friend',  label:'Rat Whisperer', desc:'Get the water rat companion',   icon:'🐀', unlocked:false}
+  ];
+  var unlockedAchievements = safeGet('gh_achievements_v1', []);
+  ACHIEVEMENTS.forEach(function(a){ if(unlockedAchievements.indexOf(a.id)>-1) a.unlocked=true; });
+
+  var achievementQueue = [];
+  var achievementToast = null, achievementToastT = 0;
+
+  function unlockAchievement(id){
+    var a = ACHIEVEMENTS.filter(function(x){ return x.id===id; })[0];
+    if(!a || a.unlocked) return;
+    a.unlocked = true;
+    unlockedAchievements.push(id);
+    safeSet('gh_achievements_v1', unlockedAchievements);
+    achievementQueue.push(a);
+    renderAchievements();
+  }
+
+  function renderAchievements(){
+    var el = document.getElementById('achievementBadges');
+    if(!el) return;
+    el.innerHTML = '';
+    ACHIEVEMENTS.forEach(function(a){
+      var b = document.createElement('span');
+      b.title = a.label + ': ' + a.desc;
+      b.style.cssText = 'font-size:20px;opacity:'+(a.unlocked?'1':'0.2')+';cursor:default;';
+      b.textContent = a.icon;
+      el.appendChild(b);
+    });
+  }
+
+  /* ---------- Feature 5: Random Mid-Level Events ---------- */
+  var EVENTS = [
+    {id:'bubble_storm', label:'BUBBLE STORM!', color:'#7fe3ff', duration:10},
+    {id:'speed_boost',  label:'TAILWIND!',      color:'#ffd700', duration:8},
+    {id:'fog',          label:'FOG ROLLS IN…', color:'#aabbcc', duration:10}
+  ];
+  var activeEvent = null, eventTimer = 0, nextEventIn = rand(20,35);
 
   var PALETTES_P1 = [
     { body:'#ff7a45', belly:'#fff3e6', ear:'#2a0d05', tailTip:'#fff' },   // 0: default orange
@@ -1132,7 +1223,9 @@
       selectMode('1');
     }
     var level = LEVELS[loc.id];
-    document.getElementById('hudLocation').textContent = loc.name;
+    var locPlayCount = (progress[loc.id] && progress[loc.id].playCount) || 0;
+    var tier = Math.min(locPlayCount+1, 10);
+    document.getElementById('hudLocation').textContent = loc.name + (locPlayCount > 0 ? ' T' + tier : '');
     document.getElementById('howtoTitle').textContent = 'Touch down in ' + loc.name;
     document.getElementById('howtoBlurb').textContent = level.blurb;
     resetGame();
@@ -1148,6 +1241,8 @@
     sceneGlobe.hidden = false;
     globeRunning = true;
     refreshClearedPin();
+    updateStreak();
+    refreshDailyUI();
     document.getElementById('netHudBadge').hidden = true;
     if(wasHost){ netBroadcastScene('map'); }
   }
@@ -1888,6 +1983,8 @@
   var players, enemies, bubbles, collectibles, particles, popups, powerups;
   var score = 0, lives = 3, gameState = 'ready', enemiesLeft = 0, startTime = 0;
   var shakeT = 0, waveNumber = 1, comboCount = 0, comboTimer = 0, waveFlash = 0;
+  var survivorUnlocked = false;
+  var usedPowerups = {};
   var CHASE_DELAY = 12;
   var POWERUP_TYPES = ['speed','rapid','shield'];
   var chaseAlertPlayed = false;
@@ -2043,6 +2140,11 @@
     players = [ makePlayer(0, numPlayers===2 ? 320 : 360, PALETTES_P1[selectedSkins.p1]) ];
     if(numPlayers===2) players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
 
+    /* Feature 4: Escalating Difficulty */
+    var playCount = (progress[currentLocationId] && progress[currentLocationId].playCount) || 0;
+    var diffMult = Math.min(1 + playCount * 0.12, 2.2);
+    var adjustedChaseDelay = Math.max(5, CHASE_DELAY / diffMult);
+
     if(currentLocationId === 'boss'){
       enemies = BOSS_SPAWN.map(function(s){
         return { x:s.x, y:s.y, w:s.w, h:s.h, vx:s.vx, vy:0, dir: Math.random()<0.5?1:-1, platform:0,
@@ -2051,7 +2153,7 @@
       waveNumber = 99;
     } else {
       enemies = ENEMY_SPAWNS.map(function(s){
-        return { x:s.x, y:s.y, w:28, h:26, vx:70, vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
+        return { x:s.x, y:s.y, w:28, h:26, vx:Math.round(70 * diffMult), vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
           state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false };
       });
       waveNumber = 1;
@@ -2063,7 +2165,24 @@
     powerups = [];
     chaseAlertPlayed = false;
     comboCount = 0; comboTimer = 0; waveFlash = 0;
-    collectibles = COLLECTIBLE_SPOTS.map(function(c){ return {x:c.x,y:c.y,slot:c.slot,taken:false,bob:Math.random()*TAU}; });
+    survivorUnlocked = false;
+    usedPowerups = {};
+
+    /* Feature 5: Reset events */
+    activeEvent = null; eventTimer = 0; nextEventIn = rand(20,35);
+
+    /* Feature 6: Ghost collectibles */
+    var missedPrev = safeGet('gh_missed_'+currentLocationId, []);
+    collectibles = COLLECTIBLE_SPOTS.map(function(c){
+      var wasMissed = missedPrev.some(function(m){ return m.x===c.x && m.y===c.y; });
+      return {x:c.x, y:c.y, slot:c.slot, taken:false, bob:Math.random()*TAU, ghost:wasMissed};
+    });
+
+    /* Store adjustedChaseDelay for use in update */
+    resetGame._adjustedChaseDelay = adjustedChaseDelay;
+    resetGame._diffMult = diffMult;
+    resetGame._playCount = playCount;
+
     score = 0;
     lives = 3;
     gameState = 'ready';
@@ -2074,6 +2193,9 @@
     var pr = progress[currentLocationId] || {best:0};
     document.getElementById('hudBest').textContent = pr.best;
   }
+  resetGame._adjustedChaseDelay = CHASE_DELAY;
+  resetGame._diffMult = 1;
+  resetGame._playCount = 0;
 
   function stopGame(){ gameState = 'stopped'; }
 
@@ -2238,6 +2360,7 @@
       if(p.rapidFire>0) p.rapidFire -= dt;
       if(p.shield>0) p.shield -= dt;
       var maxSpeed = p.speedBoost>0 ? 340 : 220;
+      if(activeEvent && activeEvent.id==='speed_boost') maxSpeed += 80;
       var left, right, jump, bubble;
       if(numPlayers===1){
         left = keys.p1Left || keys.p2Left;
@@ -2281,13 +2404,20 @@
       for(var pi=0; pi<players.length; pi++){
         if(rectsOverlap(players[pi], box)){
           c.taken = true;
-          var v = level.values[c.slot] || 50;
+          var v = (level.values[c.slot] || 50) * (c.ghost ? 2 : 1);
           score += v;
-          spawnPopup(c.x,c.y,'+'+v,'#ffd166');
-          spawnParticles(c.x,c.y,'#ffd166',10);
+          if(c.ghost){
+            spawnPopup(c.x,c.y,'+'+v+' GHOST BONUS!','#00e5ff');
+          } else {
+            spawnPopup(c.x,c.y,'+'+v,'#ffd166');
+          }
+          spawnParticles(c.x,c.y,c.ghost?'#00e5ff':'#ffd166',10);
           playSound('collect');
           // water rat companion (Modena slot c)
-          if(currentLocationId==='modena' && c.slot==='c') players[pi].hasRat = true;
+          if(currentLocationId==='modena' && c.slot==='c'){
+            players[pi].hasRat = true;
+            unlockAchievement('rat_friend');
+          }
           break;
         }
       }
@@ -2302,7 +2432,8 @@
         b.vy = lerp(b.vy, -70, dt*2.2);
         b.x += b.vx*dt; b.y += b.vy*dt;
         b.r = Math.min(16, 6 + b.age*30);
-        if(b.age > 2.4 || b.x<-20 || b.x>W+20 || b.y < -20){ bubbles.splice(bi,1); continue; }
+        if(b.age > 2.4 || b.x<-20 || b.x>W+20 || b.y < -20 || b.y > H+20){ bubbles.splice(bi,1); continue; }
+        if(b.decorative) continue;
         for(var ei=0; ei<enemies.length; ei++){
           var en = enemies[ei];
           if(en.state !== 'free') continue;
@@ -2364,6 +2495,8 @@
           spawnParticles(b.x,b.y,multiplier>2?'#ff5470':'#ff9c7a',14);
           score += pts;
           playSound('pop');
+          unlockAchievement('first_pop');
+          if(comboCount >= 3) unlockAchievement('combo3');
           // 35% chance to drop a power-up
           if(Math.random()<0.35){
             var ptype = POWERUP_TYPES[Math.floor(Math.random()*POWERUP_TYPES.length)];
@@ -2377,9 +2510,41 @@
       }
     }
 
+    /* Feature 5: Random mid-level events */
+    nextEventIn -= dt;
+    if(nextEventIn <= 0 && !activeEvent){
+      activeEvent = EVENTS[Math.floor(Math.random()*EVENTS.length)];
+      eventTimer = activeEvent.duration;
+      spawnPopup(W/2, 60, activeEvent.label, activeEvent.color);
+      nextEventIn = rand(25,45);
+    }
+    if(activeEvent){
+      eventTimer -= dt;
+      if(eventTimer <= 0) activeEvent = null;
+    }
+    /* bubble_storm event: 3% chance per frame to spawn a decorative bubble */
+    if(activeEvent && activeEvent.id==='bubble_storm' && Math.random()<0.03){
+      bubbles.push({x:rand(20,W-20), y:-20, vx:rand(-30,30), vy:rand(20,50), r:rand(8,16), grown:true, age:0, state:'flying', trapped:null, t:0, decorative:true});
+    }
+
+    /* Feature 3: Achievement toast drain in update */
+    if(achievementQueue.length > 0 && !achievementToast){
+      achievementToast = achievementQueue.shift();
+      achievementToastT = 3.5;
+    }
+    if(achievementToast){ achievementToastT -= dt; if(achievementToastT<=0) achievementToast=null; }
+
     // enemies
     var elapsed = (performance.now() - startTime) / 1000;
-    var chasing = elapsed >= CHASE_DELAY;
+    var currentChaseDelay = resetGame._adjustedChaseDelay || CHASE_DELAY;
+    var chasing = elapsed >= currentChaseDelay;
+
+    /* Feature 3: Survivor achievement */
+    if(chasing && elapsed - currentChaseDelay > 60 && !survivorUnlocked && lives > 0){
+      survivorUnlocked = true;
+      unlockAchievement('survivor');
+    }
+
     enemies.forEach(function(en){
       if(en.state !== 'free') return;
       if(en.angry>0) en.angry -= dt;
@@ -2433,7 +2598,7 @@
     if(shakeT>0) shakeT -= dt;
 
     // chase alert sound
-    if(!chaseAlertPlayed && elapsed >= CHASE_DELAY){ chaseAlertPlayed = true; playSound('chase'); }
+    if(!chaseAlertPlayed && elapsed >= currentChaseDelay){ chaseAlertPlayed = true; playSound('chase'); }
 
     // power-ups: bob, expire, pickup
     for(var pui=powerups.length-1; pui>=0; pui--){
@@ -2454,6 +2619,8 @@
           var puNames = {speed:'FAST!', rapid:'RAPID!', shield:'SHIELD!'};
           spawnPopup(pu.x, pu.y-10, puNames[pu.type], '#b0f0ff');
           spawnParticles(pu.x, pu.y, '#b0f0ff', 10);
+          usedPowerups[pu.type] = true;
+          if(usedPowerups.speed && usedPowerups.rapid && usedPowerups.shield) unlockAchievement('powerup_all');
           powerups.splice(pui,1);
         }
       }
@@ -2513,13 +2680,36 @@
     if(totalElapsed < 60) stars++;
     var pr = progress[currentLocationId] || {best:0,cleared:false};
     pr.cleared = true;
+    pr.playCount = (pr.playCount||0) + 1;
     var isNewBest = score > pr.best;
     if(isNewBest) pr.best = score;
     progress[currentLocationId] = pr;
     safeSet('gh_progress_v2', progress);
+
+    /* Feature 3: Achievements in winLevel */
+    if(totalElapsed < 40) unlockAchievement('speedrun');
+    if(collected >= collectibles.length) unlockAchievement('treasure');
+    var allFiveCleared = ['glasgow','modena','kenya','paris','ireland'].every(function(id){ return progress[id] && progress[id].cleared; });
+    if(allFiveCleared) unlockAchievement('globetrotter');
+
+    /* Feature 2: Daily challenge check */
+    var daily = safeGet('gh_daily_v1', {date:'',score:0,done:false});
+    var today2 = new Date().toDateString();
+    if(currentLocationId === getDailyLocationId() && (!daily.done || daily.date !== today2)){
+      daily.date = today2; daily.score = score; daily.done = true;
+      safeSet('gh_daily_v1', daily);
+      refreshDailyUI();
+      spawnPopup(W/2, H/2-60, 'DAILY COMPLETE!', '#ffd700');
+    }
+
+    /* Feature 6: Track missed collectibles */
+    var missed = collectibles.filter(function(c){ return !c.taken; }).map(function(c){ return {x:c.x, y:c.y, slot:c.slot}; });
+    safeSet('gh_missed_'+currentLocationId, missed);
+
+    var playCount = resetGame._playCount || 0;
     document.getElementById('winTitle').textContent = LEVELS[currentLocationId].name + ' cleared!';
     document.getElementById('winStars').textContent = '★'.repeat(stars) + '☆'.repeat(3-stars);
-    document.getElementById('winSummary').textContent = 'Score ' + score + ' · ' + collected + '/' + collectibles.length + ' treasures found';
+    document.getElementById('winSummary').textContent = 'Score ' + score + ' · ' + collected + '/' + collectibles.length + ' treasures found' + ' · Tier ' + Math.min(playCount+1, 10);
     var nameEntryRow = document.getElementById('nameEntryRow');
     var nameInput = document.getElementById('nameInput');
     if(isNewBest){
@@ -3049,7 +3239,20 @@
     for(var i=1;i<PLATFORMS.length;i++) drawPlatform(PLATFORMS[i], theme);
     drawGround(theme);
 
-    collectibles.forEach(level.collectibleDraw);
+    collectibles.forEach(function(c){
+      if(c.taken) return;
+      if(c.ghost){
+        ctx.save();
+        ctx.globalAlpha = 0.5 + Math.sin(performance.now()*0.004)*0.2;
+        ctx.filter = 'hue-rotate(180deg)';
+        level.collectibleDraw(c);
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      } else {
+        level.collectibleDraw(c);
+      }
+    });
     enemies.forEach(function(en){ if(en.state==='free') level.enemyDraw(en); });
     powerups.forEach(drawPowerup);
     players.forEach(function(p){
@@ -3105,10 +3308,48 @@
       ctx.fillText(up.text, up.x, up.y - up.t*30);
       ctx.globalAlpha = 1;
     });
+    /* Feature 5: Fog overlay */
+    if(activeEvent && activeEvent.id==='fog'){
+      ctx.fillStyle='rgba(180,190,200,0.35)'; ctx.fillRect(0,0,W,H);
+    }
+    /* Feature 5: Event indicator pill */
+    if(activeEvent && eventTimer > 0){
+      ctx.save();
+      ctx.fillStyle = 'rgba(29,42,92,0.85)';
+      ctx.beginPath(); ctx.roundRect(8, 36, 160, 28, 8); ctx.fill();
+      ctx.fillStyle = activeEvent.color;
+      ctx.font = 'bold 11px "Fredoka",sans-serif'; ctx.textAlign='left';
+      ctx.fillText(activeEvent.label, 14, 54);
+      // timer bar
+      var barW = 50 * (eventTimer / activeEvent.duration);
+      ctx.fillStyle = activeEvent.color;
+      ctx.fillRect(120, 46, barW, 6);
+      ctx.restore();
+    }
+    /* Feature 3: Achievement toast */
+    if(achievementToast){
+      var at = achievementToast, tt = achievementToastT;
+      var alpha = tt > 3 ? 1 : tt/3;
+      var ty = tt > 3 ? (3.5-tt)*60 : 0;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#1d2a5c';
+      ctx.beginPath(); ctx.roundRect(W-220, 8+ty, 210, 48, 10); ctx.fill();
+      ctx.strokeStyle = '#ffcf5c'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.roundRect(W-220, 8+ty, 210, 48, 10); ctx.stroke();
+      ctx.fillStyle = '#ffcf5c';
+      ctx.font = 'bold 13px "Fredoka",sans-serif'; ctx.textAlign='left';
+      ctx.fillText(at.icon + ' ' + at.label, W-210, 28+ty);
+      ctx.fillStyle = '#a9b2d6'; ctx.font='11px "Nunito",sans-serif';
+      ctx.fillText(at.desc, W-210, 46+ty);
+      ctx.restore();
+    }
+
     // chase warning
     if(gameState==='playing'){
       var elapsedDraw = (performance.now() - startTime) / 1000;
-      var timeLeft = CHASE_DELAY - elapsedDraw;
+      var currentChaseDelayDraw = resetGame._adjustedChaseDelay || CHASE_DELAY;
+      var timeLeft = currentChaseDelayDraw - elapsedDraw;
       if(timeLeft > 0 && timeLeft <= 5){
         // countdown flash
         var flash2 = Math.floor(elapsedDraw*2)%2===0;
@@ -3185,6 +3426,18 @@
 
     ctx.restore();
   }
+
+  /* Feature 2: Daily Challenge button */
+  document.getElementById('btnDaily').addEventListener('click', function(){
+    var locId = getDailyLocationId();
+    var loc = LOCATIONS.filter(function(l){ return l.id===locId; })[0];
+    if(loc && loc.unlocked) enterLocation(loc);
+  });
+
+  /* Feature 1+2+3: Init on page load */
+  updateStreak();
+  refreshDailyUI();
+  renderAchievements();
 
   var lastT = null;
   function frame(t){
