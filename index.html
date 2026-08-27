@@ -1819,18 +1819,36 @@
     } catch(e){}
   }
 
-  /* ---------- background music ---------- */
+  /* ---------- background music (per-level tracks) ---------- */
   var musicNextBeat = 0, musicTimer = null, musicActive = false;
-  var BPM = 138, BEAT = 60/BPM, S16 = BEAT/4;
-  // melody: note freq (0=rest), expressed as 16th-note steps
-  var MELODY_SEQ = [
-    523,0,523,659, 784,0,659,0, 698,0,698,784, 880,0,0,0,
-    523,0,523,659, 784,0,659,523, 440,0,0,0,   0,0,0,0
-  ];
-  var BASS_SEQ = [
-    262,0,0,262, 0,0,262,0, 196,0,0,196, 0,0,196,0,
-    175,0,0,175, 0,0,175,0, 196,0,0,196, 0,0,196,0
-  ];
+  var MUSIC_TRACKS = {
+    glasgow: {
+      bpm: 148, type: 'square',
+      melody: [440,0,523,0,659,523,440,0, 784,0,659,0,523,0,440,0, 523,659,784,0,880,0,784,659, 523,0,440,0,0,0,0,0],
+      bass:   [110,0,0,110,0,0,110,0, 147,0,0,147,0,0,147,0, 131,0,0,131,0,0,131,0, 147,0,0,147,0,0,0,0]
+    },
+    modena: {
+      bpm: 116, type: 'sine',
+      melody: [523,0,659,0,784,0,659,523, 698,0,880,0,784,0,0,0, 523,659,784,0,1047,0,784,0, 659,0,523,0,0,0,0,0],
+      bass:   [131,0,0,0,131,0,0,0, 110,0,0,0,110,0,0,0, 131,0,0,0,131,0,0,0, 98,0,0,0,98,0,0,0]
+    },
+    kenya: {
+      bpm: 158, type: 'square',
+      melody: [587,784,587,0,784,0,880,784, 587,0,784,587,523,0,587,0, 784,880,784,0,1047,0,880,784, 587,784,523,0,440,0,0,0],
+      bass:   [147,0,147,0,147,0,0,0, 196,0,196,0,196,0,0,0, 147,0,147,0,147,0,0,0, 131,0,131,0,131,0,0,0]
+    },
+    paris: {
+      bpm: 104, type: 'sine',
+      melody: [698,0,784,0,880,784,698,0, 784,0,880,0,1047,0,880,784, 698,784,698,0,659,0,698,0, 784,0,698,0,0,0,0,0],
+      bass:   [175,0,0,175,220,0,0,220, 175,0,0,175,196,0,0,196, 175,0,0,175,220,0,0,220, 131,0,0,131,175,0,0,0]
+    },
+    ireland: {
+      bpm: 172, type: 'square',
+      melody: [587,659,698,587,523,0,587,0, 698,784,880,784,698,0,587,0, 523,587,659,587,523,440,523,0, 587,698,587,0,0,0,0,0],
+      bass:   [147,0,0,147,0,0,147,0, 131,0,0,131,0,0,131,0, 196,0,0,196,0,0,196,0, 147,0,0,147,0,0,0,0]
+    }
+  };
+  var activeTrack = null;
   function schedMusicNote(freq,time,dur,vol,type){
     if(!freq) return;
     try{
@@ -1842,16 +1860,20 @@
     }catch(e){}
   }
   function scheduleLoop(startT){
-    var len = MELODY_SEQ.length;
+    var tr = activeTrack;
+    if(!tr) return startT;
+    var s16 = (60/tr.bpm)/4;
+    var len = tr.melody.length;
     for(var i=0;i<len;i++){
-      var t = startT + i*S16;
-      schedMusicNote(MELODY_SEQ[i], t, S16*1.5, 0.055, 'square');
-      schedMusicNote(BASS_SEQ[i],   t, S16*1.8, 0.07,  'triangle');
+      var t = startT + i*s16;
+      schedMusicNote(tr.melody[i], t, s16*1.5, 0.055, tr.type);
+      schedMusicNote(tr.bass[i],   t, s16*1.8, 0.07,  'triangle');
     }
-    return startT + len*S16;
+    return startT + len*s16;
   }
   function startMusic(){
-    if(musicActive) return;
+    stopMusic();
+    activeTrack = MUSIC_TRACKS[currentLocationId] || MUSIC_TRACKS.glasgow;
     musicActive = true;
     try{ musicNextBeat = ac().currentTime + 0.05; } catch(e){ return; }
     musicNextBeat = scheduleLoop(musicNextBeat);
@@ -1865,6 +1887,7 @@
   }
   function stopMusic(){
     musicActive = false;
+    activeTrack = null;
     if(musicTimer){ clearInterval(musicTimer); musicTimer=null; }
   }
 
