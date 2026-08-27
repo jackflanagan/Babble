@@ -544,6 +544,14 @@
                 </div>
               </div>
             </div>
+            <div id="skinSelector" style="margin-top:8px; display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
+              <div style="font-size:12px; color:var(--dim-text);">
+                Leti: <span id="skinDotsP1"></span>
+              </div>
+              <div style="font-size:12px; color:var(--dim-text);">
+                Jack: <span id="skinDotsP2"></span>
+              </div>
+            </div>
             <p style="color:var(--dim-text); font-size:11px; margin-top:2px;" id="localControlsHint">On touch screens the on-screen buttons always drive Player 1.</p>
 
             <div class="net-panel" id="netPanel" hidden>
@@ -580,6 +588,10 @@
           <h2 id="winTitle">Glasgow cleared!</h2>
           <div class="stars" id="winStars">&#9733;&#9733;&#9733;</div>
           <p id="winSummary">Score 0 &middot; 0 treasures found</p>
+          <div id="nameEntryRow" hidden style="margin:8px 0;">
+            <p style="font-size:13px; color:var(--dim-text); margin:4px 0;">New best! Enter your name:</p>
+            <input id="nameInput" maxlength="12" placeholder="Your name" autocomplete="off" style="font-family:inherit; font-size:15px; padding:6px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); color:#fff; text-align:center; width:160px;">
+          </div>
           <div class="btn-row" id="winBtnRow">
             <button class="btn btn-primary" id="btnWinAgain">Play again</button>
             <button class="btn btn-ghost" id="btnWinMap">World map</button>
@@ -636,7 +648,20 @@
     try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ /* ignore */ }
   }
 
-  var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false } });
+  var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
+
+  var PALETTES_P1 = [
+    { body:'#ff7a45', belly:'#fff3e6', ear:'#2a0d05', tailTip:'#fff' },   // 0: default orange
+    { body:'#e0eeff', belly:'#fff', ear:'#8090c0', tailTip:'#c0d8ff' },   // 1: arctic (unlock glasgow)
+    { body:'#cc2020', belly:'#ffd0d0', ear:'#6a0000', tailTip:'#fff' },   // 2: crimson (unlock modena)
+    { body:'#1a1a2e', belly:'#3a3a5e', ear:'#0a0a1e', tailTip:'#888' }    // 3: midnight (unlock kenya)
+  ];
+  var PALETTES_P2 = [
+    { body:'#7a93ff', belly:'#eef1ff', ear:'#141c4d', tailTip:'#fff' },   // 0: default blue
+    { body:'#f5c842', belly:'#fff8e0', ear:'#8a7000', tailTip:'#fff' },   // 1: golden (unlock paris)
+    { body:'#3a8a3a', belly:'#d0f0d0', ear:'#1a4a1a', tailTip:'#fff' }    // 2: forest (unlock ireland)
+  ];
+  var selectedSkins = safeGet('gh_skins_v1', {p1:0, p2:0});
 
   /* =========================================================
      Ambient starfield (behind everything)
@@ -694,7 +719,8 @@
     { id:'modena', name:'Modena', lat:44.65, lon:10.93, unlocked:true },
     { id:'kenya', name:'Kenya', lat:-1.28, lon:36.82, unlocked:false },
     { id:'paris', name:'Paris', lat:48.85, lon:2.35, unlocked:false },
-    { id:'ireland', name:'Ireland', lat:53.33, lon:-6.25, unlocked:false }
+    { id:'ireland', name:'Ireland', lat:53.33, lon:-6.25, unlocked:false },
+    { id:'boss', name:'Null Island', lat:0, lon:0, unlocked:false }
   ];
 
   // Real, simplified world coastlines (Natural Earth 110m land polygons,
@@ -933,18 +959,42 @@
         }
       }
     });
+    // Unlock boss (Null Island) when ALL of glasgow, modena, kenya, paris, ireland are cleared
+    var allCleared = ['glasgow','modena','kenya','paris','ireland'].every(function(id){
+      return progress[id] && progress[id].cleared;
+    });
+    var bossLoc = LOCATIONS.filter(function(l){ return l.id==='boss'; })[0];
+    if(bossLoc && allCleared && !bossLoc.unlocked){
+      bossLoc.unlocked = true;
+      var bossBtn = pinEls['boss'];
+      if(bossBtn){
+        bossBtn.classList.remove('locked');
+        bossBtn.setAttribute('aria-label', bossLoc.name);
+        bossBtn.querySelector('.label').textContent = bossLoc.name;
+        bossBtn.disabled = false;
+        bossBtn.addEventListener('click', function(){
+          if(netRole==='guest' && netConnected) return;
+          enterLocation(bossLoc);
+        });
+      }
+    }
     LOCATIONS.forEach(function(loc){
       var pr = progress[loc.id];
       if(pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add('cleared');
     });
     renderBestScores();
+    buildSkinDots();
   }
   function renderBestScores(){
     var el = document.getElementById('bestScoreLine');
     var parts = [];
     LOCATIONS.forEach(function(loc){
       var pr = progress[loc.id];
-      if(pr && pr.best > 0) parts.push(loc.name + ': ' + pr.best);
+      if(pr && pr.best > 0){
+        var entry = loc.name + ': ' + pr.best;
+        if(pr.name) entry += ' (' + pr.name + ')';
+        parts.push(entry);
+      }
     });
     if(parts.length){ el.hidden = false; el.textContent = 'Best runs — ' + parts.join('  ·  '); }
     else { el.hidden = true; }
@@ -1490,14 +1540,11 @@
     {x:520, y:146, platform:5}
   ];
 
+  var BOSS_SPAWN = [{x:330, y:390, w:54, h:46, vx:100, hits:3}];
+
   var COLLECTIBLE_SPOTS = [
     {x:100, y:322, slot:'a'}, {x:600, y:322, slot:'b'}, {x:360, y:234, slot:'c'},
     {x:100, y:146, slot:'b'}, {x:600, y:146, slot:'a'}, {x:360, y:68, slot:'c'}
-  ];
-
-  var PALETTES = [
-    { body:'#ff7a45', belly:'#fff3e6', ear:'#2a0d05', tailTip:'#fff' },
-    { body:'#7a93ff', belly:'#eef1ff', ear:'#141c4d', tailTip:'#fff' }
   ];
 
   /* ---------- per-location theming ---------- */
@@ -1740,6 +1787,67 @@
       },
       enemyDraw:drawBansheeRef,
       collectibleDraw:drawIrelandCollectibleRef
+    },
+    boss:{
+      name:'Null Island',
+      blurb:'Face the Kraken! Trap it in a bubble, then bump it — it takes 3 hits to defeat. Watch out: each hit makes it faster and angrier.',
+      values:{ a:100, b:60, c:250, pop:500 },
+      theme:{
+        skyTop:'#0a0520', skyMid:'#1a0a40', skyBottom:'#2a1060',
+        sunColor:'rgba(80,0,120,0.6)',
+        groundBase:'#0a0018', groundEdge:'#1a0030', detailColor:['#2a0060','#1a0040'],
+        platformTop:'#1a0840', platformBody:'#0a0020', platformDetail:'#2a0060',
+        drawBackdrop:function(){
+          // stars / void
+          ctx.fillStyle = 'rgba(255,255,255,0.8)';
+          var starSeed = 42;
+          for(var si=0;si<80;si++){
+            starSeed = (starSeed*1664525+1013904223)&0xffffffff;
+            var sx = ((starSeed>>>16)&0xffff)/65535*W;
+            starSeed = (starSeed*1664525+1013904223)&0xffffffff;
+            var sy = ((starSeed>>>16)&0xffff)/65535*300;
+            starSeed = (starSeed*1664525+1013904223)&0xffffffff;
+            var sr = ((starSeed>>>16)&0xffff)/65535*1.5+0.5;
+            ctx.beginPath(); ctx.arc(sx,sy,sr,0,TAU); ctx.fill();
+          }
+          // void portal glow
+          var portalGrad = ctx.createRadialGradient(360,150,10,360,150,120);
+          portalGrad.addColorStop(0,'rgba(120,0,200,0.35)');
+          portalGrad.addColorStop(0.5,'rgba(60,0,120,0.15)');
+          portalGrad.addColorStop(1,'rgba(0,0,0,0)');
+          ctx.fillStyle = portalGrad;
+          ctx.beginPath(); ctx.ellipse(360,150,120,80,0,0,TAU); ctx.fill();
+        },
+        drawCenterpiece:function(x,y){
+          ctx.save(); ctx.translate(x,y);
+          // void portal / skull
+          var t = performance.now()*0.002;
+          // outer ring
+          ctx.strokeStyle = 'rgba(150,0,255,0.5)';
+          ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(0,0,44,0,TAU); ctx.stroke();
+          ctx.strokeStyle = 'rgba(200,80,255,0.3)';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(0,0,52+Math.sin(t*3)*4,0,TAU); ctx.stroke();
+          // skull face
+          ctx.fillStyle = '#1a0030';
+          ctx.beginPath(); ctx.ellipse(0,-4,28,26,0,0,TAU); ctx.fill();
+          ctx.fillStyle = '#0a0018';
+          ctx.beginPath(); ctx.roundRect(-20,12,40,16,4); ctx.fill();
+          // eye sockets glow
+          ctx.fillStyle = 'rgba(200,0,255,0.7)';
+          ctx.beginPath(); ctx.ellipse(-10,-8,8,9,0,0,TAU); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(10,-8,8,9,0,0,TAU); ctx.fill();
+          // teeth
+          ctx.fillStyle = 'rgba(180,120,255,0.5)';
+          for(var ti=0;ti<5;ti++){
+            ctx.beginPath(); ctx.moveTo(-16+ti*8,12); ctx.lineTo(-13+ti*8,20); ctx.lineTo(-10+ti*8,12); ctx.fill();
+          }
+          ctx.restore();
+        }
+      },
+      enemyDraw:drawKrakenRef,
+      collectibleDraw:drawScotCollectibleRef
     }
   };
 
@@ -1898,20 +2006,28 @@
   }
 
   function resetGame(){
-    players = [ makePlayer(0, numPlayers===2 ? 320 : 360, PALETTES[0]) ];
-    if(numPlayers===2) players.push(makePlayer(1, 420, PALETTES[1]));
+    players = [ makePlayer(0, numPlayers===2 ? 320 : 360, PALETTES_P1[selectedSkins.p1]) ];
+    if(numPlayers===2) players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
 
-    enemies = ENEMY_SPAWNS.map(function(s){
-      return { x:s.x, y:s.y, w:28, h:26, vx:70, vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
-        state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false };
-    });
+    if(currentLocationId === 'boss'){
+      enemies = BOSS_SPAWN.map(function(s){
+        return { x:s.x, y:s.y, w:s.w, h:s.h, vx:s.vx, vy:0, dir: Math.random()<0.5?1:-1, platform:0,
+          state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false, hits:s.hits };
+      });
+      waveNumber = 99;
+    } else {
+      enemies = ENEMY_SPAWNS.map(function(s){
+        return { x:s.x, y:s.y, w:28, h:26, vx:70, vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
+          state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false };
+      });
+      waveNumber = 1;
+    }
     enemiesLeft = enemies.length;
     bubbles = [];
     particles = [];
     popups = [];
     powerups = [];
     chaseAlertPlayed = false;
-    waveNumber = 1;
     comboCount = 0; comboTimer = 0; waveFlash = 0;
     collectibles = COLLECTIBLE_SPOTS.map(function(c){ return {x:c.x,y:c.y,slot:c.slot,taken:false,bob:Math.random()*TAU}; });
     score = 0;
@@ -1950,6 +2066,63 @@
     startMusic();
     netBroadcastScene('winAgain');
   });
+
+  // Name entry for best score
+  (function(){
+    var nameInput = document.getElementById('nameInput');
+    function saveName(){
+      var val = nameInput.value.trim();
+      if(!val) return;
+      var pr = progress[currentLocationId] || {best:0,cleared:false};
+      pr.name = val;
+      progress[currentLocationId] = pr;
+      safeSet('gh_progress_v2', progress);
+      renderBestScores();
+    }
+    nameInput.addEventListener('blur', saveName);
+    nameInput.addEventListener('keydown', function(e){
+      if(e.key==='Enter'){ saveName(); nameInput.blur(); }
+    });
+  })();
+
+  // Skin selector
+  function buildSkinDots(){
+    var p1Unlocks = [true, progress.glasgow && progress.glasgow.cleared, progress.modena && progress.modena.cleared, progress.kenya && progress.kenya.cleared];
+    var p2Unlocks = [true, progress.paris && progress.paris.cleared, progress.ireland && progress.ireland.cleared];
+    var p1Colors = PALETTES_P1.map(function(p){ return p.body; });
+    var p2Colors = PALETTES_P2.map(function(p){ return p.body; });
+
+    function renderDots(containerId, colors, unlocks, playerIdx, currentSel){
+      var container = document.getElementById(containerId);
+      if(!container) return;
+      container.innerHTML = '';
+      colors.forEach(function(col, i){
+        var dot = document.createElement('span');
+        var unlocked = unlocks[i];
+        dot.style.cssText = 'display:inline-block;width:16px;height:16px;border-radius:50%;background:'+col+';margin:0 2px;vertical-align:middle;'+(unlocked?'cursor:pointer;':'')+'opacity:'+(unlocked?1:0.3)+';border:'+(i===currentSel?'2px solid #fff':'2px solid transparent')+';';
+        dot.title = unlocked ? 'Select skin '+(i+1) : 'Locked';
+        if(unlocked){
+          dot.addEventListener('click', function(){
+            if(playerIdx===1) selectedSkins.p1 = i;
+            else selectedSkins.p2 = i;
+            safeSet('gh_skins_v1', selectedSkins);
+            buildSkinDots();
+            // update player palettes if playing
+            if(gameState==='playing'){
+              players.forEach(function(p){
+                if(p.id===0) p.palette = PALETTES_P1[selectedSkins.p1];
+                if(p.id===1) p.palette = PALETTES_P2[selectedSkins.p2];
+              });
+            }
+          });
+        }
+        container.appendChild(dot);
+      });
+    }
+    renderDots('skinDotsP1', p1Colors, p1Unlocks, 1, selectedSkins.p1);
+    renderDots('skinDotsP2', p2Colors, p2Unlocks, 2, selectedSkins.p2);
+  }
+  buildSkinDots();
 
   function updateHud(){
     document.getElementById('hudScore').textContent = score;
@@ -2132,6 +2305,21 @@
           if(rectsOverlap(players[pj], pbox)) popped = true;
         }
         if(popped){
+          if(en2 && en2.hits && en2.hits > 1){
+            // Boss multi-hit: reduce HP instead of removing
+            en2.hits--;
+            en2.angry = 5;
+            en2.vx = Math.min(en2.vx*1.4, 300);
+            en2.state = 'free';
+            en2.bubbleTimer = 0;
+            b.trapped = null;
+            bubbles.splice(bi,1);
+            spawnPopup(b.x, b.y-10, 'HIT! '+en2.hits+' to go', '#ff3030');
+            spawnParticles(b.x,b.y,'#ff3030',14);
+            playSound('trap');
+            shakeT = 0.2;
+            continue;
+          }
           comboCount++;
           comboTimer = 2.2;
           var basePoints = level.values.pop;
@@ -2291,12 +2479,22 @@
     if(totalElapsed < 60) stars++;
     var pr = progress[currentLocationId] || {best:0,cleared:false};
     pr.cleared = true;
-    if(score > pr.best) pr.best = score;
+    var isNewBest = score > pr.best;
+    if(isNewBest) pr.best = score;
     progress[currentLocationId] = pr;
     safeSet('gh_progress_v2', progress);
     document.getElementById('winTitle').textContent = LEVELS[currentLocationId].name + ' cleared!';
     document.getElementById('winStars').textContent = '★'.repeat(stars) + '☆'.repeat(3-stars);
     document.getElementById('winSummary').textContent = 'Score ' + score + ' · ' + collected + '/' + collectibles.length + ' treasures found';
+    var nameEntryRow = document.getElementById('nameEntryRow');
+    var nameInput = document.getElementById('nameInput');
+    if(isNewBest){
+      nameEntryRow.hidden = false;
+      nameInput.value = pr.name || '';
+      setTimeout(function(){ nameInput.focus(); }, 100);
+    } else {
+      nameEntryRow.hidden = true;
+    }
     document.getElementById('overlayWin').hidden = false;
     updateHud();
   }
@@ -2745,6 +2943,53 @@
       ctx.beginPath(); ctx.roundRect(-8,-2,16,6,2); ctx.fill();
       ctx.fillStyle = '#f0c020';
       [-4,0,4].forEach(function(cx){ ctx.beginPath(); ctx.arc(cx,-1,2.5,0,TAU); ctx.fill(); });
+    }
+    ctx.restore();
+  }
+
+  /* ---------- drawing: Boss Kraken ---------- */
+  function drawKrakenRef(en){
+    ctx.save();
+    var t = performance.now()*0.004;
+    var wob = Math.sin(t + en.x*0.03)*4;
+    ctx.translate(en.x+en.w/2, en.y+en.h/2+wob);
+    var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
+    var bodyCol = en.state==='trapped' ? '#c0a0ff' : (flash ? '#ff4444' : '#4a1080');
+    var darkCol = en.state==='trapped' ? '#9070cc' : (flash ? '#cc2222' : '#2a0050');
+    // tentacles (8)
+    for(var ti=0;ti<8;ti++){
+      var angle = (ti/8)*TAU + t*0.5;
+      var tx2 = Math.cos(angle)*(en.w*0.6);
+      var ty2 = Math.sin(angle)*(en.h*0.4)+8;
+      var waved = Math.sin(t*2+ti)*6;
+      ctx.strokeStyle = darkCol; ctx.lineWidth=7; ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(tx2*0.4, ty2*0.4);
+      ctx.quadraticCurveTo(tx2*0.8+waved, ty2*0.8+waved, tx2+waved, ty2+waved);
+      ctx.stroke();
+      ctx.strokeStyle = bodyCol; ctx.lineWidth=4;
+      ctx.stroke();
+    }
+    // main body
+    ctx.fillStyle = darkCol;
+    ctx.beginPath(); ctx.ellipse(0,0,en.w*0.42,en.h*0.42,0,0,TAU); ctx.fill();
+    ctx.fillStyle = bodyCol;
+    ctx.beginPath(); ctx.ellipse(0,-2,en.w*0.36,en.h*0.36,0,0,TAU); ctx.fill();
+    // eyes
+    ctx.fillStyle = flash ? '#fff' : '#ff00ff';
+    ctx.beginPath(); ctx.arc(-9,-4,5,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(9,-4,5,0,TAU); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-9,-4,2.5,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(9,-4,2.5,0,TAU); ctx.fill();
+    // HP pips above
+    if(en.hits){
+      for(var hp=0;hp<en.hits;hp++){
+        ctx.fillStyle = '#ff2020';
+        ctx.beginPath(); ctx.arc(-6+hp*6, -en.h*0.42-10, 4, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth=1;
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
