@@ -499,10 +499,10 @@
   </section>
 
   <!-- LEADERBOARD OVERLAY (full-screen, floats above everything) -->
-  <div id="overlayLeaderboard" hidden style="
-    position:fixed; inset:0; z-index:9000;
+  <div id="overlayLeaderboard" style="
+    display:none; position:fixed; inset:0; z-index:9000;
     background:rgba(10,14,40,0.92); backdrop-filter:blur(6px);
-    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    flex-direction:column; align-items:center; justify-content:flex-start;
     padding:24px 16px; overflow-y:auto; box-sizing:border-box;">
     <div style="width:100%;max-width:540px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -737,7 +737,7 @@
   function openLeaderboard(locationId){
     lbCurrentLocation = locationId || (LOCATIONS[0] && LOCATIONS[0].id);
     var overlay = document.getElementById('overlayLeaderboard');
-    overlay.hidden = false;
+    overlay.style.display = 'flex';
     buildLbTabs();
     loadLbTab(lbCurrentLocation);
   }
@@ -1495,7 +1495,7 @@
     openLeaderboard(null);
   });
   document.getElementById('btnLeaderboardClose').addEventListener('click', function(){
-    document.getElementById('overlayLeaderboard').hidden = true;
+    document.getElementById('overlayLeaderboard').style.display = 'none';
   });
 
   function togglePause(){
