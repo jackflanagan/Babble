@@ -621,9 +621,11 @@
             <input id="nameInput" maxlength="12" placeholder="Your name" autocomplete="off" style="font-family:inherit; font-size:15px; padding:6px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); color:#fff; text-align:center; width:160px;">
           </div>
           <div class="btn-row" id="winBtnRow">
+            <button class="btn btn-primary" id="btnWinNext" hidden>→ Next Level</button>
             <button class="btn btn-primary" id="btnWinAgain">Play again</button>
             <button class="btn btn-ghost" id="btnWinMap">World map</button>
           </div>
+          <p id="winNextHint" style="font-size:12px;color:var(--dim-text);margin:4px 0;" hidden></p>
           <p class="net-hint" id="winWaitHint" hidden>Waiting for the host to choose what&rsquo;s next&hellip;</p>
         </div>
 
@@ -1351,6 +1353,7 @@
     if(netRole==='host'){ netBroadcastScene('enterLocation', {locationId: loc.id}); }
   }
   function backToMap(){
+    if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
     var wasHost = (netRole==='host');
     stopGame();
     sceneGame.hidden = true;
@@ -2100,7 +2103,7 @@
     }
   };
 
-  var players, enemies, bubbles, collectibles, particles, popups, powerups;
+  var players, enemies, bubbles, collectibles, particles, popups, powerups, popBursts;
   var score = 0, lives = 3, gameState = 'ready', enemiesLeft = 0, startTime = 0;
   var shakeT = 0, waveNumber = 1, comboCount = 0, comboTimer = 0, waveFlash = 0;
   var survivorUnlocked = false;
@@ -2323,6 +2326,7 @@
     particles = [];
     popups = [];
     powerups = [];
+    popBursts = [];
     chaseAlertPlayed = false;
     comboCount = 0; comboTimer = 0; waveFlash = 0;
     survivorUnlocked = false;
@@ -2395,8 +2399,15 @@
     startMusic();
     netBroadcastScene('retry');
   });
+  document.getElementById('btnWinNext').addEventListener('click', function(){
+    if(netRole==='guest') return;
+    var nextLoc = getNextLocation();
+    if(nextLoc) startNextLevel(nextLoc);
+  });
   document.getElementById('btnWinAgain').addEventListener('click', function(){
     if(netRole==='guest') return;
+    if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
+    document.getElementById('winNextHint').hidden = true;
     survivalMode = false;
     resetGame();
     gameState = 'playing';
@@ -2532,7 +2543,7 @@
       playSound('shoot');
       bubbles.push({
         x: p.x + p.w/2 + p.facing*10, y: p.y+6,
-        vx: p.facing*260, vy:-40, r:4, grown:false, age:0,
+        vx: p.facing*310, vy:55, r:4, grown:false, age:0,
         state:'flying', trapped:null, t:0
       });
     }
@@ -2547,6 +2558,8 @@
       if(currFloor < prevFloor && currFloor > 0) playSound('beep');
       if(countdownT <= 0) playSound('go');
       if(countdownT > 0) return;
+    } else if(countdownT > -0.5){
+      countdownT -= dt; // keep ticking so GO! fades out properly
     }
     /* Survival spawner */
     if(survivalMode && gameState==='playing'){
@@ -2727,6 +2740,21 @@
           if(idx>-1){ enemies.splice(idx,1); enemiesLeft--; }
           bubbles.splice(bi,1);
           shakeT = 0.15;
+          // spinning ghost that flies off
+          popBursts.push({
+            x:b.x, y:b.y,
+            vx:rand(-220,220), vy:rand(-340,-140),
+            rot:0, rotV:rand(-12,12),
+            t:0, life:0.65,
+            drawFn:LEVELS[currentLocationId].enemyDraw,
+            w:en2.w, h:en2.h, hits:0
+          });
+          // gold coin shower
+          for(var ci2=0;ci2<5;ci2++){
+            particles.push({x:b.x+rand(-8,8), y:b.y+rand(-8,8),
+              vx:rand(-90,90), vy:rand(-180,-60),
+              life:0.7, t:0, color:'#ffd700', r:rand(3,6)});
+          }
         }
       }
     }
@@ -2830,6 +2858,13 @@
       if(pp.t>pp.life){ particles.splice(pi2,1); continue; }
       pp.x += pp.vx*dt; pp.y += pp.vy*dt; pp.vy += 500*dt;
     }
+    for(var pbi=popBursts.length-1; pbi>=0; pbi--){
+      var pb = popBursts[pbi];
+      pb.t += dt;
+      if(pb.t >= pb.life){ popBursts.splice(pbi,1); continue; }
+      pb.x += pb.vx*dt; pb.y += pb.vy*dt; pb.vy += 600*dt;
+      pb.rot += pb.rotV*dt;
+    }
     for(var upi=popups.length-1; upi>=0; upi--){
       var up = popups[upi];
       up.t += dt;
@@ -2908,6 +2943,29 @@
     }
   }
 
+  var winNextTimer = null;
+
+  function getNextLocation(){
+    var idx = -1;
+    for(var i=0; i<LOCATIONS.length; i++){ if(LOCATIONS[i].id === currentLocationId){ idx=i; break; } }
+    for(var i = idx+1; i < LOCATIONS.length; i++){
+      if(LOCATIONS[i].unlocked) return LOCATIONS[i];
+    }
+    return null;
+  }
+
+  function startNextLevel(loc){
+    if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
+    document.getElementById('overlayWin').hidden = true;
+    document.getElementById('winNextHint').hidden = true;
+    document.getElementById('btnWinNext').hidden = true;
+    currentLocationId = loc.id;
+    resetGame();
+    document.getElementById('howto').hidden = true;
+    gameState = 'playing';
+    startMusic();
+  }
+
   function winLevel(){
     if(survivalMode) return;
     if(gameState !== 'playing') return;
@@ -2982,6 +3040,40 @@
       });
     }
     document.getElementById('overlayWin').hidden = false;
+
+    /* Level flow: show Next Level button and auto-advance after 5s */
+    refreshClearedPin(); // unlock any newly reachable locations first
+    var nextLoc = getNextLocation();
+    var btnWinNext = document.getElementById('btnWinNext');
+    var winNextHint = document.getElementById('winNextHint');
+    if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
+    if(nextLoc && netRole !== 'guest'){
+      btnWinNext.hidden = false;
+      btnWinNext.textContent = '→ ' + nextLoc.name;
+      if(!isNewBest){
+        var autoSecs = 5;
+        winNextHint.textContent = 'Auto-advancing to ' + nextLoc.name + ' in ' + autoSecs + 's…';
+        winNextHint.hidden = false;
+        var tick = setInterval(function(){
+          autoSecs--;
+          if(autoSecs > 0){
+            winNextHint.textContent = 'Auto-advancing to ' + nextLoc.name + ' in ' + autoSecs + 's…';
+          } else {
+            clearInterval(tick);
+          }
+        }, 1000);
+        winNextTimer = setTimeout(function(){
+          clearInterval(tick);
+          if(gameState === 'won') startNextLevel(nextLoc);
+        }, 5000);
+      } else {
+        winNextHint.hidden = true;
+      }
+    } else {
+      btnWinNext.hidden = true;
+      winNextHint.hidden = true;
+    }
+
     updateHud();
   }
 
@@ -3530,6 +3622,20 @@
           ctx.restore();
         }
       }
+    });
+    // pop burst: spinning enemy ghost that flies off after being popped
+    popBursts.forEach(function(pb){
+      var frac = pb.t / pb.life;
+      var fakeEn = {x:pb.x-pb.w/2, y:pb.y-pb.h/2, w:pb.w, h:pb.h,
+                    state:'trapped', facing:1, dir:1, angry:0, hits:pb.hits, vx:0, vy:0, bubbleTimer:0};
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - frac);
+      ctx.translate(pb.x, pb.y);
+      ctx.rotate(pb.rot);
+      ctx.scale(1 - frac*0.6, 1 - frac*0.6);
+      ctx.translate(-pb.x, -pb.y);
+      pb.drawFn(fakeEn);
+      ctx.restore();
     });
     powerups.forEach(drawPowerup);
     players.forEach(function(p){
