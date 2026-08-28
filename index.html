@@ -496,6 +496,7 @@
     <button class="btn btn-ghost" id="btnLeaderboard" style="font-size:13px;padding:8px 20px;margin-top:4px;">🏆 Leaderboard</button>
     <div style="font-size:11px;color:var(--dim-text);text-align:center;margin-top:8px;letter-spacing:0.05em;text-transform:uppercase;">Achievements</div>
     <div id="achievementBadges" style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:520px;margin-top:4px;"></div>
+    <div id="achTooltip" style="display:none;margin-top:8px;font-size:13px;text-align:center;padding:6px 16px;background:rgba(255,207,92,0.12);border:1px solid rgba(255,207,92,0.35);border-radius:10px;max-width:320px;color:var(--ink-text);"></div>
   </section>
 
   <!-- LEADERBOARD OVERLAY (full-screen, floats above everything) -->
@@ -868,15 +869,30 @@
 
   function renderAchievements(){
     var el = document.getElementById('achievementBadges');
+    var tip = document.getElementById('achTooltip');
     if(!el) return;
     el.innerHTML = '';
     ACHIEVEMENTS.forEach(function(a){
       var b = document.createElement('span');
-      b.title = (a.unlocked ? '✓ ' : '(locked) ') + a.label + ': ' + a.desc;
-      b.style.cssText = 'font-size:20px;opacity:'+(a.unlocked?'1':'0.2')+';cursor:default;';
+      b.style.cssText = 'font-size:22px;opacity:'+(a.unlocked?'1':'0.2')+';cursor:'+(a.unlocked?'pointer':'default')+';transition:transform 0.1s;display:inline-block;';
       b.textContent = a.icon;
+      if(a.unlocked){
+        b.addEventListener('mouseenter', function(){
+          b.style.transform = 'scale(1.3)';
+          if(tip){ tip.style.display='block'; tip.innerHTML='<strong>'+a.icon+' '+a.label+'</strong><br><span style="color:var(--dim-text);font-size:12px;">'+a.desc+'</span>'; }
+        });
+        b.addEventListener('mouseleave', function(){
+          b.style.transform = '';
+          if(tip){ tip.style.display='none'; }
+        });
+        /* touch support */
+        b.addEventListener('touchstart', function(e){ e.preventDefault();
+          if(tip){ tip.style.display='block'; tip.innerHTML='<strong>'+a.icon+' '+a.label+'</strong><br><span style="color:var(--dim-text);font-size:12px;">'+a.desc+'</span>'; }
+        }, {passive:false});
+      }
       el.appendChild(b);
     });
+    if(tip) tip.style.display = 'none';
   }
 
   /* ---------- Feature 5: Random Mid-Level Events ---------- */
@@ -1252,8 +1268,7 @@
     btn.className = 'pin' + (loc.unlocked ? '' : ' locked');
     btn.setAttribute('aria-label', loc.name + (loc.unlocked ? '' : ' (coming soon)'));
     var dot = document.createElement('div'); dot.className = 'dot';
-    var label = document.createElement('div'); label.className = 'label'; label.textContent = loc.unlocked ? loc.name : (loc.name + ' · soon');
-    btn.appendChild(dot); btn.appendChild(label);
+    btn.appendChild(dot);
     if(loc.unlocked){
       btn.addEventListener('click', function(){
         if(netRole==='guest' && netConnected) return; // guest follows the host once paired up
@@ -1287,7 +1302,6 @@
     if(btn){
       btn.classList.remove('locked');
       btn.setAttribute('aria-label', loc.name);
-      btn.querySelector('.label').textContent = loc.name;
       btn.disabled = false;
       btn.addEventListener('click', function(){
         if(netRole==='guest' && netConnected) return;
@@ -1354,7 +1368,8 @@
       el.style.opacity = visible ? clamp(0.35 + p.z*0.9, 0.25, 1) : 0;
       el.style.pointerEvents = (visible && loc.unlocked) ? 'auto' : 'none';
       var sx = p.x*scale, sy = p.y*scale;
-      el.style.transform = 'translate(' + (sx-8) + 'px,' + (sy-8) + 'px) scale(' + clamp(0.7+p.z*0.5,0.6,1.15) + ')';
+      var sc = clamp(0.7+p.z*0.5,0.6,1.15);
+      el.style.transform = 'translate(' + (sx-8*sc) + 'px,' + (sy-8*sc) + 'px) scale(' + sc + ')';
       el.style.zIndex = String(Math.round(1000 + p.z*100));
     });
   }
