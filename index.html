@@ -2732,7 +2732,7 @@
     /* Feature 3: Achievement toast drain in update */
     if(achievementQueue.length > 0 && !achievementToast){
       achievementToast = achievementQueue.shift();
-      achievementToastT = 3.5;
+      achievementToastT = 4.8;
     }
     if(achievementToast){ achievementToastT -= dt; if(achievementToastT<=0) achievementToast=null; }
 
@@ -3583,22 +3583,75 @@
       ctx.fillRect(120, 46, barW, 6);
       ctx.restore();
     }
-    /* Feature 3: Achievement toast */
+    /* Feature 3: Achievement popup — centered, dramatic */
     if(achievementToast){
       var at = achievementToast, tt = achievementToastT;
-      var alpha = tt > 3 ? 1 : tt/3;
-      var ty = tt > 3 ? (3.5-tt)*60 : 0;
+      var TOTAL = 4.8;
+      // slide-in: first 0.4s; hold; fade-out: last 0.6s
+      var slideP = tt > TOTAL-0.4 ? (TOTAL-tt)/0.4 : 1;
+      var fadeP  = tt < 0.6 ? tt/0.6 : 1;
+      var prog   = clamp(Math.min(slideP, fadeP), 0, 1);
+      // ease out cubic for slide
+      var ease   = 1 - Math.pow(1-slideP, 3);
+
+      var cW = 380, cH = 120;
+      var cx = (W - cW) / 2;
+      var cy = H * 0.28 - cH / 2;
+      var slideY = (1 - ease) * -(cH + 40);
+
       ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#1d2a5c';
-      ctx.beginPath(); ctx.roundRect(W-220, 8+ty, 210, 48, 10); ctx.fill();
-      ctx.strokeStyle = '#ffcf5c'; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.roundRect(W-220, 8+ty, 210, 48, 10); ctx.stroke();
+      ctx.globalAlpha = prog;
+
+      // outer glow halo
+      var halo = ctx.createRadialGradient(W/2, cy+cH/2+slideY, 10, W/2, cy+cH/2+slideY, cW*0.72);
+      halo.addColorStop(0, 'rgba(255,207,92,0.28)');
+      halo.addColorStop(1, 'rgba(255,207,92,0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(cx - 60, cy + slideY - 40, cW + 120, cH + 80);
+
+      // card shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath(); ctx.roundRect(cx+4, cy+slideY+6, cW, cH, 16); ctx.fill();
+
+      // card body
+      ctx.fillStyle = '#111a3d';
+      ctx.beginPath(); ctx.roundRect(cx, cy+slideY, cW, cH, 16); ctx.fill();
+
+      // gold border (double ring feel)
+      ctx.strokeStyle = 'rgba(255,207,92,0.9)'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.roundRect(cx, cy+slideY, cW, cH, 16); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,207,92,0.22)'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.roundRect(cx-2, cy+slideY-2, cW+4, cH+4, 18); ctx.stroke();
+
+      // "ACHIEVEMENT UNLOCKED" header strip
+      ctx.fillStyle = 'rgba(255,207,92,0.13)';
+      ctx.beginPath(); ctx.roundRect(cx, cy+slideY, cW, 30, {upperLeft:16,upperRight:16,lowerLeft:0,lowerRight:0}); ctx.fill();
       ctx.fillStyle = '#ffcf5c';
-      ctx.font = 'bold 13px "Fredoka",sans-serif'; ctx.textAlign='left';
-      ctx.fillText(at.icon + ' ' + at.label, W-210, 28+ty);
-      ctx.fillStyle = '#a9b2d6'; ctx.font='11px "Nunito",sans-serif';
-      ctx.fillText(at.desc, W-210, 46+ty);
+      ctx.font = '700 11px "Space Mono",monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u2606 ACHIEVEMENT UNLOCKED \u2606', W/2, cy+slideY+19);
+
+      // divider
+      ctx.fillStyle = 'rgba(255,207,92,0.25)';
+      ctx.fillRect(cx+14, cy+slideY+30, cW-28, 1);
+
+      // big icon
+      ctx.font = '36px serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(at.icon, cx+44, cy+slideY+80);
+
+      // label
+      ctx.fillStyle = '#eef1fb';
+      ctx.font = '700 20px "Fredoka",sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(at.label, cx+72, cy+slideY+64);
+
+      // description
+      ctx.fillStyle = '#a9b2d6';
+      ctx.font = '600 13px "Nunito",sans-serif';
+      ctx.fillText(at.desc, cx+72, cy+slideY+86);
+
       ctx.restore();
     }
 
