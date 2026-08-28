@@ -3170,6 +3170,7 @@
         en.vy += GRAVITY * dt;
         en.y += en.vy * dt;
         resolvePlatformCollision(en);
+        if(en.y + en.h > 445){ en.y = 445 - en.h; en.vy = 0; en.onGround = true; }
         // jump when player is on a higher platform and we've landed
         if(en.onGround && nearest.y < en.y - 40 && en.hopT <= 0){
           en.vy = -500;
@@ -3178,17 +3179,23 @@
         }
       } else {
         en.x += en.vx*en.dir*dt*(en.angry>0?1.6:1);
-        if(en.x < plat.x+4){ en.x = plat.x+4; en.dir = 1; }
-        if(en.x+en.w > plat.x+plat.w-4){ en.x = plat.x+plat.w-4-en.w; en.dir = -1; }
-        // patrol physics: apply gravity and land back on assigned platform
+        // patrol physics: full gravity + collision so enemies don't clip through platforms
         en.vy += GRAVITY * dt;
         en.y += en.vy * dt;
-        if(en.vy >= 0 && en.y + en.h >= plat.y){
+        resolvePlatformCollision(en);
+        // also snap to assigned platform as primary home
+        if(en.vy >= 0 && en.y + en.h >= plat.y &&
+           en.x + en.w > plat.x && en.x < plat.x + plat.w){
           en.y = plat.y - en.h;
           en.vy = 0;
           en.onGround = true;
-        } else {
-          en.onGround = false;
+        }
+        // safety: never fall below ground
+        if(en.y + en.h > 445){ en.y = 445 - en.h; en.vy = 0; en.onGround = true; }
+        // bounce at assigned platform edges
+        if(en.onGround){
+          if(en.x < plat.x+4){ en.x = plat.x+4; en.dir = 1; }
+          if(en.x+en.w > plat.x+plat.w-4){ en.x = plat.x+plat.w-4-en.w; en.dir = -1; }
         }
         // periodic hop on patrol platform
         if(en.onGround && en.hopT <= 0){
@@ -3198,11 +3205,13 @@
         }
       }
 
-      players.forEach(function(p){
-        if(p.invuln<=0 && rectsOverlap(p, en)){
-          loseLife(p, en.x + en.w/2 < p.x + p.w/2 ? -1 : 1);
-        }
-      });
+      if(gameState === 'playing'){
+        players.forEach(function(p){
+          if(p.invuln<=0 && rectsOverlap(p, en)){
+            loseLife(p, en.x + en.w/2 < p.x + p.w/2 ? -1 : 1);
+          }
+        });
+      }
     });
 
     // particles
