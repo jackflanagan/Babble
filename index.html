@@ -495,9 +495,6 @@
     <div class="best-score" id="bestScoreLine" hidden></div>
     <div style="font-size:11px;color:var(--dim-text);text-align:center;margin-top:8px;letter-spacing:0.05em;text-transform:uppercase;">Achievements</div>
     <div id="achievementBadges" style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:520px;margin-top:4px;"></div>
-    <div id="allClearedBanner" hidden style="text-align:center;font-size:14px;color:var(--gold);font-weight:700;padding:8px;background:rgba(255,207,92,0.1);border:1px solid rgba(255,207,92,0.3);border-radius:10px;max-width:400px;margin-top:8px;">
-      🌍 World tour complete! Null Island awaits… 🌍
-    </div>
   </section>
 
   <!-- GAME SCENE -->
@@ -837,7 +834,7 @@
     { id:'kenya', name:'Kenya', lat:-1.28, lon:36.82, unlocked:false },
     { id:'paris', name:'Paris', lat:48.85, lon:2.35, unlocked:false },
     { id:'ireland', name:'Ireland', lat:53.33, lon:-6.25, unlocked:false },
-    { id:'boss', name:'Null Island', lat:0, lon:0, unlocked:false }
+    { id:'boss', name:'China', lat:35.86, lon:104.19, unlocked:false }
   ];
 
   // Real, simplified world coastlines (Natural Earth 110m land polygons,
@@ -1093,7 +1090,7 @@
         }
       }
     });
-    // Unlock boss (Null Island) when ALL of glasgow, modena, kenya, paris, ireland are cleared
+    // Unlock China boss when ALL of glasgow, modena, kenya, paris, ireland are cleared
     var allCleared = ['glasgow','modena','kenya','paris','ireland'].every(function(id){
       return progress[id] && progress[id].cleared;
     });
@@ -1123,11 +1120,6 @@
       var pr = progress[loc.id];
       if(pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add('cleared');
     });
-    var allMainCleared = ['glasgow','modena','kenya','paris','ireland'].every(function(id){
-      return progress[id] && progress[id].cleared;
-    });
-    var celebEl = document.getElementById('allClearedBanner');
-    if(celebEl) celebEl.hidden = !allMainCleared;
     renderBestScores();
     buildSkinDots();
   }
@@ -1723,6 +1715,8 @@
     {x:270, y:96, w:180, h:18}
   ];
 
+  var BOSS_SPAWN = [{x:330, y:390, w:54, h:46, vx:100, hits:3}];
+
   var ENEMY_SPAWNS = [
     {x:260, y:230, platform:3},
     {x:600, y:404, platform:0},
@@ -1731,7 +1725,6 @@
     {x:520, y:146, platform:5}
   ];
 
-  var BOSS_SPAWN = [{x:330, y:390, w:54, h:46, vx:100, hits:3}];
 
   var COLLECTIBLE_SPOTS = [
     {x:100, y:322, slot:'a'}, {x:600, y:322, slot:'b'}, {x:360, y:234, slot:'c'},
@@ -1980,64 +1973,47 @@
       collectibleDraw:drawIrelandCollectibleRef
     },
     boss:{
-      name:'Null Island',
-      blurb:'The Kraken awakens at Null Island. Three hits to defeat it — each hit makes it faster and angrier. This is the final test.',
+      name:'China',
+      blurb:'A mighty dragon guards the mountains. Three hits to defeat it — each hit makes it faster and angrier. This is the final test.',
       values:{ a:100, b:60, c:250, pop:500 },
       theme:{
-        skyTop:'#0a0520', skyMid:'#1a0a40', skyBottom:'#2a1060',
-        sunColor:'rgba(80,0,120,0.6)',
-        groundBase:'#0a0018', groundEdge:'#1a0030', detailColor:['#2a0060','#1a0040'],
-        platformTop:'#1a0840', platformBody:'#0a0020', platformDetail:'#2a0060',
+        skyTop:'#c0392b', skyMid:'#e74c3c', skyBottom:'#f39c12',
+        sunColor:'rgba(255,220,50,0.95)',
+        groundBase:'#5d4037', groundEdge:'#795548', detailColor:['#c0392b','#e74c3c'],
+        platformTop:'#c0392b', platformBody:'#922b21', platformDetail:'#7b241c',
         drawBackdrop:function(){
-          // stars / void
-          ctx.fillStyle = 'rgba(255,255,255,0.8)';
-          var starSeed = 42;
-          for(var si=0;si<80;si++){
-            starSeed = (starSeed*1664525+1013904223)&0xffffffff;
-            var sx = ((starSeed>>>16)&0xffff)/65535*W;
-            starSeed = (starSeed*1664525+1013904223)&0xffffffff;
-            var sy = ((starSeed>>>16)&0xffff)/65535*300;
-            starSeed = (starSeed*1664525+1013904223)&0xffffffff;
-            var sr = ((starSeed>>>16)&0xffff)/65535*1.5+0.5;
-            ctx.beginPath(); ctx.arc(sx,sy,sr,0,TAU); ctx.fill();
-          }
-          // void portal glow
-          var portalGrad = ctx.createRadialGradient(360,150,10,360,150,120);
-          portalGrad.addColorStop(0,'rgba(120,0,200,0.35)');
-          portalGrad.addColorStop(0.5,'rgba(60,0,120,0.15)');
-          portalGrad.addColorStop(1,'rgba(0,0,0,0)');
-          ctx.fillStyle = portalGrad;
-          ctx.beginPath(); ctx.ellipse(360,150,120,80,0,0,TAU); ctx.fill();
+          // misty mountains
+          ctx.fillStyle = 'rgba(120,80,60,0.35)';
+          [[0,300,120,220,240,300],[180,300,340,195,500,300],[420,300,560,215,720,300]].forEach(function(pts){
+            ctx.beginPath(); ctx.moveTo(pts[0],pts[1]); ctx.quadraticCurveTo(pts[2],pts[3],pts[4],pts[5]); ctx.lineTo(pts[4],400); ctx.lineTo(pts[0],400); ctx.fill();
+          });
+          // The Great Wall silhouette
+          ctx.fillStyle = 'rgba(100,60,40,0.5)';
+          ctx.fillRect(0,270,720,12);
+          for(var ti=0;ti<14;ti++){ ctx.fillRect(ti*52,255,28,18); }
+          // pagoda
+          ctx.fillStyle = 'rgba(180,40,30,0.55)';
+          ctx.fillRect(560,210,60,60); ctx.fillRect(550,200,80,14);
+          ctx.fillRect(565,195,50,8); ctx.fillRect(575,188,30,8);
+          ctx.fillStyle = 'rgba(220,60,40,0.6)';
+          ctx.fillRect(546,198,88,6); ctx.fillRect(562,186,56,6); ctx.fillRect(572,178,36,6);
         },
         drawCenterpiece:function(x,y){
           ctx.save(); ctx.translate(x,y);
-          // void portal / skull
-          var t = performance.now()*0.002;
-          // outer ring
-          ctx.strokeStyle = 'rgba(150,0,255,0.5)';
-          ctx.lineWidth = 4;
-          ctx.beginPath(); ctx.arc(0,0,44,0,TAU); ctx.stroke();
-          ctx.strokeStyle = 'rgba(200,80,255,0.3)';
-          ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(0,0,52+Math.sin(t*3)*4,0,TAU); ctx.stroke();
-          // skull face
-          ctx.fillStyle = '#1a0030';
-          ctx.beginPath(); ctx.ellipse(0,-4,28,26,0,0,TAU); ctx.fill();
-          ctx.fillStyle = '#0a0018';
-          ctx.beginPath(); ctx.roundRect(-20,12,40,16,4); ctx.fill();
-          // eye sockets glow
-          ctx.fillStyle = 'rgba(200,0,255,0.7)';
-          ctx.beginPath(); ctx.ellipse(-10,-8,8,9,0,0,TAU); ctx.fill();
-          ctx.beginPath(); ctx.ellipse(10,-8,8,9,0,0,TAU); ctx.fill();
-          // teeth
-          ctx.fillStyle = 'rgba(180,120,255,0.5)';
-          for(var ti=0;ti<5;ti++){
-            ctx.beginPath(); ctx.moveTo(-16+ti*8,12); ctx.lineTo(-13+ti*8,20); ctx.lineTo(-10+ti*8,12); ctx.fill();
-          }
+          // Chinese temple gate (paifang)
+          ctx.fillStyle = '#c0392b';
+          ctx.fillRect(-36,0,8,80); ctx.fillRect(28,0,8,80);
+          ctx.fillRect(-40,-8,88,14); ctx.fillRect(-34,-24,76,18);
+          ctx.fillRect(-30,-38,68,16);
+          ctx.fillStyle = '#f39c12';
+          ctx.fillRect(-38,-10,84,4); ctx.fillRect(-36,-26,72,4); ctx.fillRect(-32,-40,64,4);
+          ctx.fillStyle = '#922b21';
+          ctx.beginPath(); ctx.moveTo(-42,-8); ctx.lineTo(-36,-28); ctx.lineTo(-30,-8); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(30,-8); ctx.lineTo(36,-28); ctx.lineTo(42,-8); ctx.fill();
           ctx.restore();
         }
       },
-      enemyDraw:drawKrakenRef,
+      enemyDraw:drawDragonRef,
       collectibleDraw:drawScotCollectibleRef
     }
   };
@@ -2696,7 +2672,7 @@
       var plat = PLATFORMS[en.platform] || PLATFORMS[0];
 
       if(chasing && players.length > 0){
-        // find nearest player by x distance only — chase on ground floor
+        // find nearest player
         var nearest = players[0];
         var bestDist = Math.abs(players[0].x - en.x);
         for(var cp=1; cp<players.length; cp++){
@@ -2706,18 +2682,36 @@
         en.dir = nearest.x > en.x ? 1 : -1;
         var speed = en.vx * (en.angry>0 ? 1.8 : 1.3);
         en.x += speed * en.dir * dt;
-        if(en.x < -en.w) en.x = W;
-        if(en.x > W) en.x = -en.w;
-        // keep on ground — no ledge-getting-stuck
-        var ground = PLATFORMS[0];
-        en.y = ground.y - en.h;
-        en.vy = 0;
+        // full physics — enemies can jump up to reach the player
+        en.vy += GRAVITY * dt;
+        en.y += en.vy * dt;
+        resolvePlatformCollision(en);
+        // jump when player is on a higher platform and we've landed
+        if(en.onGround && nearest.y < en.y - 40 && en.hopT <= 0){
+          en.vy = -500;
+          en.onGround = false;
+          en.hopT = rand(0.6, 1.4);
+        }
       } else {
         en.x += en.vx*en.dir*dt*(en.angry>0?1.6:1);
         if(en.x < plat.x+4){ en.x = plat.x+4; en.dir = 1; }
         if(en.x+en.w > plat.x+plat.w-4){ en.x = plat.x+plat.w-4-en.w; en.dir = -1; }
-        en.y = plat.y - en.h;
-        en.vy = 0;
+        // patrol physics: apply gravity and land back on assigned platform
+        en.vy += GRAVITY * dt;
+        en.y += en.vy * dt;
+        if(en.vy >= 0 && en.y + en.h >= plat.y){
+          en.y = plat.y - en.h;
+          en.vy = 0;
+          en.onGround = true;
+        } else {
+          en.onGround = false;
+        }
+        // periodic hop on patrol platform
+        if(en.onGround && en.hopT <= 0){
+          en.vy = -300;
+          en.onGround = false;
+          en.hopT = rand(1.5, 3.5);
+        }
       }
 
       players.forEach(function(p){
@@ -3337,41 +3331,44 @@
     ctx.restore();
   }
 
-  /* ---------- drawing: Boss Kraken ---------- */
-  function drawKrakenRef(en){
+  /* ---------- drawing: Boss Dragon (China) ---------- */
+  function drawDragonRef(en){
     ctx.save();
-    var t = performance.now()*0.004;
-    var wob = Math.sin(t + en.x*0.03)*4;
+    var t = performance.now()*0.003;
+    var wob = Math.sin(t*1.4 + en.x*0.03)*5;
     ctx.translate(en.x+en.w/2, en.y+en.h/2+wob);
     var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
-    var bodyCol = en.state==='trapped' ? '#c0a0ff' : (flash ? '#ff4444' : '#4a1080');
-    var darkCol = en.state==='trapped' ? '#9070cc' : (flash ? '#cc2222' : '#2a0050');
-    // tentacles (8)
-    for(var ti=0;ti<8;ti++){
-      var angle = (ti/8)*TAU + t*0.5;
-      var tx2 = Math.cos(angle)*(en.w*0.6);
-      var ty2 = Math.sin(angle)*(en.h*0.4)+8;
-      var waved = Math.sin(t*2+ti)*6;
-      ctx.strokeStyle = darkCol; ctx.lineWidth=7; ctx.lineCap='round';
-      ctx.beginPath();
-      ctx.moveTo(tx2*0.4, ty2*0.4);
-      ctx.quadraticCurveTo(tx2*0.8+waved, ty2*0.8+waved, tx2+waved, ty2+waved);
-      ctx.stroke();
-      ctx.strokeStyle = bodyCol; ctx.lineWidth=4;
-      ctx.stroke();
+    var bodyCol = en.state==='trapped' ? '#ffcc88' : (flash ? '#ff6600' : '#c0392b');
+    var scaleCol = en.state==='trapped' ? '#ff9940' : (flash ? '#ff3300' : '#922b21');
+    var goldCol = en.state==='trapped' ? '#ffe080' : (flash ? '#ffcc00' : '#f39c12');
+    // serpent body segments (wavy)
+    for(var si=0;si<5;si++){
+      var sx = Math.sin(t*1.5+si*0.9)*(si*3.5);
+      var sy = si*7;
+      ctx.fillStyle = si%2===0 ? bodyCol : scaleCol;
+      ctx.beginPath(); ctx.ellipse(sx, sy, en.w*0.32-si*1.5, en.h*0.22-si, 0, 0, TAU); ctx.fill();
     }
-    // main body
-    ctx.fillStyle = darkCol;
-    ctx.beginPath(); ctx.ellipse(0,0,en.w*0.42,en.h*0.42,0,0,TAU); ctx.fill();
+    // head
     ctx.fillStyle = bodyCol;
-    ctx.beginPath(); ctx.ellipse(0,-2,en.w*0.36,en.h*0.36,0,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0,-12, en.w*0.38, en.h*0.30, 0, 0, TAU); ctx.fill();
+    // snout
+    ctx.fillStyle = scaleCol;
+    ctx.beginPath(); ctx.ellipse(en.dir*10,-14, 10, 7, 0.3*en.dir, 0, TAU); ctx.fill();
+    // mane/whiskers
+    ctx.strokeStyle = goldCol; ctx.lineWidth=2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(-8,-18); ctx.quadraticCurveTo(-18,-28,-14,-36); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8,-18); ctx.quadraticCurveTo(18,-28,14,-36); ctx.stroke();
     // eyes
-    ctx.fillStyle = flash ? '#fff' : '#ff00ff';
-    ctx.beginPath(); ctx.arc(-9,-4,5,0,TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(9,-4,5,0,TAU); ctx.fill();
+    ctx.fillStyle = flash ? '#fff' : goldCol;
+    ctx.beginPath(); ctx.arc(-8,-12,4,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(8,-12,4,0,TAU); ctx.fill();
     ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.arc(-9,-4,2.5,0,TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(9,-4,2.5,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(-8,-12,2,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(8,-12,2,0,TAU); ctx.fill();
+    // horns
+    ctx.fillStyle = goldCol;
+    ctx.beginPath(); ctx.moveTo(-6,-20); ctx.lineTo(-10,-34); ctx.lineTo(-3,-22); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(6,-20); ctx.lineTo(10,-34); ctx.lineTo(3,-22); ctx.fill();
     // HP pips above boss
     if(en.hits){
       for(var hp=0;hp<3;hp++){
