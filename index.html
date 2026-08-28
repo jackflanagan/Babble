@@ -117,7 +117,8 @@
     gap:4px;
     background:none;
     border:none;
-    padding:0;
+    padding:10px;
+    margin:-10px;
     cursor:pointer;
     will-change: transform, opacity;
   }
@@ -453,6 +454,11 @@
 
   @media (min-width: 720px){
     .touch-controls{ display:none; }
+  }
+  @media (max-width: 719px){
+    #localControls{ display:none; }
+    #localControlsHint{ display:none; }
+    #skinSelector{ display:none; }
   }
 
   footer{
@@ -1026,7 +1032,7 @@
     gctx.beginPath(); gctx.arc(globeCX, globeCY, globeR*1.14, 0, TAU); gctx.fill();
   }
 
-  var pinEls = {};
+  var pinEls = {}, chipEls = {};
   var rosterEl = document.getElementById('roster');
   LOCATIONS.forEach(function(loc){
     var btn = document.createElement('button');
@@ -1049,18 +1055,15 @@
     var chip = document.createElement('div');
     chip.className = 'chip' + (loc.unlocked ? ' active' : '');
     chip.innerHTML = '<span class="dot-mini"></span>' + loc.name;
-    chip.title = loc.unlocked ? 'Fly to ' + loc.name : 'Locked';
+    chip.title = loc.unlocked ? 'Play ' + loc.name : 'Locked';
     if(loc.unlocked){
       chip.style.cursor = 'pointer';
       (function(l){ chip.addEventListener('click', function(){
-        // rotate globe to face this location and zoom in
-        globeTargetRot = -(l.lon * Math.PI/180);
-        globeTargetZoom = 1.55;
-        // reset zoom out after 3s
-        setTimeout(function(){ globeTargetZoom = 1.0; }, 3000);
+        enterLocation(l);
       }); })(loc);
     }
     rosterEl.appendChild(chip);
+    chipEls[loc.id] = chip;
   });
 
   function refreshClearedPin(){
@@ -1081,6 +1084,13 @@
             enterLocation(loc);
           });
         }
+        var chip = chipEls[id];
+        if(chip){
+          chip.classList.add('active');
+          chip.title = 'Play ' + loc.name;
+          chip.style.cursor = 'pointer';
+          (function(l){ chip.addEventListener('click', function(){ enterLocation(l); }); })(loc);
+        }
       }
     });
     // Unlock boss (Null Island) when ALL of glasgow, modena, kenya, paris, ireland are cleared
@@ -1100,6 +1110,13 @@
           if(netRole==='guest' && netConnected) return;
           enterLocation(bossLoc);
         });
+      }
+      var bossChip = chipEls['boss'];
+      if(bossChip){
+        bossChip.classList.add('active');
+        bossChip.title = 'Play ' + bossLoc.name;
+        bossChip.style.cursor = 'pointer';
+        (function(l){ bossChip.addEventListener('click', function(){ enterLocation(l); }); })(bossLoc);
       }
     }
     LOCATIONS.forEach(function(loc){
