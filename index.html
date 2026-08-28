@@ -1918,31 +1918,10 @@
   bindHold('tJump','p1Jump', function(){ localJumpPress(); });
   bindHold('tBubble','p1Bubble', function(){ localBubblePress(); });
 
-  var PLATFORMS = [
-    {x:0, y:440, w:720, h:40, ground:true},
-    {x:40, y:350, w:160, h:18},
-    {x:520, y:350, w:160, h:18},
-    {x:220, y:262, w:280, h:18},
-    {x:40, y:174, w:160, h:18},
-    {x:520, y:174, w:160, h:18},
-    {x:270, y:96, w:180, h:18}
-  ];
+  var PLATFORMS = [];
+  var movingPlatforms = [];
 
   var BOSS_SPAWN = [{x:330, y:390, w:54, h:46, vx:100, hits:3}];
-
-  var ENEMY_SPAWNS = [
-    {x:260, y:230, platform:3},
-    {x:600, y:404, platform:0},
-    {x:70, y:322, platform:1},
-    {x:300, y:68, platform:6},
-    {x:520, y:146, platform:5}
-  ];
-
-
-  var COLLECTIBLE_SPOTS = [
-    {x:100, y:322, slot:'a'}, {x:600, y:322, slot:'b'}, {x:360, y:234, slot:'c'},
-    {x:100, y:146, slot:'b'}, {x:600, y:146, slot:'a'}, {x:360, y:68, slot:'c'}
-  ];
 
   /* ---------- per-location theming ---------- */
   function drawSkylineRow(buildings, color, baseY){
@@ -1951,6 +1930,160 @@
       ctx.fillRect(b.x, baseY-b.h, b.w, b.h);
     });
   }
+
+  var LEVEL_LAYOUTS = {
+  glasgow: {
+    platforms: [
+      {x:0, y:440, w:720, h:40, ground:true},
+      {x:40, y:350, w:160, h:18},
+      {x:520, y:350, w:160, h:18},
+      {x:220, y:262, w:280, h:18},
+      {x:40, y:174, w:160, h:18},
+      {x:520, y:174, w:160, h:18},
+      {x:270, y:96, w:180, h:18}
+    ],
+    enemySpawns: [
+      {x:260, y:230, platform:3},
+      {x:600, y:404, platform:0},
+      {x:70, y:322, platform:1},
+      {x:300, y:68, platform:6},
+      {x:520, y:146, platform:5}
+    ],
+    collectibleSpots: [
+      {x:100, y:322, slot:'a'},{x:600, y:322, slot:'b'},{x:360, y:234, slot:'c'},
+      {x:100, y:146, slot:'b'},{x:600, y:146, slot:'a'},{x:360, y:68, slot:'c'}
+    ],
+    movingPlatformDefs: [
+      {ox:260, oy:310, w:120, h:18, axis:'x', amplitude:90, speed:0.7}
+    ],
+    enemyVariety: {specialType:'armoured', waveRatio:0.4}
+  },
+  modena: {
+    platforms: [
+      {x:0, y:440, w:720, h:40, ground:true},
+      {x:20, y:350, w:200, h:18},
+      {x:500, y:350, w:200, h:18},
+      {x:160, y:255, w:400, h:18},
+      {x:50, y:165, w:110, h:18},
+      {x:560, y:165, w:110, h:18},
+      {x:275, y:85, w:170, h:18}
+    ],
+    enemySpawns: [
+      {x:80, y:320, platform:1},
+      {x:580, y:320, platform:2},
+      {x:280, y:225, platform:3},
+      {x:80, y:135, platform:4},
+      {x:580, y:135, platform:5}
+    ],
+    collectibleSpots: [
+      {x:100, y:320, slot:'a'},{x:600, y:320, slot:'b'},{x:350, y:225, slot:'c'},
+      {x:100, y:135, slot:'b'},{x:610, y:135, slot:'a'},{x:360, y:55, slot:'c'}
+    ],
+    movingPlatformDefs: [
+      {ox:360, oy:210, w:100, h:18, axis:'y', amplitude:45, speed:0.9}
+    ],
+    enemyVariety: {specialType:'fast', waveRatio:0.5}
+  },
+  paris: {
+    platforms: [
+      {x:0, y:440, w:720, h:40, ground:true},
+      {x:30, y:375, w:130, h:18},
+      {x:560, y:375, w:130, h:18},
+      {x:75, y:285, w:170, h:18},
+      {x:475, y:285, w:170, h:18},
+      {x:35, y:190, w:135, h:18},
+      {x:550, y:190, w:135, h:18},
+      {x:295, y:100, w:130, h:18}
+    ],
+    enemySpawns: [
+      {x:60, y:345, platform:1},
+      {x:600, y:345, platform:2},
+      {x:130, y:255, platform:3},
+      {x:530, y:255, platform:4},
+      {x:80, y:160, platform:5}
+    ],
+    collectibleSpots: [
+      {x:80, y:345, slot:'a'},{x:610, y:345, slot:'b'},{x:145, y:255, slot:'c'},
+      {x:530, y:255, slot:'b'},{x:90, y:160, slot:'a'},{x:350, y:70, slot:'c'}
+    ],
+    movingPlatformDefs: [
+      {ox:280, oy:215, w:110, h:18, axis:'x', amplitude:80, speed:0.8}
+    ],
+    enemyVariety: {specialType:'fast', waveRatio:0.4}
+  },
+  ireland: {
+    platforms: [
+      {x:0, y:440, w:720, h:40, ground:true},
+      {x:15, y:360, w:220, h:18},
+      {x:540, y:355, w:165, h:18},
+      {x:255, y:270, w:210, h:18},
+      {x:40, y:185, w:155, h:18},
+      {x:525, y:185, w:155, h:18},
+      {x:295, y:100, w:130, h:18}
+    ],
+    enemySpawns: [
+      {x:80, y:330, platform:1},
+      {x:595, y:325, platform:2},
+      {x:310, y:240, platform:3},
+      {x:95, y:155, platform:4},
+      {x:570, y:155, platform:5}
+    ],
+    collectibleSpots: [
+      {x:100, y:330, slot:'a'},{x:605, y:325, slot:'b'},{x:340, y:240, slot:'c'},
+      {x:100, y:155, slot:'b'},{x:580, y:155, slot:'a'},{x:350, y:70, slot:'c'}
+    ],
+    movingPlatformDefs: [
+      {ox:340, oy:225, w:115, h:18, axis:'x', amplitude:90, speed:0.65}
+    ],
+    enemyVariety: {specialType:'armoured', waveRatio:0.35}
+  },
+  kenya: {
+    platforms: [
+      {x:0, y:440, w:720, h:40, ground:true},
+      {x:20, y:365, w:155, h:18},
+      {x:545, y:365, w:155, h:18},
+      {x:245, y:295, w:230, h:18},
+      {x:25, y:205, w:145, h:18},
+      {x:550, y:205, w:145, h:18},
+      {x:195, y:115, w:330, h:18}
+    ],
+    enemySpawns: [
+      {x:70, y:335, platform:1},
+      {x:605, y:335, platform:2},
+      {x:310, y:265, platform:3},
+      {x:70, y:175, platform:4},
+      {x:605, y:175, platform:5}
+    ],
+    collectibleSpots: [
+      {x:80, y:335, slot:'a'},{x:615, y:335, slot:'b'},{x:350, y:265, slot:'c'},
+      {x:80, y:175, slot:'b'},{x:615, y:175, slot:'a'},{x:360, y:85, slot:'c'}
+    ],
+    movingPlatformDefs: [
+      {ox:360, oy:255, w:130, h:18, axis:'x', amplitude:110, speed:1.0}
+    ],
+    enemyVariety: {specialType:'armoured', waveRatio:0.5}
+  },
+  boss: {
+    platforms: [
+      {x:0, y:440, w:720, h:40, ground:true},
+      {x:35, y:330, w:105, h:18},
+      {x:580, y:330, w:105, h:18},
+      {x:255, y:240, w:210, h:18},
+      {x:75, y:150, w:115, h:18},
+      {x:530, y:150, w:115, h:18},
+      {x:305, y:65, w:110, h:18}
+    ],
+    enemySpawns: [
+      {x:330, y:390, platform:0}
+    ],
+    collectibleSpots: [
+      {x:80, y:300, slot:'a'},{x:615, y:300, slot:'b'},{x:360, y:210, slot:'c'},
+      {x:120, y:120, slot:'b'},{x:580, y:120, slot:'a'},{x:360, y:35, slot:'c'}
+    ],
+    movingPlatformDefs: [],
+    enemyVariety: null
+  }
+};
 
   var LEVELS = {
     glasgow: {
@@ -2233,7 +2366,8 @@
 
   var players, enemies, bubbles, collectibles, particles, popups, powerups, popBursts;
   var score = 0, lives = 3, gameState = 'ready', enemiesLeft = 0, startTime = 0;
-  var shakeT = 0, waveNumber = 1, comboCount = 0, comboTimer = 0, waveFlash = 0;
+  var shakeT = 0, waveNumber = 1, comboCount = 0, comboTimer = 0, waveFlash = 0, screenFlash = 0;
+  var tutorialT = 0, tutorialDone = false, tutorialFirstPop = false;
   var survivorUnlocked = false;
   var usedPowerups = {};
   var CHASE_DELAY = 12;
@@ -2436,6 +2570,14 @@
     var diffMult = Math.min(1 + playCount * 0.12, 2.2);
     var adjustedChaseDelay = Math.max(5, CHASE_DELAY / diffMult);
 
+    var layout = LEVEL_LAYOUTS[currentLocationId];
+    PLATFORMS = layout.platforms;
+    movingPlatforms = (layout.movingPlatformDefs || []).map(function(d){
+      return {x:d.ox, y:d.oy, w:d.w, h:d.h, ox:d.ox, oy:d.oy, axis:d.axis, amplitude:d.amplitude, speed:d.speed};
+    });
+    var currentEnemySpawns = layout.enemySpawns;
+    var currentCollectibleSpots = layout.collectibleSpots;
+
     if(currentLocationId === 'boss'){
       enemies = BOSS_SPAWN.map(function(s){
         return { x:s.x, y:s.y, w:s.w, h:s.h, vx:s.vx, vy:0, dir: Math.random()<0.5?1:-1, platform:0,
@@ -2443,9 +2585,9 @@
       });
       waveNumber = 99;
     } else {
-      enemies = ENEMY_SPAWNS.map(function(s){
+      enemies = currentEnemySpawns.map(function(s){
         return { x:s.x, y:s.y, w:28, h:26, vx:Math.round(70 * diffMult), vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
-          state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false };
+          state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false, type:'normal' };
       });
       waveNumber = 1;
     }
@@ -2460,12 +2602,17 @@
     survivorUnlocked = false;
     usedPowerups = {};
 
+    var locPlayCount2 = (progress[currentLocationId] && progress[currentLocationId].playCount) || 0;
+    tutorialDone = locPlayCount2 > 0;
+    tutorialT = 0;
+    tutorialFirstPop = false;
+
     /* Feature 5: Reset events */
     activeEvent = null; eventTimer = 0; nextEventIn = rand(20,35);
 
     /* Feature 6: Ghost collectibles */
     var missedPrev = safeGet('gh_missed_'+currentLocationId, []);
-    collectibles = COLLECTIBLE_SPOTS.map(function(c){
+    collectibles = currentCollectibleSpots.map(function(c){
       var wasMissed = missedPrev.some(function(m){ return m.x===c.x && m.y===c.y; });
       return {x:c.x, y:c.y, slot:c.slot, taken:false, bob:Math.random()*TAU, ghost:wasMissed};
     });
@@ -2482,10 +2629,10 @@
       enemiesLeft = 999;
       enemies = [];
       for(var si=0; si<3; si++){
-        var ss = ENEMY_SPAWNS[si % ENEMY_SPAWNS.length];
+        var ss = currentEnemySpawns[si % currentEnemySpawns.length];
         enemies.push({ x:ss.x, y:ss.y, w:28, h:26, vx:70, vy:0,
           dir:Math.random()<0.5?1:-1, platform:ss.platform,
-          state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false, hits:1 });
+          state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false, hits:1, type:'normal' });
       }
     }
 
@@ -2640,8 +2787,9 @@
 
   function resolvePlatformCollision(ent){
     ent.onGround = false;
-    for(var i=0;i<PLATFORMS.length;i++){
-      var p = PLATFORMS[i];
+    var allPlats = PLATFORMS.concat(movingPlatforms);
+    for(var i=0;i<allPlats.length;i++){
+      var p = allPlats[i];
       if(ent.vy >= 0 &&
          ent.x + ent.w > p.x && ent.x < p.x + p.w &&
          (ent.y+ent.h) >= p.y && (ent.y+ent.h) <= p.y + Math.max(18, ent.vy/30 + 18) &&
@@ -2663,8 +2811,8 @@
       });
     }
   }
-  function spawnPopup(x,y,text,color){
-    popups.push({x:x,y:y,text:text,t:0,color:color||'#ffd166'});
+  function spawnPopup(x,y,text,color,size){
+    popups.push({x:x,y:y,text:text,t:0,color:color||'#ffd166',size:size||16});
   }
 
   // Trigger functions for jump/shoot. Called both from the per-frame input
@@ -2709,10 +2857,10 @@
         var count = Math.min(3 + survivalWave, 8);
         var sp = Math.min(70 + survivalWave*15, 220);
         for(var si=0; si<count; si++){
-          var s = ENEMY_SPAWNS[si % ENEMY_SPAWNS.length];
-          enemies.push({ x:s.x, y:s.y, w:28, h:26, vx:sp, vy:0,
-            dir:Math.random()<0.5?1:-1, platform:s.platform,
-            state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false, hits:1 });
+          var ss = LEVEL_LAYOUTS[currentLocationId].enemySpawns[si % LEVEL_LAYOUTS[currentLocationId].enemySpawns.length];
+          enemies.push({ x:ss.x, y:ss.y, w:28, h:26, vx:sp, vy:0,
+            dir:Math.random()<0.5?1:-1, platform:ss.platform,
+            state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false, hits:1, type:'normal' });
         }
         spawnPopup(W/2, 60, 'WAVE '+survivalWave+'!', '#ff5470');
       }
@@ -2727,6 +2875,18 @@
     }
     if(comboTimer>0) comboTimer -= dt; else comboCount = 0;
     if(waveFlash>0) waveFlash -= dt;
+    if(screenFlash>0) screenFlash -= dt*2.5;
+    /* moving platforms */
+    var nowSec = performance.now()/1000;
+    movingPlatforms.forEach(function(mp){
+      if(mp.axis==='x') mp.x = mp.ox + Math.sin(nowSec * mp.speed) * mp.amplitude;
+      else mp.y = mp.oy + Math.sin(nowSec * mp.speed) * mp.amplitude;
+    });
+    /* tutorial timer */
+    if(!tutorialDone && gameState==='playing'){
+      tutorialT += dt;
+      if(tutorialT > 12) tutorialDone = true;
+    }
 
     var accel = 900, fric = 1300;
     players.forEach(function(p){
@@ -2865,10 +3025,11 @@
           var multiplier = Math.min(comboCount, 6);
           var pts = basePoints * multiplier;
           var label = multiplier>1 ? '+'+pts+' x'+multiplier+'!' : '+'+pts;
-          spawnPopup(b.x, b.y-10, label, multiplier>1?'#ff5470':'#ff9c7a');
+          spawnPopup(b.x, b.y-10, label, multiplier>1?'#ff5470':'#ff9c7a', multiplier>1 ? 14+multiplier*4 : 16);
           spawnParticles(b.x,b.y,multiplier>2?'#ff5470':'#ff9c7a',14);
           score += pts;
           playSound('pop');
+          tutorialFirstPop = true;
           unlockAchievement('first_pop');
           if(comboCount >= 3) unlockAchievement('combo3');
           // 35% chance to drop a power-up
@@ -2897,6 +3058,44 @@
           }
         }
       }
+    }
+
+    /* Chain-pop: carrying bubbles that touch each other both pop */
+    if(gameState==='playing'){
+      var chainPopped = [];
+      for(var cai=0; cai<bubbles.length; cai++){
+        if(bubbles[cai].state!=='carrying') continue;
+        for(var cbi=cai+1; cbi<bubbles.length; cbi++){
+          if(bubbles[cbi].state!=='carrying') continue;
+          var cdx=bubbles[cai].x-bubbles[cbi].x, cdy=bubbles[cai].y-bubbles[cbi].y;
+          var cminD = bubbles[cai].r + bubbles[cbi].r;
+          if(cdx*cdx+cdy*cdy < cminD*cminD){
+            if(chainPopped.indexOf(cai)<0) chainPopped.push(cai);
+            if(chainPopped.indexOf(cbi)<0) chainPopped.push(cbi);
+          }
+        }
+      }
+      chainPopped.sort(function(a,b){return b-a;});
+      chainPopped.forEach(function(cidx){
+        var cb=bubbles[cidx]; if(!cb||cb.state!=='carrying') return;
+        var cen=cb.trapped; if(!cen) return;
+        comboCount++; comboTimer=2.2;
+        var pts=(level.values.pop)*Math.min(comboCount,6);
+        spawnPopup(cb.x,cb.y-10,'\u26d3 CHAIN +'+pts,'#ff5470',22);
+        spawnParticles(cb.x,cb.y,'#ff5470',18);
+        score+=pts; playSound('pop');
+        tutorialFirstPop=true;
+        var ei=enemies.indexOf(cen);
+        if(ei>-1){enemies.splice(ei,1);enemiesLeft--;}
+        bubbles.splice(cidx,1);
+        popBursts.push({x:cb.x,y:cb.y,vx:rand(-220,220),vy:rand(-340,-140),
+          rot:0,rotV:rand(-12,12),t:0,life:0.65,
+          drawFn:LEVELS[currentLocationId].enemyDraw,w:cen.w,h:cen.h,hits:0});
+        for(var ci3=0;ci3<5;ci3++){
+          particles.push({x:cb.x+rand(-8,8),y:cb.y+rand(-8,8),
+            vx:rand(-90,90),vy:rand(-180,-60),life:0.7,t:0,color:'#ffd700',r:rand(3,6)});
+        }
+      });
     }
 
     /* Feature 5: Random mid-level events */
@@ -2986,7 +3185,7 @@
 
       players.forEach(function(p){
         if(p.invuln<=0 && rectsOverlap(p, en)){
-          loseLife(p);
+          loseLife(p, en.x + en.w/2 < p.x + p.w/2 ? -1 : 1);
         }
       });
     });
@@ -3045,12 +3244,21 @@
       if(waveNumber < 2){
         waveNumber++;
         chaseAlertPlayed = false;
-        startTime = performance.now(); // reset chase timer for new wave
+        startTime = performance.now();
         var speedMult = 1 + waveNumber*0.3;
-        enemies = ENEMY_SPAWNS.map(function(s){
-          return { x:s.x, y:s.y, w:32, h:30, vx:85*speedMult, vy:0,
+        var layout2 = LEVEL_LAYOUTS[currentLocationId];
+        var variety2 = layout2 && layout2.enemyVariety;
+        enemies = layout2.enemySpawns.map(function(s, si){
+          var useSpecial = variety2 && Math.random() < variety2.waveRatio;
+          var eType = useSpecial ? variety2.specialType : 'normal';
+          var ew = eType==='armoured' ? 34 : eType==='fast' ? 22 : 32;
+          var eh = eType==='armoured' ? 30 : eType==='fast' ? 20 : 30;
+          var spd = eType==='armoured' ? 60*speedMult : eType==='fast' ? 120*speedMult : 85*speedMult;
+          var hits = eType==='armoured' ? 2 : 1;
+          return { x:s.x, y:s.y, w:ew, h:eh, vx:spd, vy:0,
             dir: Math.random()<0.5?1:-1, platform:s.platform,
-            state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false };
+            state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false,
+            type:eType, hits:hits };
         });
         enemiesLeft = enemies.length;
         waveFlash = 2.5;
@@ -3062,14 +3270,15 @@
     }
   }
 
-  function loseLife(p){
-    if(p.shield>0){ p.invuln = 0.5; return; } // shield absorbs hit
+  function loseLife(p, knockDir){
+    if(p.shield>0){ p.invuln = 0.5; return; }
     lives--;
     p.invuln = 1.6;
+    p.vy = -340;
+    p.vx = (knockDir||0) * 240;
+    screenFlash = 0.35;
+    shakeT = 0.4;
     playSound('lose');
-    p.x = p.id===0 ? (numPlayers===2 ? 320 : 360) : 420;
-    p.y = 400; p.vx=0; p.vy=0;
-    shakeT = 0.3;
     updateHud();
     if(lives<=0){
       gameState = 'lost';
@@ -3745,6 +3954,7 @@
     theme.drawBackdrop();
     theme.drawCenterpiece(360,262);
     for(var i=1;i<PLATFORMS.length;i++) drawPlatform(PLATFORMS[i], theme);
+    movingPlatforms.forEach(function(mp){ drawPlatform(mp, theme); });
     drawGround(theme);
 
     collectibles.forEach(function(c){
@@ -3771,6 +3981,25 @@
           ctx.beginPath(); ctx.arc(en.x+en.w/2, en.y+en.h/2, en.w*0.7, 0, TAU); ctx.fill();
           ctx.globalAlpha = 1;
           ctx.restore();
+        }
+        if(en.type==='armoured'){
+          ctx.save();
+          ctx.strokeStyle='rgba(160,200,230,0.8)'; ctx.lineWidth=3;
+          var cr=Math.max(en.w,en.h)*0.6;
+          ctx.beginPath(); ctx.arc(en.x+en.w/2,en.y+en.h/2,cr,0,TAU); ctx.stroke();
+          ctx.fillStyle='rgba(160,200,230,0.18)';
+          ctx.beginPath(); ctx.arc(en.x+en.w/2,en.y+en.h/2,cr,0,TAU); ctx.fill();
+          ctx.restore();
+        }
+        if(en.type==='fast'){
+          ctx.save();
+          var fdx=en.dir<0?1:-1;
+          for(var ti=1;ti<=3;ti++){
+            ctx.globalAlpha=0.12*(4-ti);
+            ctx.fillStyle='#ffd700';
+            ctx.beginPath(); ctx.ellipse(en.x+en.w/2+fdx*ti*7,en.y+en.h/2,en.w*0.3,en.h*0.3,0,0,TAU); ctx.fill();
+          }
+          ctx.globalAlpha=1; ctx.restore();
         }
       }
     });
@@ -3827,7 +4056,26 @@
       }
     });
     bubbles.forEach(drawBubble);
+    bubbles.forEach(function(b){
+      if(b.state==='carrying' && b.trapped && b.trapped.bubbleTimer){
+        var frac=b.trapped.bubbleTimer/4.5;
+        ctx.save();
+        ctx.strokeStyle=frac>0.35?'#7fe3ff':'#ff5470';
+        ctx.lineWidth=3; ctx.globalAlpha=0.85;
+        ctx.beginPath();
+        ctx.arc(b.x,b.y,b.r+5,-Math.PI/2,-Math.PI/2+TAU*frac);
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
 
+    if(screenFlash>0){
+      ctx.save();
+      ctx.globalAlpha=Math.max(0,screenFlash)*0.45;
+      ctx.fillStyle='#ff1040';
+      ctx.fillRect(0,0,W,H);
+      ctx.restore();
+    }
     particles.forEach(function(pp){
       ctx.globalAlpha = clamp(1-pp.t/pp.life,0,1);
       ctx.fillStyle = pp.color;
@@ -3837,7 +4085,7 @@
     popups.forEach(function(up){
       ctx.globalAlpha = clamp(1-up.t/0.9,0,1);
       ctx.fillStyle = up.color;
-      ctx.font = '700 16px "Space Mono", monospace';
+      ctx.font = '700 ' + (up.size||16) + 'px "Space Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillText(up.text, up.x, up.y - up.t*30);
       ctx.globalAlpha = 1;
@@ -3859,6 +4107,22 @@
       ctx.fillStyle = activeEvent.color;
       ctx.fillRect(120, 46, barW, 6);
       ctx.restore();
+    }
+    if(!tutorialDone && gameState==='playing'){
+      var tMsg=tutorialFirstPop?'Jump onto the trapped bubble to pop it!':'Shoot enemies with bubbles! [Shift / bubble button]';
+      var tAlpha;
+      if(!tutorialFirstPop){ tAlpha=Math.min(1,tutorialT*3)*Math.min(1,(6-tutorialT)*2); }
+      else { tAlpha=Math.min(1,(tutorialT-6)*2)*Math.min(1,(12-tutorialT)*2); }
+      tAlpha=Math.max(0,tAlpha);
+      if(tAlpha>0){
+        ctx.save();
+        ctx.globalAlpha=tAlpha;
+        ctx.fillStyle='rgba(12,18,50,0.82)';
+        ctx.beginPath(); ctx.roundRect(W/2-230,H-40,460,30,7); ctx.fill();
+        ctx.fillStyle='#fff'; ctx.font='700 12px "Nunito",sans-serif'; ctx.textAlign='center';
+        ctx.fillText(tMsg,W/2,H-20);
+        ctx.restore();
+      }
     }
     /* Feature 3: Achievement popup — centered, dramatic */
     if(achievementToast){
