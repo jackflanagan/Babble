@@ -829,12 +829,12 @@
   var globeWrap = document.querySelector('.globe-wrap');
 
   var LOCATIONS = [
-    { id:'glasgow', name:'Glasgow', lat:55.86, lon:-4.25, unlocked:true },
-    { id:'modena', name:'Modena', lat:44.65, lon:10.93, unlocked:true },
-    { id:'kenya', name:'Kenya', lat:-1.28, lon:36.82, unlocked:false },
-    { id:'paris', name:'Paris', lat:48.85, lon:2.35, unlocked:false },
-    { id:'ireland', name:'Ireland', lat:53.33, lon:-6.25, unlocked:false },
-    { id:'boss', name:'China', lat:35.86, lon:104.19, unlocked:false }
+    { id:'glasgow', name:'Glasgow', lat:55.86, lon:-4.25, unlocked:true,  region:'europe' },
+    { id:'modena',  name:'Modena',  lat:44.65, lon:10.93, unlocked:true,  region:'europe' },
+    { id:'paris',   name:'Paris',   lat:48.85, lon:2.35,  unlocked:true,  region:'europe' },
+    { id:'ireland', name:'Ireland', lat:53.33, lon:-6.25, unlocked:true,  region:'europe' },
+    { id:'kenya',   name:'Kenya',   lat:-1.28, lon:36.82, unlocked:false, region:'africa' },
+    { id:'boss',    name:'China',   lat:35.86, lon:104.19,unlocked:false, region:'asia'   }
   ];
 
   // Real, simplified world coastlines (Natural Earth 110m land polygons,
@@ -934,16 +934,46 @@
     {lat:-30,lon:-90,r:26},{lat:55,lon:60,r:24},{lat:5,lon:-160,r:30}
   ];
 
+  // Great-circle interpolation between two lat/lon points (returns n+1 points)
+  function greatCircle(lat1,lon1,lat2,lon2,n){
+    var f1=lat1*Math.PI/180, l1=lon1*Math.PI/180;
+    var f2=lat2*Math.PI/180, l2=lon2*Math.PI/180;
+    var x1=Math.cos(f1)*Math.cos(l1), y1=Math.sin(f1), z1=Math.cos(f1)*Math.sin(l1);
+    var x2=Math.cos(f2)*Math.cos(l2), y2=Math.sin(f2), z2=Math.cos(f2)*Math.sin(l2);
+    var dot=clamp(x1*x2+y1*y2+z1*z2,-1,1);
+    var omega=Math.acos(dot);
+    var pts=[];
+    for(var i=0;i<=n;i++){
+      var t=i/n, sinO=Math.sin(omega);
+      var a=sinO>0.001?Math.sin((1-t)*omega)/sinO:(1-t);
+      var b=sinO>0.001?Math.sin(t*omega)/sinO:t;
+      var x=a*x1+b*x2, y=a*y1+b*y2, z=a*z1+b*z2;
+      pts.push({lat:Math.asin(clamp(y,-1,1))*180/Math.PI, lon:Math.atan2(z,x)*180/Math.PI});
+    }
+    return pts;
+  }
+
+  // Ordered journey legs connecting the world tour
+  var JOURNEYS=[
+    {from:'glasgow',to:'modena'},
+    {from:'modena',to:'paris'},
+    {from:'paris',to:'ireland'},
+    {from:'ireland',to:'kenya'},
+    {from:'kenya',to:'boss'}
+  ];
+
   function drawGlobe(){
     var w = globeCanvas.width, h = globeCanvas.height;
+    var now = performance.now();
+    var pulse = 0.5 + 0.5*Math.sin(now*0.0012);   // 0–1, ~5s cycle
     gctx.clearRect(0,0,w,h);
 
     // sphere base: deep ocean gradient with a lit side
     var grad = gctx.createRadialGradient(globeCX-80, globeCY-95, 20, globeCX, globeCY, globeR*1.05);
-    grad.addColorStop(0, '#2a5fa8');
+    grad.addColorStop(0, '#2e6ab8');
     grad.addColorStop(0.45, '#1a3f82');
-    grad.addColorStop(0.8, '#122a5c');
-    grad.addColorStop(1, '#0a1836');
+    grad.addColorStop(0.8, '#0e2260');
+    grad.addColorStop(1, '#080e30');
     gctx.save();
     gctx.beginPath();
     gctx.arc(globeCX, globeCY, globeR, 0, TAU);
@@ -952,9 +982,9 @@
     gctx.clip();
 
     // real coastlines
-    gctx.fillStyle = '#4a9463';
-    gctx.strokeStyle = 'rgba(20,50,30,0.5)';
-    gctx.lineWidth = 0.6;
+    gctx.fillStyle = '#4a9a66';
+    gctx.strokeStyle = 'rgba(20,60,30,0.4)';
+    gctx.lineWidth = 0.7;
     for(var ri=0; ri<WORLD_LAND.length; ri++){
       var clipped = clipRingToHemisphere(WORLD_LAND[ri], globeRot);
       if(!clipped) continue;
@@ -968,16 +998,16 @@
       gctx.stroke();
     }
 
-    // directional shading overlay (soft light from upper-left, subtle shadow lower-right)
+    // directional shading overlay
     var shade = gctx.createRadialGradient(globeCX-90, globeCY-100, 10, globeCX, globeCY, globeR*1.15);
-    shade.addColorStop(0, 'rgba(255,255,255,0.22)');
+    shade.addColorStop(0, 'rgba(255,255,255,0.20)');
     shade.addColorStop(0.5, 'rgba(255,255,255,0)');
-    shade.addColorStop(1, 'rgba(0,0,10,0.35)');
+    shade.addColorStop(1, 'rgba(0,0,10,0.40)');
     gctx.fillStyle = shade;
     gctx.beginPath(); gctx.arc(globeCX, globeCY, globeR, 0, TAU); gctx.fill();
 
     // faint graticule
-    gctx.strokeStyle = 'rgba(255,255,255,0.09)';
+    gctx.strokeStyle = 'rgba(255,255,255,0.07)';
     gctx.lineWidth = 1;
     for(var lat=-60; lat<=60; lat+=30){
       gctx.beginPath();
@@ -1000,12 +1030,63 @@
       gctx.stroke();
     }
 
-    // drifting cloud wisps (slightly different rotation speed for parallax)
+    // ---- journey arcs ----
+    var dashOffset = (now * 0.04) % 20; // marching ants speed
+    JOURNEYS.forEach(function(j){
+      var fromLoc = LOCATIONS.filter(function(l){ return l.id===j.from; })[0];
+      var toLoc   = LOCATIONS.filter(function(l){ return l.id===j.to;   })[0];
+      if(!fromLoc || !toLoc) return;
+      var fromCleared = progress[j.from] && progress[j.from].cleared;
+      var toUnlocked  = toLoc.unlocked;
+      if(!fromCleared && !toUnlocked) return;
+      var pts = greatCircle(fromLoc.lat, fromLoc.lon, toLoc.lat, toLoc.lon, 30);
+      gctx.beginPath();
+      var started = false;
+      for(var pi=0; pi<pts.length; pi++){
+        var pp = project(pts[pi].lat, pts[pi].lon);
+        if(pp.z < 0.04){ started = false; continue; }
+        if(!started){ gctx.moveTo(pp.x, pp.y); started=true; }
+        else { gctx.lineTo(pp.x, pp.y); }
+      }
+      if(fromCleared){
+        // solid gold trail — completed leg
+        gctx.strokeStyle = 'rgba(255,207,92,0.75)';
+        gctx.lineWidth = 2;
+        gctx.setLineDash([]);
+      } else {
+        // animated dashed preview — next leg
+        gctx.strokeStyle = 'rgba(180,210,255,0.45)';
+        gctx.lineWidth = 1.5;
+        gctx.setLineDash([6, 8]);
+        gctx.lineDashOffset = -dashOffset;
+      }
+      gctx.stroke();
+      gctx.setLineDash([]);
+      gctx.lineDashOffset = 0;
+    });
+
+    // ---- location glow spots on globe surface ----
+    LOCATIONS.forEach(function(loc){
+      if(!loc.unlocked) return;
+      var pg = project(loc.lat, loc.lon);
+      if(pg.z < 0.1) return;
+      var cleared = progress[loc.id] && progress[loc.id].cleared;
+      var r = (cleared ? 28 : 20) * pg.z;
+      var gw = gctx.createRadialGradient(pg.x, pg.y, 0, pg.x, pg.y, r);
+      var col = cleared ? '255,207,92' : '140,200,255';
+      var alpha = cleared ? (0.55 + pulse*0.15) : (0.35 + pulse*0.1);
+      gw.addColorStop(0, 'rgba('+col+','+alpha+')');
+      gw.addColorStop(1, 'rgba('+col+',0)');
+      gctx.fillStyle = gw;
+      gctx.beginPath(); gctx.arc(pg.x, pg.y, r, 0, TAU); gctx.fill();
+    });
+
+    // drifting cloud wisps
     for(var ci=0; ci<CLOUD_SPOTS.length; ci++){
       var cs = CLOUD_SPOTS[ci];
       var cp = project(cs.lat, cs.lon, cloudRot);
       if(cp.z < 0.05) continue;
-      var cAlpha = clamp(cp.z*0.5, 0, 0.4);
+      var cAlpha = clamp(cp.z*0.45, 0, 0.38);
       var cg = gctx.createRadialGradient(cp.x, cp.y, 0, cp.x, cp.y, cs.r*cp.z);
       cg.addColorStop(0, 'rgba(255,255,255,'+cAlpha+')');
       cg.addColorStop(1, 'rgba(255,255,255,0)');
@@ -1015,18 +1096,30 @@
 
     gctx.restore();
 
-    // rim light + outer atmosphere glow
+    // ---- atmosphere: multi-layer pulsing glow ----
+    // inner blue rim
+    var innerA = 0.32 + pulse*0.10;
+    var atmoIn = gctx.createRadialGradient(globeCX, globeCY, globeR*0.93, globeCX, globeCY, globeR*1.07);
+    atmoIn.addColorStop(0, 'rgba(110,170,255,'+innerA+')');
+    atmoIn.addColorStop(1, 'rgba(110,170,255,0)');
+    gctx.fillStyle = atmoIn;
+    gctx.beginPath(); gctx.arc(globeCX, globeCY, globeR*1.07, 0, TAU); gctx.fill();
+
+    // outer wide haze
+    var outerA = 0.22 + pulse*0.06;
+    var atmoOut = gctx.createRadialGradient(globeCX, globeCY, globeR*0.98, globeCX, globeCY, globeR*1.28);
+    atmoOut.addColorStop(0, 'rgba(90,150,240,'+outerA+')');
+    atmoOut.addColorStop(0.55, 'rgba(70,110,200,0.08)');
+    atmoOut.addColorStop(1, 'rgba(60,90,180,0)');
+    gctx.fillStyle = atmoOut;
+    gctx.beginPath(); gctx.arc(globeCX, globeCY, globeR*1.28, 0, TAU); gctx.fill();
+
+    // bright rim stroke
     gctx.beginPath();
     gctx.arc(globeCX, globeCY, globeR, 0, TAU);
-    gctx.lineWidth = 3;
-    gctx.strokeStyle = 'rgba(150,190,255,0.4)';
+    gctx.lineWidth = 2;
+    gctx.strokeStyle = 'rgba(190,225,255,'+(0.45+pulse*0.18)+')';
     gctx.stroke();
-
-    var atmo = gctx.createRadialGradient(globeCX, globeCY, globeR*0.96, globeCX, globeCY, globeR*1.14);
-    atmo.addColorStop(0, 'rgba(130,180,255,0.35)');
-    atmo.addColorStop(1, 'rgba(130,180,255,0)');
-    gctx.fillStyle = atmo;
-    gctx.beginPath(); gctx.arc(globeCX, globeCY, globeR*1.14, 0, TAU); gctx.fill();
   }
 
   var pinEls = {}, chipEls = {};
@@ -1063,59 +1156,48 @@
     chipEls[loc.id] = chip;
   });
 
+  function unlockLocation(id){
+    var loc = LOCATIONS.filter(function(l){ return l.id===id; })[0];
+    if(!loc || loc.unlocked) return;
+    loc.unlocked = true;
+    var btn = pinEls[id];
+    if(btn){
+      btn.classList.remove('locked');
+      btn.setAttribute('aria-label', loc.name);
+      btn.querySelector('.label').textContent = loc.name;
+      btn.disabled = false;
+      btn.addEventListener('click', function(){
+        if(netRole==='guest' && netConnected) return;
+        enterLocation(loc);
+      });
+    }
+    var chip = chipEls[id];
+    if(chip){
+      chip.classList.add('active');
+      chip.title = 'Play ' + loc.name;
+      chip.style.cursor = 'pointer';
+      (function(l){ chip.addEventListener('click', function(){ enterLocation(l); }); })(loc);
+    }
+    // cinematic: zoom out to see world, rotate to new region, zoom back in
+    globeTargetZoom = 0.78;
+    setTimeout(function(){
+      globeTargetRot = -(loc.lon * Math.PI/180);
+      globeTargetZoom = 1.1;
+    }, 900);
+    setTimeout(function(){ globeTargetZoom = 1.0; }, 2200);
+  }
+
   function refreshClearedPin(){
-    // Unlock Kenya, Paris, Ireland once both Glasgow and Modena are cleared
-    var bothCleared = progress.glasgow && progress.glasgow.cleared && progress.modena && progress.modena.cleared;
-    ['kenya','paris','ireland'].forEach(function(id){
-      var loc = LOCATIONS.filter(function(l){ return l.id===id; })[0];
-      if(loc && bothCleared && !loc.unlocked){
-        loc.unlocked = true;
-        var btn = pinEls[id];
-        if(btn){
-          btn.classList.remove('locked');
-          btn.setAttribute('aria-label', loc.name);
-          btn.querySelector('.label').textContent = loc.name;
-          btn.disabled = false;
-          btn.addEventListener('click', function(){
-            if(netRole==='guest' && netConnected) return;
-            enterLocation(loc);
-          });
-        }
-        var chip = chipEls[id];
-        if(chip){
-          chip.classList.add('active');
-          chip.title = 'Play ' + loc.name;
-          chip.style.cursor = 'pointer';
-          (function(l){ chip.addEventListener('click', function(){ enterLocation(l); }); })(loc);
-        }
-      }
-    });
-    // Unlock China boss when ALL of glasgow, modena, kenya, paris, ireland are cleared
-    var allCleared = ['glasgow','modena','kenya','paris','ireland'].every(function(id){
+    // Europe → Africa: unlock Kenya once all 4 European locations are cleared
+    var europeDone = ['glasgow','modena','paris','ireland'].every(function(id){
       return progress[id] && progress[id].cleared;
     });
-    var bossLoc = LOCATIONS.filter(function(l){ return l.id==='boss'; })[0];
-    if(bossLoc && allCleared && !bossLoc.unlocked){
-      bossLoc.unlocked = true;
-      var bossBtn = pinEls['boss'];
-      if(bossBtn){
-        bossBtn.classList.remove('locked');
-        bossBtn.setAttribute('aria-label', bossLoc.name);
-        bossBtn.querySelector('.label').textContent = bossLoc.name;
-        bossBtn.disabled = false;
-        bossBtn.addEventListener('click', function(){
-          if(netRole==='guest' && netConnected) return;
-          enterLocation(bossLoc);
-        });
-      }
-      var bossChip = chipEls['boss'];
-      if(bossChip){
-        bossChip.classList.add('active');
-        bossChip.title = 'Play ' + bossLoc.name;
-        bossChip.style.cursor = 'pointer';
-        (function(l){ bossChip.addEventListener('click', function(){ enterLocation(l); }); })(bossLoc);
-      }
-    }
+    if(europeDone) unlockLocation('kenya');
+
+    // Africa → Asia: unlock China once Kenya is cleared
+    var africaDone = progress.kenya && progress.kenya.cleared;
+    if(africaDone) unlockLocation('boss');
+
     LOCATIONS.forEach(function(loc){
       var pr = progress[loc.id];
       if(pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add('cleared');
@@ -1170,7 +1252,7 @@
         if(Math.abs(diff) < 0.005) globeTargetRot = null;
         dragVel = 0;
       } else if(!draggingGlobe){
-        globeRot += 0.0008 + dragVel;
+        globeRot += 0.0014 + dragVel;
         dragVel *= 0.92;
       }
       cloudRot += 0.0024;
