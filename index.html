@@ -2186,6 +2186,25 @@
         o.type='sine'; o.frequency.setValueAtTime(440,now); o.frequency.linearRampToValueAtTime(880,now+0.2);
         g.gain.setValueAtTime(0.25,now); g.gain.linearRampToValueAtTime(0,now+0.25);
         o.start(now); o.stop(now+0.25);
+      } else if(type==='achievement'){
+        // triumphant rising fanfare: C-E-G-C-E (two octaves)
+        [[523,0],[659,0.11],[784,0.22],[1047,0.34],[1319,0.48]].forEach(function(f){
+          var po=c.createOscillator(), pg=c.createGain();
+          po.connect(pg); pg.connect(getMasterGain());
+          po.type='sine'; po.frequency.value=f[0];
+          pg.gain.setValueAtTime(0,now+f[1]);
+          pg.gain.linearRampToValueAtTime(0.28,now+f[1]+0.04);
+          pg.gain.linearRampToValueAtTime(0,now+f[1]+0.22);
+          po.start(now+f[1]); po.stop(now+f[1]+0.24);
+        });
+        // shimmer overtone layer
+        var po2=c.createOscillator(), pg2=c.createGain();
+        po2.connect(pg2); pg2.connect(getMasterGain());
+        po2.type='triangle'; po2.frequency.value=2093;
+        pg2.gain.setValueAtTime(0,now+0.48); pg2.gain.linearRampToValueAtTime(0.12,now+0.52);
+        pg2.gain.linearRampToValueAtTime(0,now+0.85);
+        po2.start(now+0.48); po2.stop(now+0.86);
+        o.stop(now);
       } else if(type==='chase'){
         [0,0.15,0.3].forEach(function(t){
           var po=c.createOscillator(), pg=c.createGain();
@@ -2733,6 +2752,7 @@
     if(achievementQueue.length > 0 && !achievementToast){
       achievementToast = achievementQueue.shift();
       achievementToastT = 4.8;
+      playSound('achievement');
     }
     if(achievementToast){ achievementToastT -= dt; if(achievementToastT<=0) achievementToast=null; }
 
