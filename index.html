@@ -273,10 +273,14 @@
 
   /* ---- Landscape phone layout: canvas fills viewport height, HUD floats above ---- */
   @media (orientation: landscape) and (max-height: 520px){
-    /* Scene goes edge-to-edge */
-    #scene-game{ max-width:100%; gap:0; }
+    /* Game scene takes the full viewport, sits above footer / other DOM elements */
+    #scene-game{
+      position:fixed; inset:0; z-index:200;
+      max-width:100%; gap:0; padding:0; margin:0;
+    }
     /* Cabinet strips decoration and becomes a full-bleed wrapper */
     .cabinet{
+      width:100%; height:100%;
       max-width:100%;
       padding:0;
       border-radius:0;
@@ -296,18 +300,41 @@
       gap:6px;
       border-radius:0;
     }
-    /* Canvas frame fills the screen and centres the canvas */
+    /* Canvas frame fills the cabinet */
     .canvas-frame{
       border-radius:0; border:none;
-      display:flex; align-items:center; justify-content:center;
+      position:relative;
+      width:100%; height:100%;
       background:#090e20;
-      min-height:100dvh;
+      display:flex; align-items:center; justify-content:center;
     }
     /* Canvas is height-constrained — maintains aspect ratio, centred */
     #gameCanvas{
+      display:block;
       width:auto;
-      height:100dvh;
-      max-width:100vw;
+      height:100%;
+      max-width:100%;
+    }
+    /* Howto card overlays the canvas, scrollable if taller than viewport */
+    .howto{
+      position:absolute; inset:0; z-index:20;
+      overflow-y:auto; -webkit-overflow-scrolling:touch;
+      display:flex; align-items:flex-start; justify-content:center;
+      padding-top:6px; padding-bottom:6px; box-sizing:border-box;
+      background:rgba(9,14,32,0.88);
+      backdrop-filter:blur(4px);
+    }
+    .howto[hidden]{ display:none; }
+    /* Strip non-essential howto content in landscape to make Start button reachable */
+    #localControls{ display:none !important; }   /* keyboard layout — touch uses on-screen buttons */
+    #skinSelector{ display:none !important; }    /* skin picker — not worth the space */
+    #btnSurvival{ display:none !important; }     /* survival mode button */
+    #localControlsHint{ display:none !important; }
+    #tutorialTip{ display:none !important; }
+    /* Clamp blurb to 2 lines */
+    #howtoBlurb{
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+      overflow:hidden; line-height:1.3;
     }
   }
 
