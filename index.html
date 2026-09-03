@@ -2783,11 +2783,14 @@
   var score = 0, lives = 3, gameState = 'ready', enemiesLeft = 0, startTime = 0;
   var shakeT = 0, waveNumber = 1, comboCount = 0, comboTimer = 0, waveFlash = 0, screenFlash = 0, allClearFired = false, allClearDelay = 0;
   var freezeT = 0, slowT = 0, doubleScoreT = 0, smokeLevel = 0; var paintBlobs = [];
+  var magnetT = 0;
+  var puFlash = 0, puFlashLabel = '', puFlashColor = '#fff';
+  var screenFlashColor = '#ff1040';
   var tutorialT = 0, tutorialDone = false, tutorialFirstPop = false;
   var survivorUnlocked = false;
   var usedPowerups = {};
   var CHASE_DELAY = 12;
-  var POWERUP_TYPES = ['speed','rapid','shield'];
+  var POWERUP_TYPES = ['speed','rapid','shield','magnet','ghost'];
   var chaseAlertPlayed = false;
   var survivalMode = false, survivalWave = 0, survivalEnemyTimer = 0;
   var countdownT = 0, countdownBeep = 3;
@@ -2895,6 +2898,44 @@
           po.start(now+t); po.stop(now+t+0.14);
         });
         o.stop(now);
+      } else if(type==='pop_combo'){
+        // Ascending sparkle pop — bright and snappy
+        o.type='sine'; o.frequency.setValueAtTime(520,now); o.frequency.linearRampToValueAtTime(1400,now+0.13);
+        g.gain.setValueAtTime(0.32,now); g.gain.linearRampToValueAtTime(0,now+0.15);
+        o.start(now); o.stop(now+0.15);
+        // crisp noise burst
+        var buf=c.createBuffer(1,c.sampleRate*0.06,c.sampleRate);
+        var d=buf.getChannelData(0); for(var ni=0;ni<d.length;ni++) d[ni]=Math.random()*2-1;
+        var ns=c.createBufferSource(); ns.buffer=buf;
+        var ng=c.createGain(); ng.gain.setValueAtTime(0.28,now); ng.gain.linearRampToValueAtTime(0,now+0.06);
+        ns.connect(ng); ng.connect(getMasterGain()); ns.start(now); ns.stop(now+0.06);
+        // sparkle chime on top
+        [0.05,0.09].forEach(function(t,i){
+          var po=c.createOscillator(), pg=c.createGain();
+          po.connect(pg); pg.connect(getMasterGain());
+          po.type='sine'; po.frequency.value=[1047,1319][i];
+          pg.gain.setValueAtTime(0.15,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.1);
+          po.start(now+t); po.stop(now+t+0.12);
+        });
+      } else if(type==='powerup_big'){
+        // Rising arpeggio sweep + final chord punch
+        [[330,0],[440,0.07],[554,0.14],[660,0.21],[880,0.28]].forEach(function(f){
+          var po=c.createOscillator(), pg=c.createGain();
+          po.connect(pg); pg.connect(getMasterGain());
+          po.type='square'; po.frequency.value=f[0];
+          pg.gain.setValueAtTime(0,now+f[1]);
+          pg.gain.linearRampToValueAtTime(0.18,now+f[1]+0.03);
+          pg.gain.linearRampToValueAtTime(0,now+f[1]+0.11);
+          po.start(now+f[1]); po.stop(now+f[1]+0.13);
+        });
+        [523,659,784].forEach(function(freq){
+          var po=c.createOscillator(), pg=c.createGain();
+          po.connect(pg); pg.connect(getMasterGain());
+          po.type='sine'; po.frequency.value=freq;
+          pg.gain.setValueAtTime(0.22,now+0.35); pg.gain.linearRampToValueAtTime(0,now+0.65);
+          po.start(now+0.35); po.stop(now+0.67);
+        });
+        o.stop(now);
       }
     } catch(e){}
   }
@@ -2971,6 +3012,7 @@
     popBursts = [];
     chaseAlertPlayed = false;
     comboCount = 0; comboTimer = 0; waveFlash = 0; allClearFired = false; allClearDelay = 0; smokeLevel = 0; paintBlobs = [];
+    magnetT = 0; puFlash = 0; screenFlashColor = '#ff1040';
     survivorUnlocked = false;
     usedPowerups = {};
 
@@ -3252,6 +3294,8 @@
     if(slowT>0) slowT -= dt;
     if(doubleScoreT>0) doubleScoreT -= dt;
     if(screenFlash>0) screenFlash -= dt*2.5;
+    if(puFlash>0) puFlash -= dt*1.8;
+    if(magnetT>0) magnetT -= dt;
     /* moving platforms */
     var nowSec = performance.now()/1000;
     movingPlatforms.forEach(function(mp){
@@ -3310,6 +3354,15 @@
     collectibles.forEach(function(c){
       if(c.taken) return;
       c.bob += dt*2;
+      if(magnetT > 0 && players.length > 0){
+        var mpt = players[0];
+        for(var mpi=1;mpi<players.length;mpi++){
+          if(Math.abs(players[mpi].x-c.x)<Math.abs(mpt.x-c.x)) mpt=players[mpi];
+        }
+        var mcdx=mpt.x+mpt.w/2-c.x, mcdy=mpt.y+mpt.h/2-c.y;
+        var mcdist=Math.sqrt(mcdx*mcdx+mcdy*mcdy)||1;
+        c.x += (mcdx/mcdist)*240*dt; c.y += (mcdy/mcdist)*240*dt;
+      }
       var box = {x:c.x-14,y:c.y-14,w:28,h:28};
       for(var pi=0; pi<players.length; pi++){
         if(rectsOverlap(players[pi], box)){
@@ -3457,7 +3510,7 @@
           spawnPopup(b.x, b.y-10, label, multiplier>1?'#ff5470':'#ff9c7a', multiplier>1 ? 14+multiplier*4 : 16);
           spawnParticles(b.x,b.y,multiplier>2?'#ff5470':'#ff9c7a',14);
           score += pts;
-          playSound('pop'); haptic(10);
+          playSound(multiplier>1 ? 'pop_combo' : 'pop'); haptic(multiplier>1?20:10);
           tutorialFirstPop = true;
           unlockAchievement('first_pop');
           if(comboCount >= 3) unlockAchievement('combo3');
@@ -3518,7 +3571,7 @@
         var pts=(level.values.pop)*Math.min(comboCount,6);
         spawnPopup(cb.x,cb.y-10,'\u26d3 CHAIN +'+pts,'#ff5470',22);
         spawnParticles(cb.x,cb.y,'#ff5470',18);
-        score+=pts; playSound('pop');
+        score+=pts; playSound('pop_combo'); haptic(25);
         tutorialFirstPop=true;
         var ei=enemies.indexOf(cen);
         if(ei>-1){enemies.splice(ei,1);enemiesLeft--;}
@@ -3735,13 +3788,18 @@
           if(pu.type==='speed') pp2.speedBoost = 6;
           else if(pu.type==='rapid') pp2.rapidFire = 6;
           else if(pu.type==='shield') pp2.shield = 6;
+          else if(pu.type==='magnet') magnetT = 6;
+          else if(pu.type==='ghost'){ pp2.invuln = 5; pp2.shield = 5; }
           else if(lvlPU2 && pu.type===lvlPU2.type){ lvlPU2.effect(pp2); }
-          playSound('powerup');
-          var puNames = {speed:'FAST!', rapid:'RAPID!', shield:'SHIELD!'};
+          playSound('powerup_big');
+          var puNames = {speed:'FAST!', rapid:'RAPID!', shield:'SHIELD!', magnet:'MAGNET!', ghost:'GHOST MODE!'};
           var puLabel = (lvlPU2 && pu.type===lvlPU2.type) ? lvlPU2.label : (puNames[pu.type] || 'POWER!');
-          var puCol   = (lvlPU2 && pu.type===lvlPU2.type) ? lvlPU2.color : '#b0f0ff';
-          spawnPopup(pu.x, pu.y-10, puLabel, puCol);
-          spawnParticles(pu.x, pu.y, puCol, 10);
+          var puColMap = {speed:'#ffd700', rapid:'#ff7800', shield:'#4499ff', magnet:'#ff44ff', ghost:'#aaffee'};
+          var puCol = puColMap[pu.type] || ((lvlPU2 && pu.type===lvlPU2.type) ? lvlPU2.color : '#b0f0ff');
+          spawnPopup(W/2, H/2-20, puLabel, puCol, 38);
+          spawnParticles(pu.x, pu.y, puCol, 18);
+          shakeT = 0.35; screenFlash = 0.7; screenFlashColor = puCol;
+          puFlash = 1.4; puFlashLabel = puLabel; puFlashColor = puCol;
           usedPowerups[pu.type] = true;
           if(usedPowerups.speed && usedPowerups.rapid && usedPowerups.shield) unlockAchievement('powerup_all');
           powerups.splice(pui,1);
@@ -3812,7 +3870,7 @@
     p.invuln = 1.6;
     p.vy = -340;
     p.vx = (knockDir||0) * 240;
-    screenFlash = 0.35;
+    screenFlash = 0.35; screenFlashColor = '#ff1040';
     shakeT = 0.4;
     playSound('lose'); haptic(50);
     updateHud();
@@ -4127,7 +4185,15 @@
     ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,TAU); ctx.fill();
     ctx.lineWidth = 1.4;
     ctx.stroke();
-    if(b.state==='carrying' && b.trapped) LEVELS[currentLocationId].enemyDraw(b.trapped);
+    if(b.state==='carrying' && b.trapped){
+      var te=b.trapped;
+      if(te.type==='buckfast') drawBuckfastRef(te);
+      else if(te.type==='parmesan') drawParmesanRef(te);
+      else if(te.type==='lukekelly') drawLukeKellyRef(te);
+      else if(te.type==='artist') drawArtistRef(te);
+      else if(te.type==='motorbike') drawMotorbikeRef(te);
+      else LEVELS[currentLocationId].enemyDraw(te);
+    }
     ctx.restore();
   }
 
@@ -4188,17 +4254,28 @@
       }
     } else {
       // standard power-ups
-      var glowCol = pu.type==='speed'?'rgba(255,220,0,0.35)':pu.type==='rapid'?'rgba(255,120,0,0.35)':'rgba(80,160,255,0.35)';
+      var glowColMap2 = {speed:'rgba(255,220,0,0.35)',rapid:'rgba(255,120,0,0.35)',shield:'rgba(80,160,255,0.35)',magnet:'rgba(255,60,255,0.35)',ghost:'rgba(150,255,220,0.35)'};
+      var glowCol = glowColMap2[pu.type] || 'rgba(80,160,255,0.35)';
       var grd = ctx.createRadialGradient(0,0,4,0,0,18);
       grd.addColorStop(0,glowCol); grd.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(0,0,18,0,TAU); ctx.fill();
-      ctx.fillStyle = pu.type==='speed'?'#ffd700':pu.type==='rapid'?'#ff7800':'#4499ff';
+      var baseColMap = {speed:'#ffd700',rapid:'#ff7800',shield:'#4499ff',magnet:'#ff44ff',ghost:'#aaffee'};
+      ctx.fillStyle = baseColMap[pu.type] || '#4499ff';
       ctx.beginPath(); ctx.arc(0,0,10,0,TAU); ctx.fill();
       ctx.fillStyle='#fff';
       if(pu.type==='speed'){
         ctx.beginPath(); ctx.moveTo(2,-8); ctx.lineTo(-2,0); ctx.lineTo(1,0); ctx.lineTo(-2,8); ctx.lineTo(3,0); ctx.lineTo(0,0); ctx.closePath(); ctx.fill();
       } else if(pu.type==='rapid'){
         [-5,0,5].forEach(function(ox){ ctx.beginPath(); ctx.arc(ox,0,2.2,0,TAU); ctx.fill(); });
+      } else if(pu.type==='magnet'){
+        // magnet U shape
+        ctx.lineWidth=2.5; ctx.strokeStyle='#fff'; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(-5,-6); ctx.lineTo(-5,4); ctx.arc(-5,4,3,Math.PI,TAU); ctx.moveTo(-2,4); ctx.lineTo(-2,-6); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(2,-6); ctx.lineTo(2,4); ctx.arc(2,4,3,Math.PI,TAU); ctx.moveTo(5,4); ctx.lineTo(5,-6); ctx.stroke();
+      } else if(pu.type==='ghost'){
+        // ghost shape
+        ctx.beginPath(); ctx.arc(0,-4,6,Math.PI,0); ctx.lineTo(6,5); ctx.quadraticCurveTo(4,8,2,5); ctx.quadraticCurveTo(0,8,-2,5); ctx.quadraticCurveTo(-4,8,-6,5); ctx.lineTo(-6,-4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#44aaff'; ctx.beginPath(); ctx.arc(-2,-5,1.5,0,TAU); ctx.fill(); ctx.beginPath(); ctx.arc(2,-5,1.5,0,TAU); ctx.fill();
       } else {
         ctx.beginPath(); ctx.moveTo(0,-7); ctx.lineTo(6,-4); ctx.lineTo(6,2); ctx.quadraticCurveTo(0,8,-6,2); ctx.lineTo(-6,-4); ctx.closePath(); ctx.fill();
       }
@@ -5117,7 +5194,7 @@
     if(screenFlash>0){
       ctx.save();
       ctx.globalAlpha=Math.max(0,screenFlash)*0.45;
-      ctx.fillStyle='#ff1040';
+      ctx.fillStyle=screenFlashColor;
       ctx.fillRect(0,0,W,H);
       ctx.restore();
     }
@@ -5279,7 +5356,8 @@
       var bannerY = 38;
       if(freezeT>0){ ctx.fillStyle='rgba(80,200,255,0.85)'; ctx.fillText('❄ FREEZE '+Math.ceil(freezeT)+'s', 8, bannerY); bannerY+=14; }
       if(slowT>0){ ctx.fillStyle='rgba(122,184,64,0.85)'; ctx.fillText('🐢 SLOW '+Math.ceil(slowT)+'s', 8, bannerY); bannerY+=14; }
-      if(doubleScoreT>0){ ctx.fillStyle='rgba(240,192,48,0.9)'; ctx.fillText('✦ x2 SCORE '+Math.ceil(doubleScoreT)+'s', 8, bannerY); }
+      if(doubleScoreT>0){ ctx.fillStyle='rgba(240,192,48,0.9)'; ctx.fillText('✦ x2 SCORE '+Math.ceil(doubleScoreT)+'s', 8, bannerY); bannerY+=14; }
+      if(magnetT>0){ ctx.fillStyle='rgba(255,80,255,0.9)'; ctx.fillText('MAGNET '+Math.ceil(magnetT)+'s', 8, bannerY); bannerY+=14; }
     }
 
     // enemy indicator arrows (for enemies off the bottom third of screen)
@@ -5298,6 +5376,25 @@
         ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-5,-5); ctx.lineTo(-5,5); ctx.closePath(); ctx.fill();
         ctx.restore();
       });
+    }
+
+    // powerup flash banner
+    if(puFlash > 0){
+      var pf = puFlash;
+      var pfAlpha = pf > 0.8 ? 1 : pf / 0.8;
+      ctx.save();
+      ctx.globalAlpha = pfAlpha * 0.92;
+      var pfScale = pf > 1.0 ? 1 + (pf-1.0)*0.4 : 1;
+      ctx.translate(W/2, H/2 - 30);
+      ctx.scale(pfScale, pfScale);
+      ctx.shadowColor = puFlashColor;
+      ctx.shadowBlur = 28;
+      ctx.fillStyle = puFlashColor;
+      ctx.font = 'bold 52px "Fredoka",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(puFlashLabel, 0, 0);
+      ctx.shadowBlur = 0;
+      ctx.restore();
     }
 
     // wave transition overlay
