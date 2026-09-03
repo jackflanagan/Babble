@@ -1631,7 +1631,7 @@
     currentLocationId = loc.id;
     var cIdx2=-1;
     for(var ci5=0;ci5<CAMPAIGN.length;ci5++){ if(CAMPAIGN[ci5].type==='level'&&CAMPAIGN[ci5].id===loc.id){ cIdx2=ci5; break; } }
-    campaignMode = cIdx2>=0; campaignIndex = cIdx2>=0?cIdx2:0;
+    campaignMode = cIdx2>=0; campaignLastType = 'level';
     if(netRole){
       numPlayers = 2;
       document.getElementById('p2Controls').hidden = true;
@@ -2799,7 +2799,7 @@
   var tutorialT = 0, tutorialDone = false, tutorialFirstPop = false;
   var survivorUnlocked = false;
   var usedPowerups = {};
-  var campaignMode = false, campaignIndex = 0;
+  var campaignMode = false, campaignLastType = 'minigame';
   var miniGameId = null, miniGameTimer = 0, miniGamePhase = 'playing', miniGameData = {};
   var unlockedCosmetics = (function(){ try{ return JSON.parse(localStorage.getItem('bbl_cosmetics')||'{}'); }catch(e){ return {}; } })();
   var CHASE_DELAY = 12;
@@ -3973,6 +3973,16 @@
 
   // ── Campaign & mini-game system ──────────────────────────────────────────
 
+  function getNextCampaignItem(){
+    var levelIds = ['glasgow','modena','paris','ireland','kenya'];
+    var mgIds = ['mediterranean','krakow','berlin'];
+    if(campaignLastType === 'level'){
+      return {type:'minigame', id:mgIds[Math.floor(Math.random()*mgIds.length)]};
+    } else {
+      return {type:'level', id:levelIds[Math.floor(Math.random()*levelIds.length)]};
+    }
+  }
+
   function startCampaignTransition(){
     if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer=null; }
     var el = document.getElementById('campaignOverlay');
@@ -3985,14 +3995,13 @@
       document.getElementById('overlayWin').hidden = true;
       document.getElementById('overlayLose').hidden = true;
       document.getElementById('howto').hidden = true;
-      campaignIndex++;
-      if(campaignIndex >= CAMPAIGN.length) campaignIndex = 0;
-      var item = CAMPAIGN[campaignIndex];
+      var item = getNextCampaignItem();
       var locName = item.type==='level' ? (LEVELS[item.id] ? LEVELS[item.id].name : item.id) : MINI_GAME_DEFS[item.id].title;
       var sub = item.type==='minigame' ? MINI_GAME_DEFS[item.id].subtitle : 'Get ready!';
       el.innerHTML = '<div style="color:#fff;font-family:Fredoka,sans-serif;font-size:42px;font-weight:bold;text-align:center;text-shadow:0 0 30px rgba(255,255,255,0.4);">'+locName+'</div>'
         +'<div style="color:#aabbc8;font-family:Nunito,sans-serif;font-size:20px;margin-top:10px;text-align:center;">'+sub+'</div>';
       if(item.type==='level'){
+        campaignLastType = 'level';
         stopMusic();
         currentLocationId = item.id;
         resetGame();
@@ -4001,6 +4010,7 @@
         startTime = performance.now();
         startMusic();
       } else {
+        campaignLastType = 'minigame';
         startMiniGame(item.id);
       }
       setTimeout(function(){
@@ -4440,44 +4450,45 @@
     });
 
     if(campaignMode){
-      if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer=null; }
+      /* Campaign mode: auto-transition after win celebration */
+      document.getElementById('btnWinNext').hidden = true;
+      document.getElementById('winNextHint').hidden = true;
       winNextTimer = setTimeout(function(){
-        document.getElementById('overlayWin').hidden = true;
         startCampaignTransition();
-      }, 2500);
-    }
-
-    /* Level flow: show Next Level button and auto-advance after 5s */
-    refreshClearedPin(); // unlock any newly reachable locations first
-    var nextLoc = getNextLocation();
-    var btnWinNext = document.getElementById('btnWinNext');
-    var winNextHint = document.getElementById('winNextHint');
-    if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
-    if(nextLoc && netRole !== 'guest'){
-      btnWinNext.hidden = false;
-      btnWinNext.textContent = '→ ' + nextLoc.name;
-      if(!isNewBest){
-        var autoSecs = 5;
-        winNextHint.textContent = 'Auto-advancing to ' + nextLoc.name + ' in ' + autoSecs + 's…';
-        winNextHint.hidden = false;
-        var tick = setInterval(function(){
-          autoSecs--;
-          if(autoSecs > 0){
-            winNextHint.textContent = 'Auto-advancing to ' + nextLoc.name + ' in ' + autoSecs + 's…';
-          } else {
+      }, 2200);
+    } else {
+      /* Level flow: show Next Level button and auto-advance after 5s */
+      refreshClearedPin(); // unlock any newly reachable locations first
+      var nextLoc = getNextLocation();
+      var btnWinNext = document.getElementById('btnWinNext');
+      var winNextHint = document.getElementById('winNextHint');
+      if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
+      if(nextLoc && netRole !== 'guest'){
+        btnWinNext.hidden = false;
+        btnWinNext.textContent = '→ ' + nextLoc.name;
+        if(!isNewBest){
+          var autoSecs = 5;
+          winNextHint.textContent = 'Auto-advancing to ' + nextLoc.name + ' in ' + autoSecs + 's…';
+          winNextHint.hidden = false;
+          var tick = setInterval(function(){
+            autoSecs--;
+            if(autoSecs > 0){
+              winNextHint.textContent = 'Auto-advancing to ' + nextLoc.name + ' in ' + autoSecs + 's…';
+            } else {
+              clearInterval(tick);
+            }
+          }, 1000);
+          winNextTimer = setTimeout(function(){
             clearInterval(tick);
-          }
-        }, 1000);
-        winNextTimer = setTimeout(function(){
-          clearInterval(tick);
-          if(gameState === 'won') startNextLevel(nextLoc);
-        }, 5000);
+            if(gameState === 'won') startNextLevel(nextLoc);
+          }, 5000);
+        } else {
+          winNextHint.hidden = true;
+        }
       } else {
+        btnWinNext.hidden = true;
         winNextHint.hidden = true;
       }
-    } else {
-      btnWinNext.hidden = true;
-      winNextHint.hidden = true;
     }
 
     updateHud();
