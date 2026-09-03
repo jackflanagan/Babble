@@ -5407,5 +5407,29 @@
   }
   requestAnimationFrame(frame);
 
+  /* Debug hook — exposes internal state for automated playtests only.
+     Never call __game in production code; use the public APIs instead. */
+  window.__game = {
+    getState: function(){ return { gameState:gameState, waveNumber:waveNumber, score:score,
+      lives:lives, enemiesLeft:enemiesLeft, enemyCount:enemies.length,
+      collectiblesTaken: collectibles.filter(function(c){return c.taken;}).length,
+      collectiblesTotal: collectibles.length, allClearFired:allClearFired,
+      smokeLevel:smokeLevel, paintBlobCount:paintBlobs.length,
+      currentLocationId:currentLocationId }; },
+    getEnemyTypes: function(){ return enemies.map(function(e){return e.type;}); },
+    hasFn: function(n){ return typeof window[n]==='function'; },
+    forceAllCollectiblesTaken: function(){ collectibles.forEach(function(c){c.taken=true;}); },
+    forceWave2: function(){ enemies=[]; enemiesLeft=0; allClearFired=true; allClearDelay=0; },
+    spawnArtistEnemy: function(){ enemies.push({x:300,y:150,w:28,h:26,vx:80,vy:0,dir:1,
+      state:'free',bubbleTimer:0,hopT:0,angry:0,onGround:false,type:'artist',hits:1,
+      wanderX:200,wanderT:5,paintT:0.05}); return 'ok'; },
+    spawnMotorbikeEnemy: function(){ enemies.push({x:100,y:400,w:42,h:28,vx:160,vy:0,dir:1,
+      state:'free',bubbleTimer:0,hopT:0,angry:0,onGround:true,type:'motorbike',hits:1,
+      wanderX:600,wanderT:5,smokeRevT:0.1}); return 'ok'; },
+    drawFns: { buckfast: typeof drawBuckfastRef, parmesan: typeof drawParmesanRef,
+      lukekelly: typeof drawLukeKellyRef, artist: typeof drawArtistRef,
+      motorbike: typeof drawMotorbikeRef }
+  };
+
 })();
 </script>
