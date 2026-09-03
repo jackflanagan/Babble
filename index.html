@@ -3635,12 +3635,13 @@
           en.stuckX = en.x; en.stuckT = 0;
         }
 
-        /* Jump: when player is above OR randomly to traverse platforms */
-        if(en.onGround && en.hopT <= 0){
-          if(nearest.y < en.y - 40 || Math.random() < 0.25){
+        /* Jump: immediately if player is above; randomly to traverse platforms */
+        if(en.onGround){
+          var playerAbove = nearest.y < en.y - 40;
+          if(playerAbove || (en.hopT <= 0 && Math.random() < 0.35)){
             en.vy = rand(-530, -380);
             en.onGround = false;
-            en.hopT = rand(0.4, 1.2);
+            en.hopT = rand(0.4, 1.0);
           }
         }
       } else {
