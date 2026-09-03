@@ -1,5 +1,7 @@
 <title>Babble</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- CrazyGames SDK — remove this script tag when self-hosting outside CrazyGames -->
+<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -99,7 +101,7 @@
   /* ---------- globe screen ---------- */
   .globe-wrap{
     position:relative;
-    width:min(78vw, 460px);
+    width:min(78vw, 460px, 72dvh);
     aspect-ratio:1/1;
     display:flex; align-items:center; justify-content:center;
   }
@@ -263,10 +265,18 @@
   }
   #gameCanvas{
     display:block;
-    width:100%;
+    /* On landscape phones the canvas would overflow vertically if width:100%.
+       min() picks the smaller of full container width, or the width that lets
+       the 720:480 canvas fit within the viewport height minus HUD space. */
+    width: min(100%, calc((100dvh - 80px) * (720 / 480)));
     height:auto;
     aspect-ratio: 720 / 480;
     touch-action:none;
+  }
+  /* Tighten cabinet padding on very short landscape screens */
+  @media (orientation: landscape) and (max-height: 520px){
+    .cabinet{ padding: 8px; }
+    .hud{ padding: 2px 8px 6px; }
   }
 
   .overlay{
@@ -486,7 +496,7 @@
 
   <div class="brand">
     <div class="mark">Bab<span>ble</span></div>
-    <div class="tag">journeys of bab</div>
+    <div class="tag">a globe-hopping adventure</div>
   </div>
 
   <!-- GLOBE SCENE -->
@@ -495,7 +505,7 @@
       <canvas id="globeCanvas" width="600" height="600" aria-hidden="true"></canvas>
       <!-- pins injected by JS -->
     </div>
-    <p class="globe-caption">Hi Bab this is a game for you and me :) <button id="btnFullscreenGlobe" style="background:none;border:none;color:var(--dim-text);font-size:16px;cursor:pointer;vertical-align:middle;padding:0 4px;" title="Fullscreen">⛶</button></p>
+    <p class="globe-caption">Pick a destination, bubble every creature, and pop it! <button id="btnFullscreenGlobe" style="background:none;border:none;color:var(--dim-text);font-size:16px;cursor:pointer;vertical-align:middle;padding:0 4px;" title="Fullscreen">⛶</button></p>
     <div id="streakBadge" style="text-align:center;font-size:13px;color:var(--gold);font-weight:700;min-height:18px;"></div>
     <div id="dailyChallenge" style="display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;">
       <button class="btn btn-primary" id="btnDaily" style="font-size:13px;padding:8px 18px;">⭐ Daily Challenge</button>
@@ -580,7 +590,7 @@
 
             <div class="controls-cols" id="localControls">
               <div class="controls-col p1">
-                <div class="who">Leti (Fox)</div>
+                <div class="who">Player 1 (Fox)</div>
                 <div class="keys" style="margin:0;">
                   <div class="key-group"><div class="keycaps"><kbd>A</kbd><kbd>D</kbd></div>Move</div>
                   <div class="key-group"><div class="keycaps"><kbd>W</kbd></div>Jump</div>
@@ -598,10 +608,10 @@
             </div>
             <div id="skinSelector" style="margin-top:8px; display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
               <div style="font-size:12px; color:var(--dim-text);">
-                Leti: <span id="skinDotsP1"></span>
+                P1: <span id="skinDotsP1"></span>
               </div>
               <div style="font-size:12px; color:var(--dim-text);">
-                Jack: <span id="skinDotsP2"></span>
+                P2: <span id="skinDotsP2"></span>
               </div>
             </div>
             <p style="color:var(--dim-text); font-size:11px; margin-top:2px;" id="localControlsHint">On touch screens the on-screen buttons always drive Player 1.</p>
@@ -712,6 +722,32 @@
   ========================================================= */
   var TAU = Math.PI * 2;
   function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+
+  /* ---------- CrazyGames SDK wrapper ----------
+     All calls are no-ops when running outside CrazyGames (dev, self-host, Poki, etc.)
+     Replace the SDK script tag + CGSDK init to target a different platform.      */
+  var CGSDK = null;
+  (function(){
+    try{
+      if(typeof CrazyGames !== 'undefined' && CrazyGames.SDK){
+        CGSDK = CrazyGames.SDK;
+        CGSDK.init();
+      }
+    }catch(e){}
+  })();
+  function adGameplayStart(){ try{ if(CGSDK) CGSDK.game.gameplayStart(); }catch(e){} }
+  function adGameplayStop(){  try{ if(CGSDK) CGSDK.game.gameplayStop();  }catch(e){} }
+  function showAdBreak(cb){
+    adGameplayStop();
+    if(!CGSDK){ if(cb) cb(); return; }
+    try{
+      CGSDK.ad.requestAd('midgame', {
+        adStarted:  function(){ /* music already stopped at game-over/win */ },
+        adFinished: function(){ adGameplayStart(); if(cb) cb(); },
+        adError:    function(){ adGameplayStart(); if(cb) cb(); }
+      });
+    }catch(e){ if(cb) cb(); }
+  }
   function lerp(a,b,t){ return a + (b-a)*t; }
   function rand(a,b){ return a + Math.random()*(b-a); }
 
@@ -1535,6 +1571,7 @@
   function backToMap(){
     if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
     var wasHost = (netRole==='host');
+    adGameplayStop();
     stopGame();
     sceneGame.hidden = true;
     sceneGlobe.hidden = false;
@@ -2916,6 +2953,7 @@
     gameState = 'playing';
     startTime = performance.now();
     startMusic();
+    adGameplayStart();
     netBroadcastScene('start');
   });
   document.getElementById('btnRetry').addEventListener('click', function(){
@@ -3632,12 +3670,13 @@
     if(lives<=0){
       gameState = 'lost';
       stopMusic();
-      if(survivalMode){
-        document.getElementById('loseSummary').textContent = 'Reached wave ' + survivalWave + ' · Score: ' + score;
-      } else {
-        document.getElementById('loseSummary').textContent = 'Score ' + score + ' · try trapping enemies before they reach you.';
-      }
-      document.getElementById('overlayLose').hidden = false;
+      var loseSummaryText = survivalMode
+        ? 'Reached wave ' + survivalWave + ' · Score: ' + score
+        : 'Score ' + score + ' · try trapping enemies before they reach you.';
+      showAdBreak(function(){
+        document.getElementById('loseSummary').textContent = loseSummaryText;
+        document.getElementById('overlayLose').hidden = false;
+      });
     }
   }
 
@@ -3781,7 +3820,9 @@
         r: rand(4,9), rot: rand(0,TAU), rotV: rand(-3,3), life:3, t:0
       });
     }
-    document.getElementById('overlayWin').hidden = false;
+    showAdBreak(function(){
+      document.getElementById('overlayWin').hidden = false;
+    });
 
     /* Level flow: show Next Level button and auto-advance after 5s */
     refreshClearedPin(); // unlock any newly reachable locations first
@@ -4619,7 +4660,7 @@
           ctx.restore();
         }
         // name label above character
-        var label = p.id===0 ? 'Leti' : 'Jack';
+        var label = p.id===0 ? 'P1' : 'P2';
         ctx.save();
         ctx.font = '700 11px "Nunito", sans-serif';
         ctx.textAlign = 'center';
