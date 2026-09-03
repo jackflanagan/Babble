@@ -2197,7 +2197,7 @@
     movingPlatformDefs: [
       {ox:260, oy:310, w:120, h:18, axis:'x', amplitude:90, speed:0.7}
     ],
-    enemyVariety: {specialType:'armoured', waveRatio:0.4}
+    enemyVariety: {specialType:'buckfast', waveRatio:0.4}
   },
   modena: {
     platforms: [
@@ -2223,7 +2223,7 @@
     movingPlatformDefs: [
       {ox:360, oy:210, w:100, h:18, axis:'y', amplitude:45, speed:0.9}
     ],
-    enemyVariety: {specialType:'fast', waveRatio:0.5}
+    enemyVariety: {specialType:'parmesan', waveRatio:0.5}
   },
   paris: {
     platforms: [
@@ -2250,7 +2250,7 @@
     movingPlatformDefs: [
       {ox:280, oy:215, w:110, h:18, axis:'x', amplitude:80, speed:0.8}
     ],
-    enemyVariety: {specialType:'fast', waveRatio:0.4}
+    enemyVariety: {specialType:'artist', waveRatio:0.4}
   },
   ireland: {
     platforms: [
@@ -2276,7 +2276,7 @@
     movingPlatformDefs: [
       {ox:340, oy:225, w:115, h:18, axis:'x', amplitude:90, speed:0.65}
     ],
-    enemyVariety: {specialType:'armoured', waveRatio:0.35}
+    enemyVariety: {specialType:'lukekelly', waveRatio:0.35}
   },
   kenya: {
     platforms: [
@@ -2302,7 +2302,7 @@
     movingPlatformDefs: [
       {ox:360, oy:255, w:130, h:18, axis:'x', amplitude:110, speed:1.0}
     ],
-    enemyVariety: {specialType:'armoured', waveRatio:0.5}
+    enemyVariety: {specialType:'motorbike', waveRatio:0.5}
   },
   tokyo: {
     platforms: [
@@ -2782,7 +2782,7 @@
   var players, enemies, bubbles, collectibles, particles, popups, powerups, popBursts;
   var score = 0, lives = 3, gameState = 'ready', enemiesLeft = 0, startTime = 0;
   var shakeT = 0, waveNumber = 1, comboCount = 0, comboTimer = 0, waveFlash = 0, screenFlash = 0, allClearFired = false, allClearDelay = 0;
-  var freezeT = 0, slowT = 0, doubleScoreT = 0;
+  var freezeT = 0, slowT = 0, doubleScoreT = 0, smokeLevel = 0; var paintBlobs = [];
   var tutorialT = 0, tutorialDone = false, tutorialFirstPop = false;
   var survivorUnlocked = false;
   var usedPowerups = {};
@@ -2950,9 +2950,16 @@
       });
       waveNumber = 99;
     } else {
+      var variety1 = layout.enemyVariety;
       enemies = currentEnemySpawns.map(function(s){
-        return { x:s.x, y:s.y, w:28, h:26, vx:Math.round(70 * diffMult * (lvlPhys.enemySpeed || 1)), vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
-          state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false, type:'normal', wanderX:rand(40,680), wanderT:rand(3,9) };
+        var useSpecial = variety1 && Math.random() < (variety1.waveRatio * 0.45);
+        var eType = useSpecial ? variety1.specialType : 'normal';
+        var ew = eType==='parmesan'?44 : eType==='buckfast'?20 : eType==='motorbike'?42 : eType==='armoured'?34 : eType==='fast'?22 : 28;
+        var eh = eType==='parmesan'?38 : eType==='buckfast'?26 : eType==='motorbike'?28 : eType==='armoured'?30 : eType==='fast'?20 : 26;
+        var baseSpd = eType==='buckfast'?130 : eType==='parmesan'?50 : eType==='motorbike'?160 : eType==='armoured'?60 : eType==='fast'?110 : 70;
+        var ehits = eType==='parmesan'?3 : eType==='armoured'?2 : 1;
+        return { x:s.x, y:s.y, w:ew, h:eh, vx:Math.round(baseSpd * diffMult * (lvlPhys.enemySpeed || 1)), vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
+          state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false, type:eType, hits:ehits, wanderX:rand(40,680), wanderT:rand(3,9) };
       });
       waveNumber = 1;
     }
@@ -2963,7 +2970,7 @@
     powerups = [];
     popBursts = [];
     chaseAlertPlayed = false;
-    comboCount = 0; comboTimer = 0; waveFlash = 0; allClearFired = false; allClearDelay = 0;
+    comboCount = 0; comboTimer = 0; waveFlash = 0; allClearFired = false; allClearDelay = 0; smokeLevel = 0; paintBlobs = [];
     survivorUnlocked = false;
     usedPowerups = {};
 
@@ -3315,7 +3322,7 @@
             spawnPopup(c.x,c.y,'+'+v,'#ffd166');
           }
           spawnParticles(c.x,c.y,c.ghost?'#00e5ff':'#ffd166',10);
-          playSound('collect');
+          playSound('collect'); haptic(12);
           // water rat companion (Modena slot c)
           if(currentLocationId==='modena' && c.slot==='c'){
             players[pi].hasRat = true;
@@ -3358,7 +3365,7 @@
           popBursts.push({x:en.x+en.w/2, y:en.y+en.h/2,
             vx:rand(-260,260), vy:rand(-400,-160),
             rot:0, rotV:rand(-14,14), t:0, life:0.9,
-            drawFn:LEVELS[currentLocationId].enemyDraw, w:en.w, h:en.h, hits:0});
+            drawFn:LEVELS[currentLocationId].enemyDraw, w:en.w, h:en.h, hits:0, enType:en.type});
           score += Math.round(level.values.pop * 0.5);
         });
         enemies = [];
@@ -3450,7 +3457,7 @@
           spawnPopup(b.x, b.y-10, label, multiplier>1?'#ff5470':'#ff9c7a', multiplier>1 ? 14+multiplier*4 : 16);
           spawnParticles(b.x,b.y,multiplier>2?'#ff5470':'#ff9c7a',14);
           score += pts;
-          playSound('pop');
+          playSound('pop'); haptic(10);
           tutorialFirstPop = true;
           unlockAchievement('first_pop');
           if(comboCount >= 3) unlockAchievement('combo3');
@@ -3476,7 +3483,7 @@
             rot:0, rotV:rand(-12,12),
             t:0, life:0.65,
             drawFn:LEVELS[currentLocationId].enemyDraw,
-            w:en2.w, h:en2.h, hits:0
+            w:en2.w, h:en2.h, hits:0, enType:en2.type
           });
           // gold coin shower
           for(var ci2=0;ci2<5;ci2++){
@@ -3568,7 +3575,40 @@
       if(en.angry>0) en.angry -= dt;
       en.hopT -= dt;
 
-      if(chasing && players.length > 0){
+      /* Motorbike: periodic smoke burst */
+      if(en.type === 'motorbike'){
+        en.smokeRevT = ((en.smokeRevT !== undefined) ? en.smokeRevT : rand(3,6)) - dt;
+        if(en.smokeRevT <= 0){
+          en.smokeRevT = rand(3, 7);
+          smokeLevel = Math.min(1, smokeLevel + 0.55);
+          for(var msi=0;msi<12;msi++){
+            particles.push({x:en.x+en.w/2, y:en.y+en.h/2, vx:rand(-80,80), vy:rand(-60,20),
+              life:rand(1.5,3), t:0, color:'rgba(120,120,120,0.6)', r:rand(10,22)});
+          }
+        }
+      }
+
+      /* Artist: throw paint blobs at players */
+      if(en.type === 'artist' && players.length > 0){
+        en.paintT = ((en.paintT !== undefined) ? en.paintT : rand(2,4)) - dt;
+        if(en.paintT <= 0){
+          en.paintT = rand(3, 6);
+          var ptgt = players[0];
+          var pbx = en.x+en.w/2, pby = en.y+en.h/2;
+          var pdx = ptgt.x+ptgt.w/2-pbx, pdy = ptgt.y+ptgt.h/2-pby;
+          var pdist = Math.sqrt(pdx*pdx+pdy*pdy)||1;
+          var pspd = 200;
+          var paintCols = ['#ff4040','#4040ff','#40cc40','#ffcc00'];
+          paintBlobs.push({x:pbx, y:pby, vx:(pdx/pdist)*pspd, vy:(pdy/pdist)*pspd,
+            r:7, color:paintCols[Math.floor(Math.random()*4)], life:3, t:0});
+          playSound('shoot');
+        }
+      }
+
+      /* Luke Kelly never chases — always wanders */
+      var doChase = chasing && players.length > 0 && en.type !== 'lukekelly';
+
+      if(doChase){
         // find nearest player
         var nearest = players[0];
         var bestDist = Math.abs(players[0].x - en.x);
@@ -3579,40 +3619,50 @@
         en.dir = nearest.x > en.x ? 1 : -1;
         var speed = en.vx * (en.angry>0 ? 1.8 : 1.3) * (slowT > 0 ? 0.4 : 1);
         en.x += speed * en.dir * dt;
-        // full physics — enemies can jump up to reach the player
         en.vy += GRAVITY * dt;
         en.y += en.vy * dt;
         resolvePlatformCollision(en);
         if(en.y + en.h > 445){ en.y = 445 - en.h; en.vy = 0; en.onGround = true; }
-        // jump when player is on a higher platform and we've landed
-        if(en.onGround && nearest.y < en.y - 40 && en.hopT <= 0){
-          en.vy = -500;
-          en.onGround = false;
-          en.hopT = rand(0.6, 1.4);
+
+        /* Stuck detection: if enemy hasn't moved much in 1.5 s, force a jump/redirect */
+        en.stuckX = (en.stuckX !== undefined) ? en.stuckX : en.x;
+        en.stuckT = ((en.stuckT !== undefined) ? en.stuckT : 0) + dt;
+        if(en.stuckT >= 1.5){
+          if(Math.abs(en.x - en.stuckX) < 28){
+            if(en.onGround){ en.vy = rand(-520, -380); en.onGround = false; }
+            en.dir *= -1;
+          }
+          en.stuckX = en.x; en.stuckT = 0;
+        }
+
+        /* Jump: when player is above OR randomly to traverse platforms */
+        if(en.onGround && en.hopT <= 0){
+          if(nearest.y < en.y - 40 || Math.random() < 0.25){
+            en.vy = rand(-530, -380);
+            en.onGround = false;
+            en.hopT = rand(0.4, 1.2);
+          }
         }
       } else {
-        // Free-roaming wander: pick a random map target and navigate toward it
-        {
-          var speedMod = slowT > 0 ? 0.4 : 1;
-          en.wanderT = (en.wanderT || 0) - dt;
-          if(!en.wanderX || Math.abs(en.x + en.w/2 - en.wanderX) < 35 || en.wanderT <= 0){
-            en.wanderX = rand(40, W - 70);
-            en.wanderT = rand(3, 9);
-          }
-          en.dir = en.wanderX > en.x + en.w / 2 ? 1 : -1;
-          en.x += en.vx * en.dir * dt * (en.angry > 0 ? 1.5 : 1) * speedMod;
-          en.vy += GRAVITY * dt;
-          en.y += en.vy * dt;
-          resolvePlatformCollision(en);
-          if(en.y + en.h > 445){ en.y = 445 - en.h; en.vy = 0; en.onGround = true; }
-          if(en.x < 4){ en.x = 4; en.wanderX = rand(120, W - 60); }
-          if(en.x + en.w > W - 4){ en.x = W - 4 - en.w; en.wanderX = rand(40, W - 150); }
-          // Always jump when on ground to traverse platforms freely
-          if(en.onGround && en.hopT <= 0){
-            en.vy = rand(-440, -260);
-            en.onGround = false;
-            en.hopT = rand(0.4, 1.6);
-          }
+        // Free-roaming wander (also used by Luke Kelly always)
+        var speedMod = slowT > 0 ? 0.4 : 1;
+        en.wanderT = (en.wanderT || 0) - dt;
+        if(!en.wanderX || Math.abs(en.x + en.w/2 - en.wanderX) < 35 || en.wanderT <= 0){
+          en.wanderX = rand(40, W - 70);
+          en.wanderT = rand(3, 9);
+        }
+        en.dir = en.wanderX > en.x + en.w / 2 ? 1 : -1;
+        en.x += en.vx * en.dir * dt * (en.angry > 0 ? 1.5 : 1) * speedMod;
+        en.vy += GRAVITY * dt;
+        en.y += en.vy * dt;
+        resolvePlatformCollision(en);
+        if(en.y + en.h > 445){ en.y = 445 - en.h; en.vy = 0; en.onGround = true; }
+        if(en.x < 4){ en.x = 4; en.wanderX = rand(120, W - 60); }
+        if(en.x + en.w > W - 4){ en.x = W - 4 - en.w; en.wanderX = rand(40, W - 150); }
+        if(en.onGround && en.hopT <= 0){
+          en.vy = rand(-440, -260);
+          en.onGround = false;
+          en.hopT = rand(0.4, 1.6);
         }
       }
 
@@ -3699,6 +3749,26 @@
     }
 
     if(allClearDelay > 0) allClearDelay -= dt;
+    if(smokeLevel > 0) smokeLevel = Math.max(0, smokeLevel - dt * 0.12);
+
+    /* Paint blob update */
+    for(var pbi=paintBlobs.length-1;pbi>=0;pbi--){
+      var pb2 = paintBlobs[pbi];
+      pb2.t += dt; pb2.x += pb2.vx*dt; pb2.y += pb2.vy*dt; pb2.vy += 400*dt;
+      var pbHit = false;
+      for(var pi2=0;pi2<players.length;pi2++){
+        var pp = players[pi2];
+        if(pp.invuln<=0 && Math.abs(pb2.x-(pp.x+pp.w/2))<20 && Math.abs(pb2.y-(pp.y+pp.h/2))<22){
+          slowT = Math.max(slowT, 2.5);
+          spawnPopup(pb2.x, pb2.y, 'PAINT SPLASH!', pb2.color, 13);
+          spawnParticles(pb2.x, pb2.y, pb2.color, 10);
+          haptic(30);
+          pbHit = true; break;
+        }
+      }
+      if(pb2.y > 445){ spawnParticles(pb2.x, 440, pb2.color, 5); pbHit = true; }
+      if(pb2.t > pb2.life || pbHit) paintBlobs.splice(pbi,1);
+    }
 
     if(enemiesLeft<=0 && allClearDelay<=0){
       if(waveNumber < 2){
@@ -3711,18 +3781,20 @@
         enemies = layout2.enemySpawns.map(function(s, si){
           var useSpecial = variety2 && Math.random() < variety2.waveRatio;
           var eType = useSpecial ? variety2.specialType : 'normal';
-          var ew = eType==='armoured' ? 34 : eType==='fast' ? 22 : 32;
-          var eh = eType==='armoured' ? 30 : eType==='fast' ? 20 : 30;
+          var ew = eType==='parmesan'?44 : eType==='buckfast'?20 : eType==='motorbike'?42 : eType==='armoured'?34 : eType==='fast'?22 : 28;
+          var eh = eType==='parmesan'?38 : eType==='buckfast'?26 : eType==='motorbike'?28 : eType==='armoured'?30 : eType==='fast'?20 : 26;
           var lvlSpd = (LEVELS[currentLocationId] && LEVELS[currentLocationId].levelPhysics && LEVELS[currentLocationId].levelPhysics.enemySpeed) || 1;
-          var spd = (eType==='armoured' ? 60*speedMult : eType==='fast' ? 120*speedMult : 85*speedMult) * lvlSpd;
-          var hits = eType==='armoured' ? 2 : 1;
+          var baseSpd2 = eType==='buckfast'?130 : eType==='parmesan'?50 : eType==='motorbike'?160 : eType==='armoured'?60 : eType==='fast'?110 : 85;
+          var spd = baseSpd2 * speedMult * lvlSpd;
+          var ehits2 = eType==='parmesan'?3 : eType==='armoured'?2 : 1;
           return { x:s.x, y:s.y, w:ew, h:eh, vx:spd, vy:0,
             dir: Math.random()<0.5?1:-1, platform:s.platform,
             state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false,
-            type:eType, hits:hits, wanderX:rand(40,680), wanderT:rand(3,9) };
+            type:eType, hits:ehits2, wanderX:rand(40,680), wanderT:rand(3,9) };
         });
         enemiesLeft = enemies.length;
-        allClearFired = false;
+        /* Don't re-trigger all-clear if collectibles were already all taken in wave 1 */
+        allClearFired = collectibles.length > 0 && collectibles.every(function(c){ return c.taken; });
         allClearDelay = 0;
         waveFlash = 2.5;
         spawnParticles(W/2, H/2, '#ff5470', 30);
@@ -3741,7 +3813,7 @@
     p.vx = (knockDir||0) * 240;
     screenFlash = 0.35;
     shakeT = 0.4;
-    playSound('lose');
+    playSound('lose'); haptic(50);
     updateHud();
     if(lives<=0){
       gameState = 'lost';
@@ -4598,6 +4670,268 @@
     ctx.restore();
   }
 
+  /* ---------- Special enemy draw functions ---------- */
+  function drawBuckfastRef(en){
+    var t = performance.now()*0.006;
+    ctx.save();
+    ctx.translate(en.x+en.w/2, en.y+en.h/2);
+    if(en.dir<0) ctx.scale(-1,1);
+    var flash = en.angry>0 && Math.floor(performance.now()/80)%2===0;
+    var trapped = en.state==='trapped';
+    // Speed blur trails
+    if(!trapped && en.dir){
+      for(var ti=1;ti<=3;ti++){
+        ctx.globalAlpha=0.08*(4-ti);
+        ctx.fillStyle='#3a7a2a';
+        ctx.beginPath(); ctx.ellipse(-ti*8, 0, en.w*0.4, en.h*0.45, 0, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    }
+    // Bottle body
+    ctx.fillStyle = trapped?'#88cc88':(flash?'#88ff88':'#1e5a22');
+    ctx.beginPath();
+    ctx.moveTo(-5,-13); ctx.lineTo(-4,-8); ctx.lineTo(-9,0); ctx.lineTo(-9,11);
+    ctx.lineTo(9,11); ctx.lineTo(9,0); ctx.lineTo(4,-8); ctx.lineTo(5,-13);
+    ctx.closePath(); ctx.fill();
+    // Gold label
+    ctx.fillStyle = trapped?'#ffee88':'#c8a000';
+    ctx.fillRect(-8,1,16,7);
+    ctx.fillStyle='#1a1200'; ctx.font='bold 5px monospace'; ctx.textAlign='center';
+    ctx.fillText('BV',0,7);
+    // Cap
+    ctx.fillStyle='#7a5a10'; ctx.fillRect(-4,-15,8,3);
+    // Eyes (peering out of label area)
+    ctx.fillStyle='#ffe040';
+    ctx.beginPath(); ctx.arc(-3,-3,2.5,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(3,-3,2.5,0,TAU); ctx.fill();
+    ctx.fillStyle='#000';
+    ctx.beginPath(); ctx.arc(-3,-3,1.2,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(3,-3,1.2,0,TAU); ctx.fill();
+    // Legs
+    ctx.strokeStyle=trapped?'#88cc88':'#1e5a22'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(-4,11); ctx.lineTo(-4,16); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4,11); ctx.lineTo(4,16); ctx.stroke();
+    // Bubble indicator (hits)
+    if(en.type && en.hits>1){
+      ctx.fillStyle='rgba(160,210,255,0.7)';
+      ctx.beginPath(); ctx.arc(0,-19,4,0,TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawParmesanRef(en){
+    ctx.save();
+    ctx.translate(en.x+en.w/2, en.y+en.h/2);
+    if(en.dir<0) ctx.scale(-1,1);
+    var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
+    var trapped = en.state==='trapped';
+    // Crack angle based on hits taken
+    var crk = (en.hits===3?0 : en.hits===2?0.08 : 0.18);
+    ctx.rotate(crk * (Math.random()<0.5?1:-1));
+    // Wedge body
+    ctx.fillStyle = trapped?'#fffacc':(flash?'#ffe080':'#f0d050');
+    ctx.beginPath();
+    ctx.moveTo(-20,14); ctx.lineTo(20,14); ctx.lineTo(20,-6);
+    ctx.quadraticCurveTo(0,-20,-20,-6); ctx.closePath(); ctx.fill();
+    // Rind
+    ctx.strokeStyle=trapped?'#eedc80':'#b8920a'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(-20,14); ctx.lineTo(-20,-6);
+    ctx.quadraticCurveTo(0,-20,20,-6); ctx.stroke();
+    // Holes (typical parmesan texture)
+    ctx.fillStyle=trapped?'#fffacc':'#c8a820';
+    [[-10,4],[-2,-2],[9,6],[5,-9],[13,0]].forEach(function(h){
+      ctx.beginPath(); ctx.ellipse(h[0],h[1],3.5,2.5,0,0,TAU); ctx.fill();
+    });
+    // Grumpy face
+    ctx.fillStyle='#3a2000';
+    ctx.beginPath(); ctx.arc(-7,-1,3,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(7,-1,3,0,TAU); ctx.fill();
+    ctx.fillStyle='#fff5';
+    ctx.beginPath(); ctx.arc(-6,-2,1.2,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(8,-2,1.2,0,TAU); ctx.fill();
+    // Grumpy brows
+    ctx.strokeStyle='#3a2000'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(-10,-5); ctx.lineTo(-5,-8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(10,-5); ctx.lineTo(5,-8); ctx.stroke();
+    // Mouth (grumpy)
+    ctx.beginPath(); ctx.moveTo(-5,7); ctx.quadraticCurveTo(0,5,5,7); ctx.stroke();
+    // HP pips for 3-hit
+    if(en.hits){
+      for(var hp=0;hp<3;hp++){
+        ctx.fillStyle = hp<en.hits?'#ff8040':'rgba(255,255,255,0.15)';
+        ctx.beginPath(); ctx.arc(-10+hp*10,-26,4,0,TAU); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawLukeKellyRef(en){
+    var t = performance.now()*0.001;
+    ctx.save();
+    ctx.translate(en.x+en.w/2, en.y+en.h/2);
+    if(en.dir<0) ctx.scale(-1,1);
+    var trapped = en.state==='trapped';
+    var walkSwing = Math.sin(t*4)*4;
+    // Legs
+    ctx.fillStyle=trapped?'#aaa':'#222';
+    ctx.fillRect(-8,12, 7, 8+Math.sin(t*4)*2);
+    ctx.fillRect(1, 12, 7, 8-Math.sin(t*4)*2);
+    // Dark jacket body
+    ctx.fillStyle=trapped?'#aaa':'#3a2810';
+    ctx.fillRect(-10,-2,20,16);
+    // Afro — big auburn halo
+    ctx.fillStyle=trapped?'#dda':'#7a3000';
+    ctx.beginPath(); ctx.arc(0,-12,13,Math.PI,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(-11,-8,6,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(11,-8,6,0,TAU); ctx.fill();
+    // Beard — full and auburn
+    ctx.fillStyle=trapped?'#cc9':'#8b3a00';
+    ctx.beginPath(); ctx.arc(0,-6,9,0,Math.PI); ctx.fill();
+    // Face skin
+    ctx.fillStyle=trapped?'#e8d0b0':'#c8784a';
+    ctx.beginPath(); ctx.arc(0,-10,7.5,0,TAU); ctx.fill();
+    // Eyes
+    ctx.fillStyle='#1a0a00';
+    ctx.beginPath(); ctx.arc(-3,-11,1.8,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(3,-11,1.8,0,TAU); ctx.fill();
+    // Bouzouki body
+    ctx.fillStyle=trapped?'#c8c080':'#7a4a12';
+    ctx.beginPath(); ctx.ellipse(16,4,8,11,-0.4,0,TAU); ctx.fill();
+    ctx.strokeStyle=trapped?'#aaa':'#3a2000'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(9,-2); ctx.lineTo(4,-18); ctx.stroke();
+    // Strings
+    ctx.strokeStyle='#d4c080'; ctx.lineWidth=0.7;
+    for(var sti=0;sti<3;sti++){
+      ctx.beginPath(); ctx.moveTo(9+sti*1.5,-1); ctx.lineTo(20,6); ctx.stroke();
+    }
+    // Music notes floating
+    if(!trapped){
+      var nt = t*1.5;
+      var noteAlpha = Math.abs(Math.sin(nt))*0.85 + 0.15;
+      ctx.globalAlpha = noteAlpha;
+      ctx.fillStyle='#20ff70'; ctx.font='bold 15px serif'; ctx.textAlign='center';
+      ctx.fillText('♪', 4, -24 - (nt%2)*10);
+      ctx.fillStyle='#70ff20'; ctx.font='11px serif';
+      ctx.fillText('♫', 16, -18 - ((nt+1)%2)*8);
+      ctx.globalAlpha=1;
+    }
+    ctx.restore();
+  }
+
+  function drawArtistRef(en){
+    ctx.save();
+    ctx.translate(en.x+en.w/2, en.y+en.h/2);
+    if(en.dir<0) ctx.scale(-1,1);
+    var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
+    var trapped = en.state==='trapped';
+    // Legs
+    ctx.fillStyle=trapped?'#aac':'#2a2a60';
+    ctx.fillRect(-8,12,7,9); ctx.fillRect(1,12,7,9);
+    // Smock (off-white with paint stains)
+    ctx.fillStyle=trapped?'#e8e4d0':'#ddd8c4';
+    ctx.fillRect(-10,-2,20,16);
+    if(!trapped){
+      [['#ff4040',-6,2],['#4040ff',2,5],['#ffcc00',5,-1]].forEach(function(s){
+        ctx.fillStyle=s[0]; ctx.beginPath(); ctx.arc(s[1],s[2],3,0,TAU); ctx.fill();
+      });
+    }
+    // Head
+    ctx.fillStyle=trapped?'#e8d0b0':'#d4906a';
+    ctx.beginPath(); ctx.arc(0,-11,8,0,TAU); ctx.fill();
+    // Beret (tilted)
+    ctx.fillStyle=trapped?'#888':'#111';
+    ctx.beginPath(); ctx.ellipse(2,-18,11,5,-0.3,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(2,-18,3.5,0,TAU); ctx.fill();
+    // Eyes
+    ctx.fillStyle='#1a1000';
+    ctx.beginPath(); ctx.arc(-3,-12,1.8,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(3,-12,1.8,0,TAU); ctx.fill();
+    // Palette
+    ctx.fillStyle=trapped?'#c8a060':'#a07030';
+    ctx.beginPath(); ctx.ellipse(15,2,9,7,0.3,0,TAU); ctx.fill();
+    [['#f00',10,0],['#00f',16,-1],['#ff0',18,4],['#0f0',13,5]].forEach(function(d){
+      ctx.fillStyle=d[0]; ctx.beginPath(); ctx.arc(d[1],d[2],2,0,TAU); ctx.fill();
+    });
+    // Arm holding palette
+    ctx.strokeStyle=trapped?'#c8a060':'#c07040'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(2,2); ctx.lineTo(13,-1); ctx.stroke();
+    // Throw indicator when paintT is close
+    if(en.paintT!==undefined && en.paintT < 1){
+      ctx.globalAlpha = 1 - en.paintT;
+      ctx.fillStyle='#ff4040';
+      ctx.beginPath(); ctx.arc(18, -4, 5, 0, TAU); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    ctx.restore();
+  }
+
+  function drawMotorbikeRef(en){
+    var t = performance.now()*0.005;
+    ctx.save();
+    ctx.translate(en.x+en.w/2, en.y+en.h/2);
+    if(en.dir<0) ctx.scale(-1,1);
+    var trapped = en.state==='trapped';
+    var wheelRot = t * 8 * (trapped ? 0 : 1);
+    // Exhaust trail
+    if(!trapped){
+      for(var se=0;se<3;se++){
+        ctx.globalAlpha=0.15-se*0.04;
+        ctx.fillStyle='#888';
+        ctx.beginPath(); ctx.arc(-18-se*6, 8+Math.sin(t*3+se)*2, 5+se, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    }
+    // Wheels
+    ctx.strokeStyle=trapped?'#888':'#1a1a1a'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(-14,8,8,0,TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(14,8,8,0,TAU); ctx.stroke();
+    // Spokes
+    ctx.lineWidth=1.5;
+    for(var sp=0;sp<4;sp++){
+      var sa = wheelRot + sp*Math.PI/2;
+      ctx.beginPath(); ctx.moveTo(-14+Math.cos(sa)*8,8+Math.sin(sa)*8);
+      ctx.lineTo(-14-Math.cos(sa)*8,8-Math.sin(sa)*8); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(14+Math.cos(sa)*8,8+Math.sin(sa)*8);
+      ctx.lineTo(14-Math.cos(sa)*8,8-Math.sin(sa)*8); ctx.stroke();
+    }
+    ctx.fillStyle=trapped?'#888':'#222';
+    ctx.beginPath(); ctx.arc(-14,8,3.5,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(14,8,3.5,0,TAU); ctx.fill();
+    // Frame
+    ctx.strokeStyle=trapped?'#aaa':'#c0392b'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(-12,4); ctx.lineTo(0,-4); ctx.lineTo(12,4);
+    ctx.moveTo(-12,4); ctx.lineTo(12,4); ctx.stroke();
+    // Forks
+    ctx.strokeStyle=trapped?'#aaa':'#888'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(8,-6); ctx.lineTo(14,0); ctx.stroke();
+    // Handlebars
+    ctx.beginPath(); ctx.moveTo(6,-5); ctx.lineTo(11,-8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(6,-5); ctx.lineTo(11,-3); ctx.stroke();
+    // Rider body (hunched forward)
+    ctx.fillStyle=trapped?'#aaa':'#1a3050';
+    ctx.beginPath(); ctx.moveTo(-4,-2); ctx.lineTo(8,-6); ctx.lineTo(10,4); ctx.lineTo(-2,4); ctx.closePath(); ctx.fill();
+    // Helmet
+    ctx.fillStyle=trapped?'#ccc':'#e85000';
+    ctx.beginPath(); ctx.arc(3,-9,8,Math.PI*0.85,TAU*0.85); ctx.fill();
+    // Visor
+    ctx.fillStyle=trapped?'#ccc8':'#ffcc0088';
+    ctx.fillRect(-1,-12,8,4);
+    ctx.restore();
+  }
+
+  /* Paint blob draw */
+  function drawPaintBlobs(){
+    paintBlobs.forEach(function(pb){
+      ctx.save();
+      ctx.fillStyle = pb.color;
+      ctx.globalAlpha = Math.max(0, 1 - pb.t/pb.life);
+      ctx.beginPath(); ctx.arc(pb.x, pb.y, pb.r, 0, TAU); ctx.fill();
+      // Splat drip
+      ctx.beginPath(); ctx.ellipse(pb.x, pb.y+pb.r*0.7, pb.r*0.4, pb.r*0.8, 0, 0, TAU); ctx.fill();
+      ctx.globalAlpha=1; ctx.restore();
+    });
+  }
+
   function draw(){
     var level = LEVELS[currentLocationId];
     var theme = level.theme;
@@ -4636,7 +4970,12 @@
     });
     enemies.forEach(function(en){
       if(en.state==='free'){
-        level.enemyDraw(en);
+        if(en.type==='buckfast') drawBuckfastRef(en);
+        else if(en.type==='parmesan') drawParmesanRef(en);
+        else if(en.type==='lukekelly') drawLukeKellyRef(en);
+        else if(en.type==='artist') drawArtistRef(en);
+        else if(en.type==='motorbike') drawMotorbikeRef(en);
+        else level.enemyDraw(en);
         if(waveNumber >= 2){
           ctx.save();
           ctx.globalAlpha = 0.35;
@@ -4666,18 +5005,33 @@
         }
       }
     });
+    drawPaintBlobs();
+    /* Smoke screen overlay from motorbike */
+    if(smokeLevel > 0.05){
+      ctx.save();
+      ctx.globalAlpha = smokeLevel * 0.72;
+      ctx.fillStyle = '#707070';
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
     // pop burst: spinning enemy ghost that flies off after being popped
     popBursts.forEach(function(pb){
       var frac = pb.t / pb.life;
       var fakeEn = {x:pb.x-pb.w/2, y:pb.y-pb.h/2, w:pb.w, h:pb.h,
-                    state:'trapped', facing:1, dir:1, angry:0, hits:pb.hits, vx:0, vy:0, bubbleTimer:0};
+                    state:'trapped', facing:1, dir:1, angry:0, hits:pb.hits, vx:0, vy:0, bubbleTimer:0, type:pb.enType||'normal'};
       ctx.save();
       ctx.globalAlpha = Math.max(0, 1 - frac);
       ctx.translate(pb.x, pb.y);
       ctx.rotate(pb.rot);
       ctx.scale(1 - frac*0.6, 1 - frac*0.6);
       ctx.translate(-pb.x, -pb.y);
-      pb.drawFn(fakeEn);
+      if(fakeEn.type==='buckfast') drawBuckfastRef(fakeEn);
+      else if(fakeEn.type==='parmesan') drawParmesanRef(fakeEn);
+      else if(fakeEn.type==='lukekelly') drawLukeKellyRef(fakeEn);
+      else if(fakeEn.type==='artist') drawArtistRef(fakeEn);
+      else if(fakeEn.type==='motorbike') drawMotorbikeRef(fakeEn);
+      else pb.drawFn(fakeEn);
       ctx.restore();
     });
     powerups.forEach(drawPowerup);
