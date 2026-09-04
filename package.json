@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "node build.js",
+    "pretest": "node build.js",
     "test": "playwright test",
     "test:desktop": "playwright test --project=desktop",
     "test:mobile": "playwright test --project=iphone-portrait --project=iphone-landscape --project=android-portrait --project=android-landscape",
@@ -22,6 +24,7 @@
   },
   "homepage": "https://github.com/jackflanagan/Babble#readme",
   "devDependencies": {
-    "@playwright/test": "^1.62.1"
+    "@playwright/test": "^1.62.1",
+    "esbuild": "^0.28.2"
   }
 }
