@@ -3096,10 +3096,6 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         ctx.fillStyle='rgba(0,0,0,0.35)';
         ctx.beginPath(); ctx.arc(piX+12,piY+8,12,0,TAU); ctx.fill();
         ctx.strokeStyle='#aaffaa'; ctx.lineWidth=2.5;
-        ctx.beginPath(); ctx.arc(piX+12,piY+8,-TAU/4,TAU*cdFrac-TAU/4,false); // wait, arc needs proper params
-        // draw cooldown arc
-        ctx.restore(); ctx.save();
-        ctx.strokeStyle='#aaffaa'; ctx.lineWidth=2.5;
         ctx.beginPath(); ctx.arc(piX+12,piY+8,10,-Math.PI/2,-Math.PI/2+TAU*cdFrac); ctx.stroke();
         ctx.fillStyle='rgba(170,255,170,0.5)'; ctx.font='bold 8px "Fredoka",sans-serif'; ctx.textAlign='center';
         ctx.fillText(Math.ceil(pandaCooldown)+'s', piX+12, piY+12);

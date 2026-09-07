@@ -8062,12 +8062,6 @@
             ctx2.strokeStyle = "#aaffaa";
             ctx2.lineWidth = 2.5;
             ctx2.beginPath();
-            ctx2.arc(piX + 12, piY + 8, -TAU2 / 4, TAU2 * cdFrac - TAU2 / 4, false);
-            ctx2.restore();
-            ctx2.save();
-            ctx2.strokeStyle = "#aaffaa";
-            ctx2.lineWidth = 2.5;
-            ctx2.beginPath();
             ctx2.arc(piX + 12, piY + 8, 10, -Math.PI / 2, -Math.PI / 2 + TAU2 * cdFrac);
             ctx2.stroke();
             ctx2.fillStyle = "rgba(170,255,170,0.5)";
