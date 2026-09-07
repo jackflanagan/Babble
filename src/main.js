@@ -156,6 +156,11 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
   }
   document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+  document.getElementById('btnReset').addEventListener('click', function(){
+    if(!confirm('Reset all progress, scores and unlocks?')) return;
+    localStorage.clear();
+    location.reload();
+  });
   document.getElementById('btnFullscreenGlobe').addEventListener('click', toggleFullscreen);
   document.addEventListener('fullscreenchange', function(){
     var fs = !!document.fullscreenElement;
