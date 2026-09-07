@@ -1,5 +1,13 @@
 (() => {
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __esm = (fn, res, err) => function __init() {
+    if (err) throw err[0];
+    try {
+      return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+    } catch (e) {
+      throw err = [e], e;
+    }
+  };
   var __commonJS = (cb, mod) => function __require() {
     try {
       return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
@@ -8,13 +16,66 @@
     }
   };
 
+  // src/utils.js
+  function clamp(v, a, b) {
+    return Math.max(a, Math.min(b, v));
+  }
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+  function rand(a, b) {
+    return a + Math.random() * (b - a);
+  }
+  function safeGet(key, fallback) {
+    try {
+      var v = localStorage.getItem(key);
+      return v === null ? fallback : JSON.parse(v);
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function safeSet(key, val) {
+    try {
+      localStorage.setItem(key, JSON.stringify(val));
+    } catch (e) {
+    }
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function haptic(ms) {
+    try {
+      if (navigator.vibrate) navigator.vibrate(ms || 18);
+    } catch (e) {
+    }
+  }
+  var TAU;
+  var init_utils = __esm({
+    "src/utils.js"() {
+      TAU = Math.PI * 2;
+    }
+  });
+
+  // src/canvas.js
+  function initCanvas() {
+    var cv = document.getElementById("gameCanvas");
+    ctx = cv.getContext("2d");
+  }
+  var ctx, W, H, TAU2;
+  var init_canvas = __esm({
+    "src/canvas.js"() {
+      ctx = null;
+      W = 720;
+      H = 480;
+      TAU2 = Math.PI * 2;
+    }
+  });
+
   // src/main.js
   var require_main = __commonJS({
     "src/main.js"() {
-      var TAU = Math.PI * 2;
-      function clamp(v, a, b) {
-        return Math.max(a, Math.min(b, v));
-      }
+      init_utils();
+      init_canvas();
       var CGSDK = null;
       (function() {
         try {
@@ -58,26 +119,6 @@
           });
         } catch (e) {
           if (cb) cb();
-        }
-      }
-      function lerp(a, b, t) {
-        return a + (b - a) * t;
-      }
-      function rand(a, b) {
-        return a + Math.random() * (b - a);
-      }
-      function safeGet(key, fallback) {
-        try {
-          var v = localStorage.getItem(key);
-          return v === null ? fallback : JSON.parse(v);
-        } catch (e) {
-          return fallback;
-        }
-      }
-      function safeSet(key, val) {
-        try {
-          localStorage.setItem(key, JSON.stringify(val));
-        } catch (e) {
         }
       }
       var LB_URL = "";
@@ -177,9 +218,6 @@
           html += "</table>";
           tableEl.innerHTML = html;
         });
-      }
-      function escHtml(s) {
-        return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
       }
       var progress = safeGet("gh_progress_v2", { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
       function updateStreak() {
@@ -1316,10 +1354,8 @@
           document.getElementById("btnNetJoin").click();
         }
       });
+      initCanvas();
       var cv = document.getElementById("gameCanvas");
-      var ctx = cv.getContext("2d");
-      var W = 720;
-      var H = 480;
       var GRAVITY = 1500;
       cv.addEventListener("click", function(e) {
         handleMiniGameClick(e.clientX, e.clientY);
@@ -1448,12 +1484,6 @@
       bindHold("tBubble", "p1Bubble", function() {
         localBubblePress();
       });
-      function haptic(ms) {
-        try {
-          if (navigator.vibrate) navigator.vibrate(ms || 18);
-        } catch (e) {
-        }
-      }
       function bindMC(id, prop, onPress) {
         var el = document.getElementById(id);
         if (!el) return;
@@ -4602,7 +4632,7 @@
       function startMiniGameMusic(id) {
         stopMiniGameMusic();
         try {
-          let note2 = function(freq, startAt, dur, type, gain) {
+          let note = function(freq, startAt, dur, type, gain) {
             var osc = a.createOscillator();
             var env = a.createGain();
             osc.type = type || "sine";
@@ -4615,7 +4645,7 @@
             env.connect(mg);
             osc.start(startAt);
             osc.stop(startAt + dur + 0.01);
-          }, noise2 = function(startAt, dur, gain) {
+          }, noise = function(startAt, dur, gain) {
             try {
               var buf = a.createBuffer(1, Math.ceil(a.sampleRate * dur), a.sampleRate);
               var d = buf.getChannelData(0);
@@ -4636,23 +4666,21 @@
             } catch (e) {
             }
           };
-          var note = note2, noise = noise2;
           var a = ac();
           var mg = getMasterGain();
           var vol = muted ? 0 : Math.min(1, parseFloat(document.getElementById("volSlider").value)) * 0.38;
           if (id === "mediterranean") {
-            let schedMed2 = function() {
+            let schedMed = function() {
               if (!miniGameId || miniGameId !== "mediterranean") return;
               var now = a.currentTime + 0.05;
               for (var i = 0; i < melody.length; i++) {
                 var t = now + i * (beat * 0.75);
-                note2(melody[i], t, beat * 0.65, "sine", 0.55);
-                note2(bass[i], t, beat * 0.9, "triangle", 0.35);
+                note(melody[i], t, beat * 0.65, "sine", 0.55);
+                note(bass[i], t, beat * 0.9, "triangle", 0.35);
               }
               var loopMs = melody.length * beat * 0.75 * 1e3;
-              miniGameMusicHandle = setTimeout(schedMed2, loopMs - 80);
+              miniGameMusicHandle = setTimeout(schedMed, loopMs - 80);
             };
-            var schedMed = schedMed2;
             var bpm = 80, beat = 60 / bpm, bar = beat * 3;
             var melody = [
               261.63,
@@ -4691,20 +4719,19 @@
               130.81
             ];
             var totalBars = 4;
-            schedMed2();
+            schedMed();
           } else if (id === "krakow") {
-            let schedKrak2 = function() {
+            let schedKrak = function() {
               if (!miniGameId || miniGameId !== "krakow") return;
               var now = a.currentTime + 0.05;
               for (var i = 0; i < melFreqs.length; i++) {
                 var t = now + i * beat * 0.5;
-                note2(melFreqs[i], t, beat * 0.42, "sawtooth", 0.4);
-                note2(oomFreqs[i], t, beat * 0.48, "square", 0.3);
+                note(melFreqs[i], t, beat * 0.42, "sawtooth", 0.4);
+                note(oomFreqs[i], t, beat * 0.48, "square", 0.3);
               }
               var loopMs = melFreqs.length * beat * 0.5 * 1e3;
-              miniGameMusicHandle = setTimeout(schedKrak2, loopMs - 80);
+              miniGameMusicHandle = setTimeout(schedKrak, loopMs - 80);
             };
-            var schedKrak = schedKrak2;
             var bpm = 130, beat = 60 / bpm, bar = beat * 2;
             var melFreqs = [
               329.63,
@@ -4742,9 +4769,9 @@
               196,
               261.63
             ];
-            schedKrak2();
+            schedKrak();
           } else if (id === "berlin") {
-            let schedBerlin2 = function() {
+            let schedBerlin = function() {
               if (!miniGameId || miniGameId !== "berlin") return;
               var now = a.currentTime + 0.05;
               var eighth = beat * 0.5;
@@ -4763,14 +4790,13 @@
                   osc2.start(t);
                   osc2.stop(t + 0.23);
                 }
-                if (i === 4 || i === 12) noise2(t, 0.15, 0.5);
-                note2(bassFreqs[i], t, eighth * 0.8, "sawtooth", 0.35);
-                if (leadFreqs[i] > 0) note2(leadFreqs[i], t, eighth * 0.65, "square", 0.22);
+                if (i === 4 || i === 12) noise(t, 0.15, 0.5);
+                note(bassFreqs[i], t, eighth * 0.8, "sawtooth", 0.35);
+                if (leadFreqs[i] > 0) note(leadFreqs[i], t, eighth * 0.65, "square", 0.22);
               }
               var loopMs = 16 * eighth * 1e3;
-              miniGameMusicHandle = setTimeout(schedBerlin2, loopMs - 80);
+              miniGameMusicHandle = setTimeout(schedBerlin, loopMs - 80);
             };
-            var schedBerlin = schedBerlin2;
             var bpm = 128, beat = 60 / bpm, bar = beat * 4;
             var leadFreqs = [
               0,
@@ -4808,16 +4834,16 @@
               82.41,
               73.42
             ];
-            schedBerlin2();
+            schedBerlin();
           } else if (id === "london") {
-            let schedLondon2 = function() {
+            let schedLondon = function() {
               if (!miniGameId || miniGameId !== "london") return;
               var now = a.currentTime + 0.05;
               for (var i = 0; i < 16; i++) {
                 var t = now + i * beat * 0.5;
-                if (marchMel[i] > 0) note2(marchMel[i], t, beat * 0.42, "square", 0.28);
-                note2(marchBass[i], t, beat * 0.48, "triangle", 0.32);
-                if (i === 4 || i === 12) noise2(t, 0.12, 0.45);
+                if (marchMel[i] > 0) note(marchMel[i], t, beat * 0.42, "square", 0.28);
+                note(marchBass[i], t, beat * 0.48, "triangle", 0.32);
+                if (i === 4 || i === 12) noise(t, 0.12, 0.45);
                 if (i === 0 || i === 8) {
                   var ok2 = a.createOscillator(), ek2 = a.createGain();
                   ok2.type = "sine";
@@ -4832,9 +4858,8 @@
                 }
               }
               var loopMs = 16 * beat * 0.5 * 1e3;
-              miniGameMusicHandle = setTimeout(schedLondon2, loopMs - 80);
+              miniGameMusicHandle = setTimeout(schedLondon, loopMs - 80);
             };
-            var schedLondon = schedLondon2;
             var bpm = 120, beat = 60 / bpm;
             var marchMel = [
               261.63,
@@ -4872,16 +4897,16 @@
               65.41,
               65.41
             ];
-            schedLondon2();
+            schedLondon();
           } else if (id === "pamplona") {
-            let schedPamplona2 = function() {
+            let schedPamplona = function() {
               if (!miniGameId || miniGameId !== "pamplona") return;
               var now = a.currentTime + 0.05;
               for (var i = 0; i < 16; i++) {
                 var t = now + i * beat * 0.5;
-                if (flamMel[i] > 0) note2(flamMel[i], t, beat * 0.38, "sawtooth", 0.32);
-                note2(flamBass[i], t, beat * 0.52, "sawtooth", 0.28);
-                if (i === 2 || i === 5 || i === 10 || i === 13) noise2(t, 0.08, 0.38);
+                if (flamMel[i] > 0) note(flamMel[i], t, beat * 0.38, "sawtooth", 0.32);
+                note(flamBass[i], t, beat * 0.52, "sawtooth", 0.28);
+                if (i === 2 || i === 5 || i === 10 || i === 13) noise(t, 0.08, 0.38);
                 if (i === 0 || i === 8) {
                   var os2 = a.createOscillator(), es2 = a.createGain();
                   os2.type = "sine";
@@ -4896,9 +4921,8 @@
                 }
               }
               var loopMs = 16 * beat * 0.5 * 1e3;
-              miniGameMusicHandle = setTimeout(schedPamplona2, loopMs - 80);
+              miniGameMusicHandle = setTimeout(schedPamplona, loopMs - 80);
             };
-            var schedPamplona = schedPamplona2;
             var bpm = 140, beat = 60 / bpm;
             var flamMel = [
               329.63,
@@ -4936,7 +4960,7 @@
               82.41,
               82.41
             ];
-            schedPamplona2();
+            schedPamplona();
           }
         } catch (e) {
         }

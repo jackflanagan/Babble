@@ -1,9 +1,10 @@
 
+import { TAU, clamp, lerp, rand, safeGet, safeSet, escHtml, haptic } from './utils.js';
+import { ctx, W, H, initCanvas } from './canvas.js';
+
   /* =========================================================
-     Shared helpers
+     Shared helpers (extracted to utils.js)
   ========================================================= */
-  var TAU = Math.PI * 2;
-  function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
 
   /* ---------- CrazyGames SDK wrapper ----------
      All calls are no-ops when running outside CrazyGames (dev, self-host, Poki, etc.)
@@ -30,19 +31,6 @@
       });
     }catch(e){ if(cb) cb(); }
   }
-  function lerp(a,b,t){ return a + (b-a)*t; }
-  function rand(a,b){ return a + Math.random()*(b-a); }
-
-  function safeGet(key, fallback){
-    try{
-      var v = localStorage.getItem(key);
-      return v===null ? fallback : JSON.parse(v);
-    }catch(e){ return fallback; }
-  }
-  function safeSet(key, val){
-    try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ /* ignore */ }
-  }
-
   /* ---------- Leaderboard config (fill in after Supabase setup) ---------- */
   var LB_URL  = '';   // e.g. 'https://xyzxyz.supabase.co'
   var LB_KEY  = '';   // your project's anon/public key
@@ -139,10 +127,6 @@
       html += '</table>';
       tableEl.innerHTML = html;
     });
-  }
-
-  function escHtml(s){
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
@@ -1258,9 +1242,8 @@
   /* =========================================================
      GAME ENGINE
   ========================================================= */
+  initCanvas();
   var cv = document.getElementById('gameCanvas');
-  var ctx = cv.getContext('2d');
-  var W = 720, H = 480;
   var GRAVITY = 1500;
   cv.addEventListener('click', function(e){ handleMiniGameClick(e.clientX, e.clientY); });
   cv.addEventListener('touchstart', function(e){
@@ -1326,8 +1309,6 @@
   bindHold('tBubble','p1Bubble', function(){ localBubblePress(); });
 
   /* ---- Mobile floating controls ---- */
-  function haptic(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms||18); }catch(e){} }
-
   function bindMC(id, prop, onPress){
     var el = document.getElementById(id);
     if(!el) return;
