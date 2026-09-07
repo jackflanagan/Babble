@@ -227,12 +227,60 @@
     }
   });
 
+  // src/starfield.js
+  function initStarfield() {
+    var c = document.getElementById("starfield");
+    var ctx2 = c.getContext("2d");
+    var stars = [];
+    function resize() {
+      c.width = window.innerWidth * devicePixelRatio;
+      c.height = window.innerHeight * devicePixelRatio;
+      c.style.width = window.innerWidth + "px";
+      c.style.height = window.innerHeight + "px";
+      var n = Math.floor(window.innerWidth * window.innerHeight / 9e3);
+      stars = [];
+      for (var i = 0; i < n; i++) {
+        stars.push({
+          x: Math.random() * c.width,
+          y: Math.random() * c.height,
+          r: Math.random() * 1.4 * devicePixelRatio + 0.3,
+          p: Math.random() * TAU,
+          s: rand(0.5, 1.6)
+        });
+      }
+    }
+    window.addEventListener("resize", resize);
+    resize();
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function draw(t) {
+      ctx2.clearRect(0, 0, c.width, c.height);
+      for (var i = 0; i < stars.length; i++) {
+        var s = stars[i];
+        var tw = reduceMotion ? 0.8 : 0.55 + 0.45 * Math.sin(t * 1e-3 * s.s + s.p);
+        ctx2.globalAlpha = tw * 0.8;
+        ctx2.fillStyle = "#cfe0ff";
+        ctx2.beginPath();
+        ctx2.arc(s.x, s.y, s.r, 0, TAU);
+        ctx2.fill();
+      }
+      ctx2.globalAlpha = 1;
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  }
+  var init_starfield = __esm({
+    "src/starfield.js"() {
+      init_utils();
+    }
+  });
+
   // src/main.js
   var require_main = __commonJS({
     "src/main.js"() {
       init_utils();
       init_canvas();
       init_sdk();
+      init_starfield();
       var progress = safeGet("gh_progress_v2", { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
       setProgress(progress);
       function updateStreak() {
@@ -370,46 +418,7 @@
         // 2: forest (unlock ireland)
       ];
       var selectedSkins = safeGet("gh_skins_v1", { p1: 0, p2: 0 });
-      (function starfield() {
-        var c = document.getElementById("starfield");
-        var ctx2 = c.getContext("2d");
-        var stars = [];
-        function resize() {
-          c.width = window.innerWidth * devicePixelRatio;
-          c.height = window.innerHeight * devicePixelRatio;
-          c.style.width = window.innerWidth + "px";
-          c.style.height = window.innerHeight + "px";
-          var n = Math.floor(window.innerWidth * window.innerHeight / 9e3);
-          stars = [];
-          for (var i = 0; i < n; i++) {
-            stars.push({
-              x: Math.random() * c.width,
-              y: Math.random() * c.height,
-              r: Math.random() * 1.4 * devicePixelRatio + 0.3,
-              p: Math.random() * TAU,
-              s: rand(0.5, 1.6)
-            });
-          }
-        }
-        window.addEventListener("resize", resize);
-        resize();
-        var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        function draw2(t) {
-          ctx2.clearRect(0, 0, c.width, c.height);
-          for (var i = 0; i < stars.length; i++) {
-            var s = stars[i];
-            var tw = reduceMotion ? 0.8 : 0.55 + 0.45 * Math.sin(t * 1e-3 * s.s + s.p);
-            ctx2.globalAlpha = tw * 0.8;
-            ctx2.fillStyle = "#cfe0ff";
-            ctx2.beginPath();
-            ctx2.arc(s.x, s.y, s.r, 0, TAU);
-            ctx2.fill();
-          }
-          ctx2.globalAlpha = 1;
-          requestAnimationFrame(draw2);
-        }
-        requestAnimationFrame(draw2);
-      })();
+      initStarfield();
       var globeCanvas = document.getElementById("globeCanvas");
       var gctx = globeCanvas.getContext("2d");
       var globeWrap = document.querySelector(".globe-wrap");
