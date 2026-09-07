@@ -2926,6 +2926,342 @@
     }
   });
 
+  // src/net.js
+  function setNetState(s) {
+    _state = s;
+  }
+  function _getState2() {
+    return _state;
+  }
+  function setNetTryJump(fn) {
+    _tryJump = fn;
+  }
+  function setNetTryShoot(fn) {
+    _tryShoot = fn;
+  }
+  function setNetStateAccum(v) {
+    netStateAccum = v;
+  }
+  function netRandCode() {
+    var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    var s = "";
+    for (var i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+  function netSetStatus(msg, cls) {
+    var el = document.getElementById("netStatus");
+    if (!el) return;
+    el.textContent = msg;
+    el.className = "net-status" + (cls ? " " + cls : "");
+  }
+  function netUiRefresh() {
+    var netPanel = document.getElementById("netPanel");
+    if (!netPanel || netPanel.hidden) return;
+    var chooseEl = document.getElementById("netChooseRole");
+    var codeEl = document.getElementById("netCodeDisplay");
+    var introHint = document.getElementById("netIntroHint");
+    var controlsHint = document.getElementById("netControlsHint");
+    var startBtn = document.getElementById("btnStart");
+    if (!netRole2) {
+      chooseEl.hidden = false;
+      codeEl.hidden = true;
+      introHint.hidden = false;
+      controlsHint.hidden = true;
+      netSetStatus("");
+      startBtn.hidden = true;
+      return;
+    }
+    chooseEl.hidden = true;
+    introHint.hidden = true;
+    controlsHint.hidden = false;
+    if (netRole2 === "host") {
+      codeEl.hidden = false;
+      codeEl.textContent = netRoomCode;
+      if (netConnected2) {
+        netSetStatus("Connected with your friend! Press Start when you\u2019re both ready.", "ok");
+        startBtn.hidden = false;
+      } else {
+        netSetStatus("Share this code with your friend \u2014 waiting for them to join\u2026", "");
+        startBtn.hidden = true;
+      }
+    } else {
+      codeEl.hidden = true;
+      if (netConnected2) {
+        netSetStatus("Connected! Waiting for the host to press Start\u2026", "ok");
+      } else {
+        netSetStatus("Connecting\u2026", "");
+      }
+      startBtn.hidden = true;
+    }
+  }
+  function netHudRefresh() {
+    var badge = document.getElementById("netHudBadge");
+    var text = document.getElementById("netHudBadgeText");
+    if (!badge) return;
+    if (!netRole2 || document.getElementById("scene-game").hidden) {
+      badge.hidden = true;
+      return;
+    }
+    badge.hidden = false;
+    badge.classList.toggle("lost", !netConnected2);
+    text.textContent = netConnected2 ? "Online \xB7 connected" : "Online \xB7 waiting\u2026";
+  }
+  async function netLoadJoinRoom() {
+    if (netJoinRoomFn) return netJoinRoomFn;
+    var mod = await import(NET_IMPORT_URL);
+    netJoinRoomFn = mod.joinRoom;
+    return netJoinRoomFn;
+  }
+  function netSetupRoomHandlers() {
+    var actions = {
+      input: netRoom.makeAction("input"),
+      press: netRoom.makeAction("press"),
+      state: netRoom.makeAction("state"),
+      scene: netRoom.makeAction("scene")
+    };
+    netActions = actions;
+    netRoom.onPeerJoin = function(peerId) {
+      netPeerId = peerId;
+      netConnected2 = true;
+      netUiRefresh();
+      netHudRefresh();
+      if (netRole2 === "host") {
+        netActions.scene.send({ type: "_enterLocation", locationId: _getState2().currentLocationId });
+      }
+    };
+    netRoom.onPeerLeave = function() {
+      netConnected2 = false;
+      netPeerId = null;
+      netUiRefresh();
+      netHudRefresh();
+      netSetStatus("Your friend disconnected.", "warn");
+    };
+    if (netRole2 === "host") {
+      actions.input.onMessage = function(data) {
+        if (!data) return;
+        keys.p2Left = !!data.left;
+        keys.p2Right = !!data.right;
+        keys.p2Jump = !!data.jump;
+        keys.p2Bubble = !!data.bubble;
+      };
+      actions.press.onMessage = function(data) {
+        if (!_getState2().players || _getState2().players.length < 2) return;
+        if (data === "jump") _tryJump(_getState2().players[1]);
+        else if (data === "bubble") _tryShoot(_getState2().players[1]);
+      };
+    } else {
+      actions.state.onMessage = function(data) {
+        applyRemoteState(data);
+      };
+      actions.scene.onMessage = function(data) {
+        applyRemoteScene(data);
+      };
+    }
+  }
+  async function netHostStart() {
+    netRole2 = "host";
+    netRoomCode = netRandCode();
+    netConnected2 = false;
+    netUiRefresh();
+    try {
+      var joinRoom = await netLoadJoinRoom();
+      netRoom = joinRoom({ appId: NET_APP_ID }, "gh-" + netRoomCode);
+      netSetupRoomHandlers();
+    } catch (err) {
+      netSetStatus("Couldn\u2019t start online play here \u2014 this only works once the game is hosted on the open web, not from this in-chat preview.", "warn");
+      console.error("netHostStart failed", err);
+    }
+  }
+  async function netJoinStart(code) {
+    netRole2 = "guest";
+    netRoomCode = code;
+    netConnected2 = false;
+    netUiRefresh();
+    try {
+      var joinRoom = await netLoadJoinRoom();
+      netRoom = joinRoom({ appId: NET_APP_ID }, "gh-" + code);
+      netSetupRoomHandlers();
+    } catch (err) {
+      netSetStatus("Couldn\u2019t connect here \u2014 this only works once the game is hosted on the open web, not from this in-chat preview.", "warn");
+      console.error("netJoinStart failed", err);
+    }
+  }
+  function netBroadcastScene(type, extra) {
+    if (netRole2 === "host" && netConnected2 && netActions) {
+      var msg = Object.assign({ type }, extra || {});
+      netActions.scene.send(msg);
+    }
+  }
+  function netBroadcastState() {
+    if (!(netRole2 === "host" && netConnected2 && netActions)) return;
+    var s = _getState2();
+    netActions.state.send({
+      gameState: s.gameState,
+      score: s.score,
+      lives: s.lives,
+      enemiesLeft: s.enemiesLeft,
+      currentLocationId: s.currentLocationId,
+      players: s.players.map(function(p) {
+        return { id: p.id, x: p.x, y: p.y, facing: p.facing, walkPhase: p.walkPhase, invuln: p.invuln };
+      }),
+      enemies: s.enemies,
+      bubbles: s.bubbles,
+      collectibles: s.collectibles,
+      popups: s.popups,
+      winTitle: s.gameState === "won" ? document.getElementById("winTitle").textContent : null,
+      winStars: s.gameState === "won" ? document.getElementById("winStars").textContent : null,
+      winSummary: _getState2().gameState === "won" ? document.getElementById("winSummary").textContent : null,
+      loseSummary: _getState2().gameState === "lost" ? document.getElementById("loseSummary").textContent : null
+    });
+  }
+  function netSendPress(kind) {
+    if (netRole2 === "guest" && netConnected2 && netActions) {
+      netActions.press.send(kind);
+    }
+  }
+  function netSendInputIfChanged() {
+    if (!(netRole2 === "guest" && netConnected2 && netActions)) return;
+    var cur = { left: !!keys.p1Left, right: !!keys.p1Right, jump: !!keys.p1Jump, bubble: !!keys.p1Bubble };
+    var last = netLastSentInput;
+    if (!last || last.left !== cur.left || last.right !== cur.right || last.jump !== cur.jump || last.bubble !== cur.bubble) {
+      netActions.input.send(cur);
+      netLastSentInput = cur;
+    }
+  }
+  function applyRemoteState(data) {
+    if (!data) return;
+    _getState2().gameState = data.gameState;
+    _getState2().score = data.score;
+    _getState2().lives = data.lives;
+    _getState2().enemiesLeft = data.enemiesLeft;
+    _getState2().currentLocationId = data.currentLocationId;
+    if (_getState2().players && _getState2().players.length === 2 && data.players) {
+      data.players.forEach(function(sp) {
+        var lp = _getState2().players[sp.id];
+        if (lp) {
+          lp.x = sp.x;
+          lp.y = sp.y;
+          lp.facing = sp.facing;
+          lp.walkPhase = sp.walkPhase;
+          lp.invuln = sp.invuln;
+        }
+      });
+    }
+    _getState2().enemies = data.enemies || [];
+    _getState2().bubbles = data.bubbles || [];
+    _getState2().collectibles = data.collectibles || [];
+    _getState2().popups = data.popups || [];
+    updateHud();
+    var winEl = document.getElementById("overlayWin");
+    var loseEl = document.getElementById("overlayLose");
+    if (_getState2().gameState === "won") {
+      winEl.hidden = false;
+      if (data.winTitle) document.getElementById("winTitle").textContent = data.winTitle;
+      if (data.winStars) document.getElementById("winStars").textContent = data.winStars;
+      if (data.winSummary) document.getElementById("winSummary").textContent = data.winSummary;
+      document.getElementById("winBtnRow").hidden = true;
+      document.getElementById("winWaitHint").hidden = false;
+    } else {
+      winEl.hidden = true;
+    }
+    if (_getState2().gameState === "lost") {
+      loseEl.hidden = false;
+      if (data.loseSummary) document.getElementById("loseSummary").textContent = data.loseSummary;
+      document.getElementById("loseBtnRow").hidden = true;
+      document.getElementById("loseWaitHint").hidden = false;
+    } else {
+      loseEl.hidden = true;
+    }
+  }
+  function applyRemoteScene(data) {
+    if (netRole2 !== "guest" || !data) return;
+    if (data.type === "_enterLocation") {
+      var loc = _getState2().LOCATIONS.filter(function(l) {
+        return l.id === data.locationId;
+      })[0];
+      if (loc) _enterLocation2(loc);
+    } else if (data.type === "start") {
+      _getState2().gameState = "playing";
+      document.getElementById("howto").hidden = true;
+    } else if (data.type === "retry" || data.type === "winAgain") {
+      document.getElementById("overlayWin").hidden = true;
+      document.getElementById("overlayLose").hidden = true;
+      _getState2().gameState = "playing";
+    } else if (data.type === "map") {
+      _backToMap();
+    }
+  }
+  function localJumpPress() {
+    if (netRole2 === "guest") {
+      netSendPress("jump");
+      return;
+    }
+    _tryJump(_getState2().players[0]);
+  }
+  function localBubblePress() {
+    if (netRole2 === "guest") {
+      netSendPress("bubble");
+      return;
+    }
+    _tryShoot(_getState2().players[0]);
+  }
+  var _state, _enterLocation2, _backToMap, _tryJump, _tryShoot, NET_APP_ID, NET_IMPORT_URL, netJoinRoomFn, netRole2, netRoomCode, netRoom, netActions, netConnected2, netPeerId, netLastSentInput, netStateAccum;
+  var init_net = __esm({
+    "src/net.js"() {
+      init_utils();
+      _state = {};
+      _enterLocation2 = null;
+      _backToMap = null;
+      _tryJump = function() {
+      };
+      _tryShoot = function() {
+      };
+      NET_APP_ID = "globehopper-jack-gift-v1";
+      NET_IMPORT_URL = "https://esm.run/trystero";
+      netJoinRoomFn = null;
+      netRole2 = null;
+      netRoomCode = "";
+      netRoom = null;
+      netActions = null;
+      netConnected2 = false;
+      netPeerId = null;
+      netLastSentInput = null;
+      netStateAccum = 0;
+      document.getElementById("netTabHost").addEventListener("click", function() {
+        document.getElementById("netTabHost").classList.add("active");
+        document.getElementById("netTabJoin").classList.remove("active");
+        document.getElementById("netHostPane").hidden = false;
+        document.getElementById("netJoinPane").hidden = true;
+      });
+      document.getElementById("netTabJoin").addEventListener("click", function() {
+        document.getElementById("netTabJoin").classList.add("active");
+        document.getElementById("netTabHost").classList.remove("active");
+        document.getElementById("netJoinPane").hidden = false;
+        document.getElementById("netHostPane").hidden = true;
+      });
+      document.getElementById("btnNetHost").addEventListener("click", function() {
+        netHostStart();
+      });
+      document.getElementById("btnNetJoin").addEventListener("click", function() {
+        var input = document.getElementById("netCodeInput");
+        var code = (input.value || "").trim().toUpperCase();
+        if (code.length < 3) {
+          netSetStatus("Enter the code your friend sent you.", "warn");
+          return;
+        }
+        netJoinStart(code);
+      });
+      document.getElementById("netCodeInput").addEventListener("input", function(e) {
+        e.target.value = e.target.value.toUpperCase();
+      });
+      document.getElementById("netCodeInput").addEventListener("keydown", function(e) {
+        if (e.key === "Enter") {
+          document.getElementById("btnNetJoin").click();
+        }
+      });
+    }
+  });
+
   // src/main.js
   var require_main = __commonJS({
     "src/main.js"() {
@@ -2938,6 +3274,7 @@
       init_features();
       init_globe();
       init_draw();
+      init_net();
       var progress = safeGet("gh_progress_v2", { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
       setProgress(progress);
       setGlobeProgress(progress);
@@ -2972,311 +3309,6 @@
       ];
       var selectedSkins = safeGet("gh_skins_v1", { p1: 0, p2: 0 });
       initStarfield();
-      var NET_APP_ID = "globehopper-jack-gift-v1";
-      var NET_IMPORT_URL = "https://esm.run/trystero";
-      var netJoinRoomFn = null;
-      var netRole2 = null;
-      var netRoomCode = "";
-      var netRoom = null;
-      var netActions = null;
-      var netConnected2 = false;
-      var netPeerId = null;
-      var netLastSentInput = null;
-      var netStateAccum = 0;
-      function netRandCode() {
-        var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        var s = "";
-        for (var i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
-        return s;
-      }
-      function netSetStatus(msg, cls) {
-        var el = document.getElementById("netStatus");
-        if (!el) return;
-        el.textContent = msg;
-        el.className = "net-status" + (cls ? " " + cls : "");
-      }
-      function netUiRefresh() {
-        var netPanel = document.getElementById("netPanel");
-        if (!netPanel || netPanel.hidden) return;
-        var chooseEl = document.getElementById("netChooseRole");
-        var codeEl = document.getElementById("netCodeDisplay");
-        var introHint = document.getElementById("netIntroHint");
-        var controlsHint = document.getElementById("netControlsHint");
-        var startBtn = document.getElementById("btnStart");
-        if (!netRole2) {
-          chooseEl.hidden = false;
-          codeEl.hidden = true;
-          introHint.hidden = false;
-          controlsHint.hidden = true;
-          netSetStatus("");
-          startBtn.hidden = true;
-          return;
-        }
-        chooseEl.hidden = true;
-        introHint.hidden = true;
-        controlsHint.hidden = false;
-        if (netRole2 === "host") {
-          codeEl.hidden = false;
-          codeEl.textContent = netRoomCode;
-          if (netConnected2) {
-            netSetStatus("Connected with your friend! Press Start when you\u2019re both ready.", "ok");
-            startBtn.hidden = false;
-          } else {
-            netSetStatus("Share this code with your friend \u2014 waiting for them to join\u2026", "");
-            startBtn.hidden = true;
-          }
-        } else {
-          codeEl.hidden = true;
-          if (netConnected2) {
-            netSetStatus("Connected! Waiting for the host to press Start\u2026", "ok");
-          } else {
-            netSetStatus("Connecting\u2026", "");
-          }
-          startBtn.hidden = true;
-        }
-      }
-      function netHudRefresh() {
-        var badge = document.getElementById("netHudBadge");
-        var text = document.getElementById("netHudBadgeText");
-        if (!badge) return;
-        if (!netRole2 || sceneGame.hidden) {
-          badge.hidden = true;
-          return;
-        }
-        badge.hidden = false;
-        badge.classList.toggle("lost", !netConnected2);
-        text.textContent = netConnected2 ? "Online \xB7 connected" : "Online \xB7 waiting\u2026";
-      }
-      async function netLoadJoinRoom() {
-        if (netJoinRoomFn) return netJoinRoomFn;
-        var mod = await import(NET_IMPORT_URL);
-        netJoinRoomFn = mod.joinRoom;
-        return netJoinRoomFn;
-      }
-      function netSetupRoomHandlers() {
-        var actions = {
-          input: netRoom.makeAction("input"),
-          press: netRoom.makeAction("press"),
-          state: netRoom.makeAction("state"),
-          scene: netRoom.makeAction("scene")
-        };
-        netActions = actions;
-        netRoom.onPeerJoin = function(peerId) {
-          netPeerId = peerId;
-          netConnected2 = true;
-          netUiRefresh();
-          netHudRefresh();
-          if (netRole2 === "host") {
-            netActions.scene.send({ type: "enterLocation", locationId: currentLocationId });
-          }
-        };
-        netRoom.onPeerLeave = function() {
-          netConnected2 = false;
-          netPeerId = null;
-          netUiRefresh();
-          netHudRefresh();
-          netSetStatus("Your friend disconnected.", "warn");
-        };
-        if (netRole2 === "host") {
-          actions.input.onMessage = function(data) {
-            if (!data) return;
-            keys.p2Left = !!data.left;
-            keys.p2Right = !!data.right;
-            keys.p2Jump = !!data.jump;
-            keys.p2Bubble = !!data.bubble;
-          };
-          actions.press.onMessage = function(data) {
-            if (!players || players.length < 2) return;
-            if (data === "jump") tryJump(players[1]);
-            else if (data === "bubble") tryShoot(players[1]);
-          };
-        } else {
-          actions.state.onMessage = function(data) {
-            applyRemoteState(data);
-          };
-          actions.scene.onMessage = function(data) {
-            applyRemoteScene(data);
-          };
-        }
-      }
-      async function netHostStart() {
-        netRole2 = "host";
-        netRoomCode = netRandCode();
-        netConnected2 = false;
-        netUiRefresh();
-        try {
-          var joinRoom = await netLoadJoinRoom();
-          netRoom = joinRoom({ appId: NET_APP_ID }, "gh-" + netRoomCode);
-          netSetupRoomHandlers();
-        } catch (err) {
-          netSetStatus("Couldn\u2019t start online play here \u2014 this only works once the game is hosted on the open web, not from this in-chat preview.", "warn");
-          console.error("netHostStart failed", err);
-        }
-      }
-      async function netJoinStart(code) {
-        netRole2 = "guest";
-        netRoomCode = code;
-        netConnected2 = false;
-        netUiRefresh();
-        try {
-          var joinRoom = await netLoadJoinRoom();
-          netRoom = joinRoom({ appId: NET_APP_ID }, "gh-" + code);
-          netSetupRoomHandlers();
-        } catch (err) {
-          netSetStatus("Couldn\u2019t connect here \u2014 this only works once the game is hosted on the open web, not from this in-chat preview.", "warn");
-          console.error("netJoinStart failed", err);
-        }
-      }
-      function netBroadcastScene(type, extra) {
-        if (netRole2 === "host" && netConnected2 && netActions) {
-          var msg = Object.assign({ type }, extra || {});
-          netActions.scene.send(msg);
-        }
-      }
-      function netBroadcastState() {
-        if (!(netRole2 === "host" && netConnected2 && netActions)) return;
-        netActions.state.send({
-          gameState,
-          score,
-          lives,
-          enemiesLeft,
-          currentLocationId,
-          players: players.map(function(p) {
-            return { id: p.id, x: p.x, y: p.y, facing: p.facing, walkPhase: p.walkPhase, invuln: p.invuln };
-          }),
-          enemies,
-          bubbles,
-          collectibles,
-          popups,
-          winTitle: gameState === "won" ? document.getElementById("winTitle").textContent : null,
-          winStars: gameState === "won" ? document.getElementById("winStars").textContent : null,
-          winSummary: gameState === "won" ? document.getElementById("winSummary").textContent : null,
-          loseSummary: gameState === "lost" ? document.getElementById("loseSummary").textContent : null
-        });
-      }
-      function netSendPress(kind) {
-        if (netRole2 === "guest" && netConnected2 && netActions) {
-          netActions.press.send(kind);
-        }
-      }
-      function netSendInputIfChanged() {
-        if (!(netRole2 === "guest" && netConnected2 && netActions)) return;
-        var cur = { left: !!keys.p1Left, right: !!keys.p1Right, jump: !!keys.p1Jump, bubble: !!keys.p1Bubble };
-        var last = netLastSentInput;
-        if (!last || last.left !== cur.left || last.right !== cur.right || last.jump !== cur.jump || last.bubble !== cur.bubble) {
-          netActions.input.send(cur);
-          netLastSentInput = cur;
-        }
-      }
-      function applyRemoteState(data) {
-        if (!data) return;
-        gameState = data.gameState;
-        score = data.score;
-        lives = data.lives;
-        enemiesLeft = data.enemiesLeft;
-        currentLocationId = data.currentLocationId;
-        if (players && players.length === 2 && data.players) {
-          data.players.forEach(function(sp) {
-            var lp = players[sp.id];
-            if (lp) {
-              lp.x = sp.x;
-              lp.y = sp.y;
-              lp.facing = sp.facing;
-              lp.walkPhase = sp.walkPhase;
-              lp.invuln = sp.invuln;
-            }
-          });
-        }
-        enemies = data.enemies || [];
-        bubbles = data.bubbles || [];
-        collectibles = data.collectibles || [];
-        popups = data.popups || [];
-        updateHud();
-        var winEl = document.getElementById("overlayWin");
-        var loseEl = document.getElementById("overlayLose");
-        if (gameState === "won") {
-          winEl.hidden = false;
-          if (data.winTitle) document.getElementById("winTitle").textContent = data.winTitle;
-          if (data.winStars) document.getElementById("winStars").textContent = data.winStars;
-          if (data.winSummary) document.getElementById("winSummary").textContent = data.winSummary;
-          document.getElementById("winBtnRow").hidden = true;
-          document.getElementById("winWaitHint").hidden = false;
-        } else {
-          winEl.hidden = true;
-        }
-        if (gameState === "lost") {
-          loseEl.hidden = false;
-          if (data.loseSummary) document.getElementById("loseSummary").textContent = data.loseSummary;
-          document.getElementById("loseBtnRow").hidden = true;
-          document.getElementById("loseWaitHint").hidden = false;
-        } else {
-          loseEl.hidden = true;
-        }
-      }
-      function applyRemoteScene(data) {
-        if (netRole2 !== "guest" || !data) return;
-        if (data.type === "enterLocation") {
-          var loc = LOCATIONS.filter(function(l) {
-            return l.id === data.locationId;
-          })[0];
-          if (loc) enterLocation(loc);
-        } else if (data.type === "start") {
-          gameState = "playing";
-          document.getElementById("howto").hidden = true;
-        } else if (data.type === "retry" || data.type === "winAgain") {
-          document.getElementById("overlayWin").hidden = true;
-          document.getElementById("overlayLose").hidden = true;
-          gameState = "playing";
-        } else if (data.type === "map") {
-          backToMap();
-        }
-      }
-      function localJumpPress() {
-        if (netRole2 === "guest") {
-          netSendPress("jump");
-          return;
-        }
-        tryJump(players[0]);
-      }
-      function localBubblePress() {
-        if (netRole2 === "guest") {
-          netSendPress("bubble");
-          return;
-        }
-        tryShoot(players[0]);
-      }
-      document.getElementById("netTabHost").addEventListener("click", function() {
-        document.getElementById("netTabHost").classList.add("active");
-        document.getElementById("netTabJoin").classList.remove("active");
-        document.getElementById("netHostPane").hidden = false;
-        document.getElementById("netJoinPane").hidden = true;
-      });
-      document.getElementById("netTabJoin").addEventListener("click", function() {
-        document.getElementById("netTabJoin").classList.add("active");
-        document.getElementById("netTabHost").classList.remove("active");
-        document.getElementById("netJoinPane").hidden = false;
-        document.getElementById("netHostPane").hidden = true;
-      });
-      document.getElementById("btnNetHost").addEventListener("click", function() {
-        netHostStart();
-      });
-      document.getElementById("btnNetJoin").addEventListener("click", function() {
-        var input = document.getElementById("netCodeInput");
-        var code = (input.value || "").trim().toUpperCase();
-        if (code.length < 3) {
-          netSetStatus("Enter the code your friend sent you.", "warn");
-          return;
-        }
-        netJoinStart(code);
-      });
-      document.getElementById("netCodeInput").addEventListener("input", function(e) {
-        e.target.value = e.target.value.toUpperCase();
-      });
-      document.getElementById("netCodeInput").addEventListener("keydown", function(e) {
-        if (e.key === "Enter") {
-          document.getElementById("btnNetJoin").click();
-        }
-      });
       initCanvas();
       var cv = document.getElementById("gameCanvas");
       var GRAVITY = 1500;
@@ -3289,41 +3321,41 @@
           handleMiniGameClick(e.touches[0].clientX, e.touches[0].clientY);
         }
       }, { passive: false });
-      var keys = {};
+      var keys2 = {};
       window.addEventListener("keydown", function(e) {
         var code = e.code, handled = true;
         switch (code) {
           case "KeyA":
-            keys.p1Left = true;
+            keys2.p1Left = true;
             break;
           case "KeyD":
-            keys.p1Right = true;
+            keys2.p1Right = true;
             break;
           case "KeyW":
-            keys.p1Jump = true;
+            keys2.p1Jump = true;
             localJumpPress();
             break;
           case "ShiftLeft":
           case "ShiftRight":
-            keys.p1Bubble = true;
+            keys2.p1Bubble = true;
             localBubblePress();
             break;
           case "Space":
-            keys.p1Jump = true;
+            keys2.p1Jump = true;
             localJumpPress();
             break;
           case "ArrowLeft":
-            keys.p2Left = true;
+            keys2.p2Left = true;
             break;
           case "ArrowRight":
-            keys.p2Right = true;
+            keys2.p2Right = true;
             break;
           case "ArrowUp":
-            keys.p2Jump = true;
+            keys2.p2Jump = true;
             tryJump(numPlayers === 2 ? players[1] : players[0]);
             break;
           case "Slash":
-            keys.p2Bubble = true;
+            keys2.p2Bubble = true;
             tryShoot(numPlayers === 2 ? players[1] : players[0]);
             break;
           case "Escape":
@@ -3345,32 +3377,32 @@
       window.addEventListener("keyup", function(e) {
         switch (e.code) {
           case "KeyA":
-            keys.p1Left = false;
+            keys2.p1Left = false;
             break;
           case "KeyD":
-            keys.p1Right = false;
+            keys2.p1Right = false;
             break;
           case "KeyW":
-            keys.p1Jump = false;
+            keys2.p1Jump = false;
             break;
           case "ShiftLeft":
           case "ShiftRight":
-            keys.p1Bubble = false;
+            keys2.p1Bubble = false;
             break;
           case "Space":
-            keys.p1Jump = false;
+            keys2.p1Jump = false;
             break;
           case "ArrowLeft":
-            keys.p2Left = false;
+            keys2.p2Left = false;
             break;
           case "ArrowRight":
-            keys.p2Right = false;
+            keys2.p2Right = false;
             break;
           case "ArrowUp":
-            keys.p2Jump = false;
+            keys2.p2Jump = false;
             break;
           case "Slash":
-            keys.p2Bubble = false;
+            keys2.p2Bubble = false;
             break;
         }
       });
@@ -3378,12 +3410,12 @@
         var el = document.getElementById(id);
         var press = function(e) {
           if (e && e.cancelable) e.preventDefault();
-          keys[prop] = true;
+          keys2[prop] = true;
           if (onPress) onPress();
         };
         var release = function(e) {
           if (e && e.cancelable) e.preventDefault();
-          keys[prop] = false;
+          keys2[prop] = false;
         };
         el.addEventListener("touchstart", press, { passive: false });
         el.addEventListener("touchend", release, { passive: false });
@@ -3416,7 +3448,7 @@
           if (held) return;
           held = true;
           el.classList.add("held");
-          keys[prop] = true;
+          keys2[prop] = true;
           haptic(15);
           if (onPress) onPress();
         }
@@ -3424,7 +3456,7 @@
           e.preventDefault();
           held = false;
           el.classList.remove("held");
-          keys[prop] = false;
+          keys2[prop] = false;
         }
         el.addEventListener("touchstart", press, { passive: false });
         el.addEventListener("touchend", release, { passive: false });
@@ -3471,9 +3503,9 @@
         var dy = swipeStartY - e.changedTouches[0].clientY;
         if (dy > 40) {
           localJumpPress();
-          keys.p1Jump = true;
+          keys2.p1Jump = true;
           setTimeout(function() {
-            keys.p1Jump = false;
+            keys2.p1Jump = false;
           }, 120);
         }
       }, { passive: true });
@@ -4320,6 +4352,36 @@
       setDrawState(function() {
         return { LEVELS, currentLocationId };
       });
+      var _netShared = {};
+      function syncToNet() {
+        _netShared.players = players;
+        _netShared.enemies = enemies;
+        _netShared.bubbles = bubbles;
+        _netShared.collectibles = collectibles;
+        _netShared.score = score;
+        _netShared.lives = lives;
+        _netShared.gameState = gameState;
+        _netShared.enemiesLeft = enemiesLeft;
+        _netShared.currentLocationId = currentLocationId;
+        _netShared.numPlayers = numPlayers;
+        _netShared.popups = popups;
+        _netShared.waveNumber = waveNumber;
+        _netShared.comboCount = comboCount;
+        _netShared.startTime = startTime;
+        _netShared.LOCATIONS = LOCATIONS;
+      }
+      function syncFromNet() {
+        players = _netShared.players;
+        enemies = _netShared.enemies;
+        bubbles = _netShared.bubbles;
+        collectibles = _netShared.collectibles;
+        score = _netShared.score;
+        lives = _netShared.lives;
+        gameState = _netShared.gameState;
+        enemiesLeft = _netShared.enemiesLeft;
+        popups = _netShared.popups;
+      }
+      setNetState(_netShared);
       var players;
       var enemies;
       var bubbles;
@@ -4574,7 +4636,7 @@
         lives = 3;
         gameState = "ready";
         startTime = performance.now();
-        updateHud();
+        updateHud2();
         document.getElementById("overlayWin").hidden = true;
         document.getElementById("overlayLose").hidden = true;
         var pr = progress[currentLocationId] || { best: 0 };
@@ -4697,7 +4759,7 @@
         renderDots("skinDotsP2", p2Colors, p2Unlocks, 2, selectedSkins.p2);
       }
       buildSkinDots2();
-      function updateHud() {
+      function updateHud2() {
         document.getElementById("hudScore").textContent = score;
         var pr = progress[currentLocationId] || { best: 0 };
         document.getElementById("hudBest").textContent = pr.best;
@@ -4778,6 +4840,8 @@
           });
         }
       }
+      setNetTryJump(tryJump);
+      setNetTryShoot(tryShoot);
       function drawPanda(x, y, t, sneezing) {
         ctx.save();
         ctx.translate(x, y);
@@ -4956,20 +5020,20 @@
           if (activeEvent && activeEvent.id === "speed_boost") maxSpeed += 80;
           var left, right, jump, bubble;
           if (numPlayers === 1) {
-            left = keys.p1Left || keys.p2Left;
-            right = keys.p1Right || keys.p2Right;
-            jump = keys.p1Jump || keys.p2Jump;
-            bubble = keys.p1Bubble || keys.p2Bubble;
+            left = keys2.p1Left || keys2.p2Left;
+            right = keys2.p1Right || keys2.p2Right;
+            jump = keys2.p1Jump || keys2.p2Jump;
+            bubble = keys2.p1Bubble || keys2.p2Bubble;
           } else if (p.id === 0) {
-            left = keys.p1Left;
-            right = keys.p1Right;
-            jump = keys.p1Jump;
-            bubble = keys.p1Bubble;
+            left = keys2.p1Left;
+            right = keys2.p1Right;
+            jump = keys2.p1Jump;
+            bubble = keys2.p1Bubble;
           } else {
-            left = keys.p2Left;
-            right = keys.p2Right;
-            jump = keys.p2Jump;
-            bubble = keys.p2Bubble;
+            left = keys2.p2Left;
+            right = keys2.p2Right;
+            jump = keys2.p2Jump;
+            bubble = keys2.p2Bubble;
           }
           var moveDir = 0;
           if (left) moveDir -= 1;
@@ -5762,7 +5826,7 @@
         shakeT = 0.4;
         playSound(lives > 0 ? "life_lost" : "lose");
         haptic(50);
-        updateHud();
+        updateHud2();
         if (lives > 0) {
           p.speedBoost = Math.max(p.speedBoost, 1.4);
           spawnPopup(p.x + p.w / 2, p.y - 24, "FIGHT BACK!", "#ff6644", 15);
@@ -7467,9 +7531,9 @@
             winNextHint.hidden = true;
           }
         }
-        updateHud();
+        updateHud2();
       }
-      updateHud();
+      updateHud2();
       function draw() {
         var level = LEVELS[currentLocationId];
         var theme = level.theme;
@@ -8137,6 +8201,7 @@
         if (lastT === null) lastT = t;
         var dt = Math.min(0.033, (t - lastT) / 1e3);
         lastT = t;
+        if (netRole2 === "guest") syncFromNet();
         if (!sceneGame.hidden) {
           if (miniGameId) {
             updateMiniGame(dt);
@@ -8152,9 +8217,10 @@
           if (netRole2 === "guest") {
             netSendInputIfChanged();
           } else if (netRole2 === "host" && netConnected2) {
-            netStateAccum += dt;
+            setNetStateAccum(netStateAccum + dt);
             if (netStateAccum >= 0.05) {
-              netStateAccum = 0;
+              setNetStateAccum(0);
+              syncToNet();
               netBroadcastState();
             }
           }
