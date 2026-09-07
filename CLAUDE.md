@@ -16,39 +16,55 @@ Bundled with esbuild. Targets CrazyGames but also works self-hosted.
 ### Current module structure
 ```
 src/
-  main.js     — 6,200+ line monolith (Phase 2 target: split into modules below)
+  main.js     — ~3,250 lines (core game engine, update loop, mini-games, main draw)
+  sdk.js      — CrazyGames SDK wrapper, ad break helpers, leaderboard UI
+  starfield.js — Ambient starfield animation
+  audio.js    — Web Audio API synth sound effects (playSound)
+  music.js    — Background music (embedded base64 MP3)
+  features.js — Streak counter, daily challenge, achievements
+  globe.js    — Globe scene rendering, LOCATIONS, WORLD_LAND polygon data, pins
+  net.js      — Online multiplayer (WebRTC via Trystero)
+  levels.js   — Per-location theming, LEVEL_LAYOUTS, LEVELS definitions
+  draw.js     — Drawing helpers: creatures, enemies, power-ups, platforms
   canvas.js   — ctx, W, H, initCanvas()
   utils.js    — TAU, clamp, lerp, rand, safeGet, safeSet, escHtml, haptic
 dist/
   game.js     — esbuild IIFE bundle (regenerate after src/ changes)
 ```
 
-## Refactor Status — Phase 2 in progress
+## Refactor Status — Phase 2 complete
 
-Phase 1 is complete: JS extracted from index.html, esbuild pipeline added.
+Phase 1: JS extracted from index.html, esbuild pipeline added.
+Phase 2: main.js split from 6,232 lines to ~3,250 lines across 10 modules.
 
-**Phase 2 goal:** split `src/main.js` into logical modules. The file has clear section banners
-marking the intended boundaries. Extract each section in order, keeping the game working after
-each extraction by updating imports in `main.js`.
+### Completed extractions
 
-### Planned module splits (from `src/main.js` section banners)
-
-| Target file | Approx lines in main.js | Contents |
+| Module | Lines | Contents |
 |---|---|---|
-| `src/sdk.js` | 1–133 | CrazyGames SDK wrapper, ad break helpers |
-| `src/features.js` | 134–247 | Streak, daily challenge, achievements |
-| `src/starfield.js` | 249–292 | Starfield animation |
-| `src/globe.js` | 293–773 | Globe scene rendering, pins, WORLD_LAND polygon data |
-| `src/scenes.js` | 774–918 | Scene switching logic |
-| `src/net.js` | 919–1241 | Online multiplayer (WebRTC via Trystero) |
-| `src/engine.js` | 1242–2023 | Game engine core: physics, input, keys, mobile controls |
-| `src/audio.js` | 2024–2388 | Web Audio API synth sounds |
-| `src/music.js` | 2389–3490 | Background music (embedded base64 MP3) |
-| `src/game.js` | 3491–4654 | Endless mode, per-location level themes, game loop |
-| `src/draw.js` | 4655–6232 | Drawing functions: shared, power-ups, creatures, enemies |
+| `src/sdk.js` | ~120 | CrazyGames SDK, leaderboard config/UI |
+| `src/starfield.js` | ~45 | Starfield IIFE, converted to initStarfield() |
+| `src/audio.js` | ~375 | audioCtx, masterGain, playSound (all synth types) |
+| `src/music.js` | ~20 | bgmAudio, startMusic, stopMusic |
+| `src/features.js` | ~105 | Streak, daily challenge, achievements |
+| `src/globe.js` | ~495 | Globe rendering, LOCATIONS, WORLD_LAND, pins |
+| `src/net.js` | ~335 | WebRTC multiplayer via Trystero |
+| `src/levels.js` | ~635 | LEVEL_LAYOUTS, LEVELS definitions, drawSkylineRow |
+| `src/draw.js` | ~950 | All creature/enemy/powerup/platform draw functions |
+
+### Remaining in main.js (not extracted)
+- **Scene switching** (~150 lines) — tightly coupled to game state (enterLocation, backToMap, selectMode)
+- **Game engine core** (~120 lines) — input handling, key bindings, mobile controls
+- **Game loop + update** (~700 lines) — physics, collision, spawning, update(dt)
+- **Mini-games** (~1000 lines) — endless mode, campaign transitions, 5 mini-games + their draw functions
+- **Main draw()** (~600 lines) — orchestrates all rendering, references all game state
+- **Cosmetic UI** (~80 lines) — skin dots, name input, HUD updates
+
+These sections were not extracted because they have extensive cross-references to 10+ game state
+variables (players, enemies, bubbles, gameState, score, etc.) that would require a complex shared
+state system. Further splitting would need a game state object refactor.
 
 ### Also pending
-- Extract 567-line `<style>` block from `index.html` → `src/style.css` (link tag in head)
+- Extract 567-line `<style>` block from `index.html` to `src/style.css` (link tag in head)
 - `globe-hopper.html` is a pre-refactor artifact — can be deleted once the new build is confirmed stable
 
 ## Rules for working in this codebase
