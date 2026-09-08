@@ -640,6 +640,101 @@ export function drawAthensCollectibleRef(c){
   ctx.restore();
 }
 
+/* ---------- drawing: Tokyo collectibles ---------- */
+export function drawTokyoCollectibleRef(c){
+  if(c.taken) return;
+  var y = c.y + Math.sin(c.bob)*4;
+  ctx.save(); ctx.translate(c.x,y);
+  if(c.slot==='a'){ // paper lantern
+    ctx.fillStyle = '#e23c4a';
+    ctx.beginPath(); ctx.ellipse(0,0,8,10,0,0,TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth=1;
+    [-5,0,5].forEach(function(ly){ ctx.beginPath(); ctx.moveTo(-8,ly); ctx.lineTo(8,ly); ctx.stroke(); });
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(-3,-12,6,3); ctx.fillRect(-3,9,6,3);
+  } else if(c.slot==='b'){ // sushi (nigiri)
+    ctx.fillStyle = '#f5f0e6';
+    ctx.beginPath(); ctx.roundRect(-9,0,18,7,3); ctx.fill();
+    ctx.fillStyle = '#f08a6a';
+    ctx.beginPath(); ctx.roundRect(-9,-5,18,6,3); ctx.fill();
+    ctx.fillStyle = '#2a3a2a'; ctx.fillRect(-3,-5,6,7);
+  } else { // maneki-neko (lucky cat)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(0,3,8,7,0,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(0,-6,5,0,TAU); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.moveTo(-5,-9); ctx.lineTo(-2,-13); ctx.lineTo(0,-9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(5,-9); ctx.lineTo(2,-13); ctx.lineTo(0,-9); ctx.fill();
+    ctx.strokeStyle = '#d94a4a'; ctx.lineWidth=2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(7,-2); ctx.lineTo(10,-8); ctx.stroke(); // raised paw
+    ctx.fillStyle = '#1c1330';
+    ctx.beginPath(); ctx.arc(-2,-6,1,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(2,-6,1,0,TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---------- drawing: Brazil collectibles ---------- */
+export function drawBrazilCollectibleRef(c){
+  if(c.taken) return;
+  var y = c.y + Math.sin(c.bob)*4;
+  ctx.save(); ctx.translate(c.x,y);
+  if(c.slot==='a'){ // carnival feather
+    ctx.fillStyle = '#26c6a0';
+    for(var k=0;k<5;k++){
+      ctx.save(); ctx.rotate((k-2)*0.3);
+      ctx.beginPath(); ctx.ellipse(0,-6,2.4,9,0,0,TAU); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#ffcf3a';
+    ctx.beginPath(); ctx.arc(0,4,3,0,TAU); ctx.fill();
+  } else if(c.slot==='b'){ // football
+    ctx.fillStyle = '#f5f5f5';
+    ctx.beginPath(); ctx.arc(0,0,8,0,TAU); ctx.fill();
+    ctx.fillStyle = '#1c1c1c';
+    ctx.beginPath(); ctx.moveTo(0,-4); ctx.lineTo(4,-1); ctx.lineTo(2,4); ctx.lineTo(-2,4); ctx.lineTo(-4,-1); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#bdbdbd'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(0,0,8,0,TAU); ctx.stroke();
+  } else { // toucan
+    ctx.fillStyle = '#1c1c22';
+    ctx.beginPath(); ctx.ellipse(-2,2,8,7,0,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(4,-4,4,0,TAU); ctx.fill();
+    ctx.fillStyle = '#ff9a1f'; // big beak
+    ctx.beginPath(); ctx.moveTo(6,-6); ctx.quadraticCurveTo(20,-3,7,0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(4,-5,1.4,0,TAU); ctx.fill();
+    ctx.fillStyle = '#1c1330'; ctx.beginPath(); ctx.arc(4,-5,0.7,0,TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---------- drawing: New York collectibles ---------- */
+export function drawNewyorkCollectibleRef(c){
+  if(c.taken) return;
+  var y = c.y + Math.sin(c.bob)*4;
+  ctx.save(); ctx.translate(c.x,y);
+  if(c.slot==='a'){ // pretzel
+    ctx.strokeStyle = '#a9702f'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(-3,0,5,-0.4,Math.PI+0.6); ctx.stroke();
+    ctx.beginPath(); ctx.arc(3,0,5,-Math.PI-0.6,0.4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-6,4); ctx.lineTo(6,4); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    [[-3,-2],[3,-2],[0,3]].forEach(function(d){ ctx.beginPath(); ctx.arc(d[0],d[1],0.8,0,TAU); ctx.fill(); });
+  } else if(c.slot==='b'){ // yellow taxi
+    ctx.fillStyle = '#ffcf00';
+    ctx.beginPath(); ctx.roundRect(-11,-2,22,9,2); ctx.fill();
+    ctx.fillRect(-7,-7,12,6);
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath(); ctx.arc(-6,7,2.4,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(6,7,2.4,0,TAU); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.fillRect(-2,-9,4,2); // roof light
+  } else { // Statue of Liberty torch
+    ctx.fillStyle = '#5bbfa6';
+    ctx.fillRect(-2,-2,4,12); // arm
+    ctx.beginPath(); ctx.moveTo(-4,-2); ctx.lineTo(4,-2); ctx.lineTo(2,-6); ctx.lineTo(-2,-6); ctx.closePath(); ctx.fill(); // cup
+    ctx.fillStyle = '#ffd23a';
+    ctx.beginPath(); ctx.moveTo(0,-16); ctx.quadraticCurveTo(5,-8,-4,-6); ctx.quadraticCurveTo(3,-8,0,-16); ctx.fill(); // flame
+  }
+  ctx.restore();
+}
+
 /* ---------- drawing: Boss Dragon (China) ---------- */
 export function drawDragonRef(en){
   ctx.save();

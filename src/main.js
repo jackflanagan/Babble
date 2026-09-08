@@ -14,6 +14,10 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
   setProgress(progress);
   setGlobeProgress(progress);
+  // Re-derive unlocked locations from saved progress. globe.js runs
+  // refreshClearedPin() at module load with empty progress, so without this
+  // pass every location beyond the defaults re-locks on each page load.
+  refreshClearedPin();
   setLocationsGetter(function(){ return LOCATIONS; });
   setDrawState(function(){ return { LEVELS: LEVELS, currentLocationId: state.currentLocationId }; });
 

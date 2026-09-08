@@ -2534,6 +2534,46 @@
     }
     ctx.restore();
   }
+  function drawHyenaRef(en) {
+    ctx.save();
+    var wob = Math.sin(performance.now() * 7e-3 + en.x * 0.05) * 2;
+    ctx.translate(en.x + en.w / 2, en.y + en.h / 2 + wob);
+    var flash = en.angry > 0 && Math.floor(performance.now() / 90) % 2 === 0;
+    ctx.fillStyle = en.state === "trapped" ? "#e8d8a0" : flash ? "#ff8a8a" : "#b08840";
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 13, 10, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "rgba(60,40,10,0.4)";
+    [[-5, 2, 3, 2], [5, 0, 2.5, 2], [0, 6, 2, 1.5]].forEach(function(s) {
+      ctx.beginPath();
+      ctx.ellipse(s[0], s[1], s[2], s[3], 0, 0, TAU);
+      ctx.fill();
+    });
+    ctx.fillStyle = en.state === "trapped" ? "#e8d8a0" : flash ? "#ff8a8a" : "#b08840";
+    ctx.beginPath();
+    ctx.ellipse(10, 0, 8, 7, 0.2, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#7a5820";
+    ctx.beginPath();
+    ctx.moveTo(8, -7);
+    ctx.lineTo(5, -14);
+    ctx.lineTo(13, -9);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(14, -5);
+    ctx.lineTo(12, -12);
+    ctx.lineTo(18, -7);
+    ctx.fill();
+    ctx.fillStyle = "#8a6030";
+    ctx.beginPath();
+    ctx.ellipse(16, 2, 4, 3, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = "#1c1330";
+    ctx.beginPath();
+    ctx.arc(11, -2, 1.6, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
   function drawWaspRef(en) {
     ctx.save();
     var wob = Math.sin(performance.now() * 0.012 + en.x * 0.05) * 2;
@@ -2933,6 +2973,196 @@
       });
       ctx.fillRect(-6, -13, 12, 3);
       ctx.fillRect(-8, -16, 16, 4);
+    }
+    ctx.restore();
+  }
+  function drawTokyoCollectibleRef(c) {
+    if (c.taken) return;
+    var y = c.y + Math.sin(c.bob) * 4;
+    ctx.save();
+    ctx.translate(c.x, y);
+    if (c.slot === "a") {
+      ctx.fillStyle = "#e23c4a";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 8, 10, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 1;
+      [-5, 0, 5].forEach(function(ly) {
+        ctx.beginPath();
+        ctx.moveTo(-8, ly);
+        ctx.lineTo(8, ly);
+        ctx.stroke();
+      });
+      ctx.fillStyle = "#3a2a1a";
+      ctx.fillRect(-3, -12, 6, 3);
+      ctx.fillRect(-3, 9, 6, 3);
+    } else if (c.slot === "b") {
+      ctx.fillStyle = "#f5f0e6";
+      ctx.beginPath();
+      ctx.roundRect(-9, 0, 18, 7, 3);
+      ctx.fill();
+      ctx.fillStyle = "#f08a6a";
+      ctx.beginPath();
+      ctx.roundRect(-9, -5, 18, 6, 3);
+      ctx.fill();
+      ctx.fillStyle = "#2a3a2a";
+      ctx.fillRect(-3, -5, 6, 7);
+    } else {
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 8, 7, 0, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -6, 5, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(-5, -9);
+      ctx.lineTo(-2, -13);
+      ctx.lineTo(0, -9);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(5, -9);
+      ctx.lineTo(2, -13);
+      ctx.lineTo(0, -9);
+      ctx.fill();
+      ctx.strokeStyle = "#d94a4a";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(7, -2);
+      ctx.lineTo(10, -8);
+      ctx.stroke();
+      ctx.fillStyle = "#1c1330";
+      ctx.beginPath();
+      ctx.arc(-2, -6, 1, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(2, -6, 1, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawBrazilCollectibleRef(c) {
+    if (c.taken) return;
+    var y = c.y + Math.sin(c.bob) * 4;
+    ctx.save();
+    ctx.translate(c.x, y);
+    if (c.slot === "a") {
+      ctx.fillStyle = "#26c6a0";
+      for (var k = 0; k < 5; k++) {
+        ctx.save();
+        ctx.rotate((k - 2) * 0.3);
+        ctx.beginPath();
+        ctx.ellipse(0, -6, 2.4, 9, 0, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillStyle = "#ffcf3a";
+      ctx.beginPath();
+      ctx.arc(0, 4, 3, 0, TAU);
+      ctx.fill();
+    } else if (c.slot === "b") {
+      ctx.fillStyle = "#f5f5f5";
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#1c1c1c";
+      ctx.beginPath();
+      ctx.moveTo(0, -4);
+      ctx.lineTo(4, -1);
+      ctx.lineTo(2, 4);
+      ctx.lineTo(-2, 4);
+      ctx.lineTo(-4, -1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#bdbdbd";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 0, TAU);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#1c1c22";
+      ctx.beginPath();
+      ctx.ellipse(-2, 2, 8, 7, 0, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(4, -4, 4, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#ff9a1f";
+      ctx.beginPath();
+      ctx.moveTo(6, -6);
+      ctx.quadraticCurveTo(20, -3, 7, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(4, -5, 1.4, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#1c1330";
+      ctx.beginPath();
+      ctx.arc(4, -5, 0.7, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawNewyorkCollectibleRef(c) {
+    if (c.taken) return;
+    var y = c.y + Math.sin(c.bob) * 4;
+    ctx.save();
+    ctx.translate(c.x, y);
+    if (c.slot === "a") {
+      ctx.strokeStyle = "#a9702f";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(-3, 0, 5, -0.4, Math.PI + 0.6);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(3, 0, 5, -Math.PI - 0.6, 0.4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-6, 4);
+      ctx.lineTo(6, 4);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      [[-3, -2], [3, -2], [0, 3]].forEach(function(d) {
+        ctx.beginPath();
+        ctx.arc(d[0], d[1], 0.8, 0, TAU);
+        ctx.fill();
+      });
+    } else if (c.slot === "b") {
+      ctx.fillStyle = "#ffcf00";
+      ctx.beginPath();
+      ctx.roundRect(-11, -2, 22, 9, 2);
+      ctx.fill();
+      ctx.fillRect(-7, -7, 12, 6);
+      ctx.fillStyle = "#2a2a2a";
+      ctx.beginPath();
+      ctx.arc(-6, 7, 2.4, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(6, 7, 2.4, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "#111";
+      ctx.fillRect(-2, -9, 4, 2);
+    } else {
+      ctx.fillStyle = "#5bbfa6";
+      ctx.fillRect(-2, -2, 4, 12);
+      ctx.beginPath();
+      ctx.moveTo(-4, -2);
+      ctx.lineTo(4, -2);
+      ctx.lineTo(2, -6);
+      ctx.lineTo(-2, -6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#ffd23a";
+      ctx.beginPath();
+      ctx.moveTo(0, -16);
+      ctx.quadraticCurveTo(5, -8, -4, -6);
+      ctx.quadraticCurveTo(3, -8, 0, -16);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -4081,6 +4311,196 @@
             lives = Math.min(lives + 1, 9);
           } }
         },
+        tokyo: {
+          name: "Tokyo",
+          blurb: "Trap every night-spirit in a bubble, then bump it to pop it. Grab a paper lantern, sushi and a lucky cat for bonus points. Walk off either edge to wrap around the map.",
+          values: { a: 100, b: 60, c: 250, pop: 150 },
+          theme: {
+            skyTop: "#1b1f3a",
+            skyMid: "#4a3a6a",
+            skyBottom: "#e79fb8",
+            sunColor: "rgba(240,240,255,0.9)",
+            groundBase: "#2a2e46",
+            groundEdge: "#464c72",
+            detailColor: ["#ff5aa8", "#5ad1ff"],
+            platformTop: "#3c4a70",
+            platformBody: "#28304c",
+            platformDetail: "#8a5aff",
+            drawBackdrop: function() {
+              drawSkylineRow([
+                { x: 0, w: 60, h: 110 },
+                { x: 58, w: 44, h: 150 },
+                { x: 100, w: 52, h: 80 },
+                { x: 150, w: 40, h: 130 },
+                { x: 500, w: 46, h: 96 },
+                { x: 544, w: 58, h: 140 },
+                { x: 600, w: 42, h: 74 },
+                { x: 640, w: 60, h: 120 }
+              ], "rgba(40,44,80,0.6)", 300);
+              ["#ff5aa8", "#5ad1ff", "#ffd23a", "#7dff9a"].forEach(function(col, i) {
+                ctx.fillStyle = col;
+                ctx.globalAlpha = 0.5;
+                ctx.fillRect(30 + i * 180, 170 + i % 2 * 40, 26, 8);
+                ctx.globalAlpha = 1;
+              });
+              ctx.fillStyle = "rgba(240,240,255,0.85)";
+              ctx.beginPath();
+              ctx.arc(600, 90, 26, 0, TAU);
+              ctx.fill();
+            },
+            drawCenterpiece: function(x, y) {
+              ctx.save();
+              ctx.translate(x, y);
+              ctx.fillStyle = "#d6392f";
+              ctx.fillRect(-34, -6, 8, 66);
+              ctx.fillRect(26, -6, 8, 66);
+              ctx.fillRect(-44, -10, 88, 8);
+              ctx.beginPath();
+              ctx.moveTo(-52, -24);
+              ctx.quadraticCurveTo(0, -32, 52, -24);
+              ctx.lineTo(52, -16);
+              ctx.quadraticCurveTo(0, -24, -52, -16);
+              ctx.closePath();
+              ctx.fill();
+              ctx.fillStyle = "#2a2a2a";
+              ctx.fillRect(-6, -16, 12, 6);
+              ctx.restore();
+            }
+          },
+          enemyDraw: drawGorgonRef,
+          collectibleDraw: drawTokyoCollectibleRef,
+          levelPhysics: { gravity: 1400, enemySpeed: 1.1 },
+          locPowerup: { type: "lantern", label: "LANTERN!", color: "#ff5aa8", glowColor: "rgba(255,90,168,0.4)", effect: function(p) {
+            p.shield = 8;
+          } }
+        },
+        brazil: {
+          name: "Brazil",
+          blurb: "Trap every jungle-sprite in a bubble, then bump it to pop it. Grab a carnival feather, football and a toucan for bonus points. Walk off either edge to wrap around the map.",
+          values: { a: 100, b: 60, c: 250, pop: 150 },
+          theme: {
+            skyTop: "#1f8fae",
+            skyMid: "#4fc2c0",
+            skyBottom: "#f3e6a8",
+            sunColor: "rgba(255,224,120,0.95)",
+            groundBase: "#7a9a3a",
+            groundEdge: "#9dc255",
+            detailColor: ["#2f8f4a", "#f0b429"],
+            platformTop: "#c98a3a",
+            platformBody: "#8a5a2a",
+            platformDetail: "#3a2a10",
+            drawBackdrop: function() {
+              ctx.fillStyle = "rgba(40,90,60,0.4)";
+              ctx.beginPath();
+              ctx.moveTo(0, 300);
+              ctx.quadraticCurveTo(120, 210, 250, 300);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.moveTo(430, 300);
+              ctx.quadraticCurveTo(560, 150, 690, 300);
+              ctx.fill();
+              ctx.fillStyle = "rgba(30,110,55,0.5)";
+              [[60, 300, 34], [150, 308, 26], [300, 304, 30], [560, 300, 40], [650, 306, 28]].forEach(function(t) {
+                ctx.beginPath();
+                ctx.ellipse(t[0], t[1] - t[2], t[2], t[2] * 0.6, 0, 0, TAU);
+                ctx.fill();
+                ctx.fillRect(t[0] - 2, t[1] - t[2], 4, t[2]);
+              });
+            },
+            drawCenterpiece: function(x, y) {
+              ctx.save();
+              ctx.translate(x, y);
+              ctx.fillStyle = "#8a8a8a";
+              ctx.fillRect(-6, -4, 12, 4);
+              ctx.fillStyle = "#cfcfcf";
+              ctx.fillRect(-3, -40, 6, 36);
+              ctx.fillRect(-22, -34, 44, 5);
+              ctx.beginPath();
+              ctx.arc(0, -44, 4, 0, TAU);
+              ctx.fill();
+              ctx.restore();
+            }
+          },
+          enemyDraw: drawHyenaRef,
+          collectibleDraw: drawBrazilCollectibleRef,
+          levelPhysics: { gravity: 1450, enemySpeed: 1.1 },
+          locPowerup: { type: "samba", label: "SAMBA!", color: "#2fbf6a", glowColor: "rgba(47,191,106,0.4)", effect: function(p) {
+            p.speedBoost = 9;
+          } }
+        },
+        newyork: {
+          name: "New York",
+          blurb: "Trap every rooftop burglar in a bubble, then bump it to pop it. Grab a pretzel, yellow taxi and a Liberty torch for bonus points. Walk off either edge to wrap around the map.",
+          values: { a: 100, b: 60, c: 250, pop: 150 },
+          theme: {
+            skyTop: "#3a4a6a",
+            skyMid: "#8a94ac",
+            skyBottom: "#e6b98a",
+            sunColor: "rgba(255,200,140,0.85)",
+            groundBase: "#4a4a52",
+            groundEdge: "#6c6c76",
+            detailColor: ["#c8c8d0", "#9a9aa6"],
+            platformTop: "#9aa0aa",
+            platformBody: "#6a6f7c",
+            platformDetail: "#3a3d46",
+            drawBackdrop: function() {
+              drawSkylineRow([
+                { x: 0, w: 54, h: 150 },
+                { x: 52, w: 40, h: 110 },
+                { x: 90, w: 60, h: 180 },
+                { x: 150, w: 44, h: 120 },
+                { x: 470, w: 48, h: 140 },
+                { x: 516, w: 64, h: 200 },
+                { x: 578, w: 40, h: 100 },
+                { x: 616, w: 56, h: 160 },
+                { x: 670, w: 50, h: 120 }
+              ], "rgba(70,74,92,0.6)", 300);
+              ctx.fillStyle = "rgba(90,94,112,0.7)";
+              ctx.fillRect(336, 150, 20, 150);
+              ctx.beginPath();
+              ctx.moveTo(336, 150);
+              ctx.lineTo(346, 120);
+              ctx.lineTo(356, 150);
+              ctx.fill();
+              ctx.fillRect(344, 100, 4, 22);
+              ctx.fillStyle = "rgba(255,220,120,0.5)";
+              for (var wx = 0; wx < 7; wx++) {
+                for (var wy = 0; wy < 10; wy++) {
+                  if ((wx + wy) % 3 === 0) ctx.fillRect(338 + wx * 2.4, 158 + wy * 13, 1.6, 6);
+                }
+              }
+            },
+            drawCenterpiece: function(x, y) {
+              ctx.save();
+              ctx.translate(x, y);
+              ctx.fillStyle = "#5bbfa6";
+              ctx.fillRect(-8, -6, 16, 6);
+              ctx.fillRect(-4, -48, 8, 42);
+              ctx.fillRect(-4, -52, 8, 4);
+              ctx.beginPath();
+              ctx.arc(0, -56, 4, 0, TAU);
+              ctx.fill();
+              for (var s = -2; s <= 2; s++) {
+                ctx.beginPath();
+                ctx.moveTo(s * 2, -60);
+                ctx.lineTo(s * 2, -66);
+                ctx.stroke();
+              }
+              ctx.fillRect(6, -64, 4, 16);
+              ctx.fillStyle = "#ffd23a";
+              ctx.beginPath();
+              ctx.arc(8, -66, 3, 0, TAU);
+              ctx.fill();
+              ctx.restore();
+            }
+          },
+          enemyDraw: drawBurglarRef,
+          collectibleDraw: drawNewyorkCollectibleRef,
+          levelPhysics: { gravity: 1500 },
+          locPowerup: { type: "bagel", label: "BAGEL!", color: "#e0a94a", glowColor: "rgba(224,169,74,0.4)", effect: function(p) {
+            p.shield = 8;
+          } }
+        },
         athens: {
           name: "Athens",
           blurb: "Trap every gorgon in a bubble, then bump it to pop it. Grab an olive branch, amphora and a mini Parthenon for bonus points. Watch out \u2014 these stone-faced enemies move fast!",
@@ -4253,6 +4673,7 @@
       var progress = safeGet("gh_progress_v2", { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
       setProgress(progress);
       setGlobeProgress(progress);
+      refreshClearedPin();
       setLocationsGetter(function() {
         return LOCATIONS;
       });
