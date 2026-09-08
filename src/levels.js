@@ -2,7 +2,7 @@
 
 import { TAU } from './utils.js';
 import { ctx, W, H } from './canvas.js';
-import { drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawTokyoCollectibleRef, drawBrazilCollectibleRef, drawNewyorkCollectibleRef } from './draw.js';
+import { drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawTokyoCollectibleRef, drawBrazilCollectibleRef, drawNewyorkCollectibleRef, drawOniRef, drawPigeonRef } from './draw.js';
 export function drawSkylineRow(buildings, color, baseY){
   ctx.fillStyle = color;
   buildings.forEach(function(b){
@@ -510,7 +510,7 @@ export var LEVELS = {
   },
   tokyo:{
     name:'Tokyo',
-    blurb:'Trap every night-spirit in a bubble, then bump it to pop it. Grab a paper lantern, sushi and a lucky cat for bonus points. Walk off either edge to wrap around the map.',
+    blurb:'Trap every oni in a bubble, then bump it to pop it. Grab a paper lantern, sushi and a lucky cat for bonus points. These little demons are quick — keep moving. Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#1b1f3a', skyMid:'#4a3a6a', skyBottom:'#e79fb8',
@@ -548,9 +548,9 @@ export var LEVELS = {
         ctx.restore();
       }
     },
-    enemyDraw:drawGorgonRef,
+    enemyDraw:drawOniRef,
     collectibleDraw:drawTokyoCollectibleRef,
-    levelPhysics:{ gravity:1400, enemySpeed:1.1 },
+    levelPhysics:{ gravity:1400, enemySpeed:1.2 },
     locPowerup:{ type:'lantern', label:'LANTERN!', color:'#ff5aa8', glowColor:'rgba(255,90,168,0.4)', effect:function(p){ p.shield = 8; } }
   },
   brazil:{
@@ -593,7 +593,7 @@ export var LEVELS = {
   },
   newyork:{
     name:'New York',
-    blurb:'Trap every rooftop burglar in a bubble, then bump it to pop it. Grab a pretzel, yellow taxi and a Liberty torch for bonus points. Walk off either edge to wrap around the map.',
+    blurb:'Trap every pigeon in a bubble, then bump it to pop it. Grab a pretzel, yellow taxi and a Liberty torch for bonus points. The flock scatters fast and comes back angrier. Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#3a4a6a', skyMid:'#8a94ac', skyBottom:'#e6b98a',
@@ -634,9 +634,9 @@ export var LEVELS = {
         ctx.restore();
       }
     },
-    enemyDraw:drawBurglarRef,
+    enemyDraw:drawPigeonRef,
     collectibleDraw:drawNewyorkCollectibleRef,
-    levelPhysics:{ gravity:1500 },
+    levelPhysics:{ gravity:1500, enemySpeed:1.15 },
     locPowerup:{ type:'bagel', label:'BAGEL!', color:'#e0a94a', glowColor:'rgba(224,169,74,0.4)', effect:function(p){ p.shield = 8; } }
   },
   athens:{

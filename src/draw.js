@@ -640,6 +640,85 @@ export function drawAthensCollectibleRef(c){
   ctx.restore();
 }
 
+/* ---------- drawing: Tokyo enemy (oni) ---------- */
+export function drawOniRef(en){
+  ctx.save();
+  var wob = Math.sin(performance.now()*0.009 + en.x*0.05)*2;
+  ctx.translate(en.x+en.w/2, en.y+en.h/2+wob);
+  var flash = en.angry>0 && Math.floor(performance.now()/80)%2===0;
+  var trapped = en.state==='trapped';
+  var skin = trapped ? '#d8b0c8' : (flash ? '#ff5a4a' : '#d0463a');
+  // body
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.ellipse(0,4,11,10,0,0,TAU); ctx.fill();
+  // head
+  ctx.beginPath(); ctx.ellipse(0,-7,9,8,0,0,TAU); ctx.fill();
+  // horns
+  ctx.fillStyle = trapped ? '#f0e0d0' : '#f5ead2';
+  ctx.beginPath(); ctx.moveTo(-7,-12); ctx.lineTo(-10,-22); ctx.lineTo(-3,-13); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(7,-12); ctx.lineTo(10,-22); ctx.lineTo(3,-13); ctx.closePath(); ctx.fill();
+  // wild hair
+  ctx.strokeStyle = trapped ? '#7a5a6a' : '#20140f'; ctx.lineWidth=2; ctx.lineCap='round';
+  [[-6,-12,-11,-6],[0,-14,0,-4],[6,-12,11,-6]].forEach(function(s){
+    ctx.beginPath(); ctx.moveTo(s[0],s[1]); ctx.quadraticCurveTo(s[2]-2,s[1]-4,s[2],s[3]); ctx.stroke();
+  });
+  // eyes
+  ctx.fillStyle = flash ? '#ffef00' : '#fff4d0';
+  ctx.beginPath(); ctx.arc(-3.5,-7,2.4,0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.5,-7,2.4,0,TAU); ctx.fill();
+  ctx.fillStyle='#1c1330';
+  ctx.beginPath(); ctx.arc(-3.5+(en.dir||1)*0.6,-7,1.1,0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.5+(en.dir||1)*0.6,-7,1.1,0,TAU); ctx.fill();
+  // fang grin
+  ctx.strokeStyle='#3a1a14'; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.arc(0,-2,4,0.15,Math.PI-0.15); ctx.stroke();
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.moveTo(-3,-1); ctx.lineTo(-1.5,2.5); ctx.lineTo(-0.5,-0.6); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(3,-1); ctx.lineTo(1.5,2.5); ctx.lineTo(0.5,-0.6); ctx.fill();
+  ctx.restore();
+}
+
+/* ---------- drawing: New York enemy (pigeon) ---------- */
+export function drawPigeonRef(en){
+  ctx.save();
+  var t = performance.now()*0.012;
+  var bob = Math.sin(t + en.x*0.05)*1.6;
+  ctx.translate(en.x+en.w/2, en.y+en.h/2+bob);
+  var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
+  var trapped = en.state==='trapped';
+  var body = trapped ? '#c9d2dc' : (flash ? '#ff9a9a' : '#8b93a0');
+  var dir = en.dir || en.facing || 1;
+  ctx.scale(dir, 1);
+  // tail
+  ctx.fillStyle = trapped ? '#b7c0cc' : '#6c7381';
+  ctx.beginPath(); ctx.moveTo(-9,2); ctx.lineTo(-16,-2); ctx.lineTo(-16,6); ctx.closePath(); ctx.fill();
+  // body
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(-1,2,10,8,0,0,TAU); ctx.fill();
+  // wing (flap)
+  var flap = Math.sin(t*2)*3;
+  ctx.fillStyle = trapped ? '#aab3bf' : '#767d8b';
+  ctx.beginPath(); ctx.ellipse(-2,1+flap*0.3,6,4,0.3+flap*0.05,0,TAU); ctx.fill();
+  // head
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.arc(8,-5,5,0,TAU); ctx.fill();
+  // iridescent neck
+  ctx.fillStyle = trapped ? '#9fd0c0' : (flash ? '#ffcaca' : '#3a8f7a');
+  ctx.beginPath(); ctx.ellipse(5,-1,3.5,4,0.2,0,TAU); ctx.fill();
+  // beak
+  ctx.fillStyle = '#e8a23a';
+  ctx.beginPath(); ctx.moveTo(12,-5); ctx.lineTo(17,-4); ctx.lineTo(12,-2.5); ctx.closePath(); ctx.fill();
+  // eye
+  ctx.fillStyle = flash ? '#ff0000' : '#e86a2a';
+  ctx.beginPath(); ctx.arc(9,-6,1.6,0,TAU); ctx.fill();
+  ctx.fillStyle = '#1c1330';
+  ctx.beginPath(); ctx.arc(9.3,-6,0.8,0,TAU); ctx.fill();
+  // feet
+  ctx.strokeStyle = '#d05a5a'; ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.moveTo(-2,9); ctx.lineTo(-2,12); ctx.moveTo(3,9); ctx.lineTo(3,12); ctx.stroke();
+  ctx.restore();
+}
+
 /* ---------- drawing: Tokyo collectibles ---------- */
 export function drawTokyoCollectibleRef(c){
   if(c.taken) return;

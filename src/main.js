@@ -563,9 +563,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         submitted = true;
         var winScoreSubmit = document.getElementById('winScoreSubmit');
         winScoreSubmit.hidden = false;
-        winScoreSubmit.textContent = 'Submitting state.score…';
+        winScoreSubmit.textContent = 'Submitting score…';
         submitScore(state.currentLocationId, val, pr.best, function(ok){
-          winScoreSubmit.textContent = ok ? '✓ On the leaderboard!' : '✗ Could not submit state.score';
+          winScoreSubmit.textContent = ok ? '✓ On the leaderboard!' : '✗ Could not submit score';
         });
       }
     }
@@ -1538,7 +1538,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       stopMusic();
       var loseSummaryText = survivalMode
         ? 'Reached wave ' + survivalWave + ' · Score: ' + state.score
-        : 'Score ' + state.score + ' · try trapping state.enemies before they reach you.';
+        : 'Score ' + state.score + ' · try trapping enemies before they reach you.';
       showAdBreak(function(){
         document.getElementById('loseSummary').textContent = loseSummaryText;
         document.getElementById('overlayLose').hidden = false;
@@ -2692,9 +2692,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       /* Auto-submit state.score if we have a saved name */
       if(pr.name && lbEnabled()){
         winScoreSubmit.hidden = false;
-        winScoreSubmit.textContent = 'Submitting state.score…';
+        winScoreSubmit.textContent = 'Submitting score…';
         submitScore(state.currentLocationId, pr.name, state.score, function(ok){
-          winScoreSubmit.textContent = ok ? '✓ Score submitted to leaderboard' : '✗ Could not submit state.score';
+          winScoreSubmit.textContent = ok ? '✓ Score submitted to leaderboard' : '✗ Could not submit score';
         });
       }
     }
@@ -2985,7 +2985,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       ctx.restore();
     }
     if(!tutorialDone && state.gameState==='playing'){
-      var tMsg=tutorialFirstPop?'Jump onto the trapped bubble to pop it!':'Shoot state.enemies with state.bubbles! [Shift / bubble button]';
+      var tMsg=tutorialFirstPop?'Jump onto the trapped bubble to pop it!':'Shoot enemies with bubbles! [Shift / bubble button]';
       var tAlpha;
       if(!tutorialFirstPop){ tAlpha=Math.min(1,tutorialT*3)*Math.min(1,(6-tutorialT)*2); }
       else { tAlpha=Math.min(1,(tutorialT-6)*2)*Math.min(1,(12-tutorialT)*2); }
