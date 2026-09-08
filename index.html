@@ -549,6 +549,8 @@ kbd{
 .mc-btn.mc-bubble{ background:rgba(255,107,74,0.25); border-color:rgba(255,107,74,0.5); bottom:calc(env(safe-area-inset-bottom,0px) + 20px); right:104px; }
 .mc-btn.mc-left{  bottom:calc(env(safe-area-inset-bottom,0px) + 20px); left:20px; }
 .mc-btn.mc-right{ bottom:calc(env(safe-area-inset-bottom,0px) + 20px); left:104px; }
+.mc-btn.mc-power{ background:rgba(127,227,255,0.3); border-color:rgba(127,227,255,0.65); bottom:calc(env(safe-area-inset-bottom,0px) + 100px); right:104px; font-size:24px; }
+.mc-btn.mc-power[hidden]{ display:none; }
 
 @media (max-width: 719px){
   #localControls{ display:none; }
@@ -638,6 +640,9 @@ footer{
           <div>
             <div class="hud-label">Lives</div>
             <div class="lives" id="hudLives"></div>
+          </div>
+          <div>
+            <button class="btn btn-ghost" id="btnPower" hidden title="Trap every enemy in a bubble (E)" style="padding:4px 10px;font-size:12px;background:rgba(127,227,255,0.16);border-color:rgba(127,227,255,0.55);color:#d6f2fd;">⚡ Trap Blast ×0</button>
           </div>
           <div style="display:flex;gap:6px;">
             <button class="btn btn-ghost" id="btnPause" style="padding:4px 10px;font-size:12px;">⏸ Pause</button>
@@ -792,6 +797,7 @@ footer{
   <div class="mc-btn mc-right" id="mcRight">▶</div>
   <div class="mc-btn mc-bubble" id="mcBubble">○</div>
   <div class="mc-btn mc-jump"  id="mcJump">↑</div>
+  <div class="mc-btn mc-power" id="mcPower" hidden>⚡</div>
 </div>
 
 <script src="dist/game.js"></script>

@@ -4902,6 +4902,7 @@
         campaignStep = 0;
         campaignLastType = "level";
         adventureComplete = false;
+        powerCharges = 0;
         var first = LOCATIONS.filter(function(l) {
           return l.id === CAMPAIGN[0].id;
         })[0] || loc;
@@ -4972,6 +4973,21 @@
         }
       }
       document.getElementById("btnPause").addEventListener("click", togglePause);
+      (function() {
+        var bp = document.getElementById("btnPower");
+        if (bp) bp.addEventListener("click", function() {
+          usePower();
+        });
+        var mp = document.getElementById("mcPower");
+        if (mp) {
+          var fire = function(e) {
+            e.preventDefault();
+            usePower();
+          };
+          mp.addEventListener("touchstart", fire, { passive: false });
+          mp.addEventListener("click", fire);
+        }
+      })();
       function toggleFullscreen() {
         if (!document.fullscreenElement) {
           (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen || document.documentElement.mozRequestFullScreen).call(document.documentElement);
@@ -5084,6 +5100,10 @@
           case "Space":
             keys.p1Jump = true;
             localJumpPress();
+            break;
+          case "KeyE":
+          case "KeyQ":
+            usePower();
             break;
           case "ArrowLeft":
             keys.p2Left = true;
@@ -5289,6 +5309,7 @@
       var campaignLastType = "minigame";
       var campaignStep = 0;
       var adventureComplete = false;
+      var powerCharges = 0;
       var miniGameId = null;
       var miniGameTimer = 0;
       var miniGamePhase = "playing";
@@ -5320,11 +5341,11 @@
         { type: "level", id: "boss" }
       ];
       var MINI_GAME_DEFS = {
-        mediterranean: { title: "Mediterranean Sea", subtitle: "Row to the other side!", timeLimit: 25, reward: "sailingHat", rewardLabel: "Sailing Hat" },
-        krakow: { title: "Krakow Kitchen", subtitle: "Click the beetroots to make soup!", timeLimit: 22, reward: "beetrootJacket", rewardLabel: "Beetroot Jacket" },
-        berlin: { title: "Berlin Club", subtitle: "Hit the glowing dance spots!", timeLimit: 25, reward: "glowstick", rewardLabel: "Glowstick" },
-        london: { title: "Buckingham Palace", subtitle: "Knock the crowns off the guards!", timeLimit: 30, reward: "crown", rewardLabel: "Golden Crown" },
-        pamplona: { title: "Running of the Bulls", subtitle: "Free all the bulls from their pens!", timeLimit: 28, reward: "bandana", rewardLabel: "Red Bandana" }
+        mediterranean: { title: "Mediterranean Sea", subtitle: "Row to the other side!", timeLimit: 22, reward: "sailingHat", rewardLabel: "Sailing Hat", power: "Tide Trap" },
+        krakow: { title: "Krakow Kitchen", subtitle: "Click the beetroots to make soup!", timeLimit: 20, reward: "beetrootJacket", rewardLabel: "Beetroot Jacket", power: "Beet Blast" },
+        berlin: { title: "Berlin Club", subtitle: "Hit the glowing dance spots!", timeLimit: 22, reward: "glowstick", rewardLabel: "Glowstick", power: "Strobe Snare" },
+        london: { title: "Buckingham Palace", subtitle: "Knock the crowns off the guards!", timeLimit: 28, reward: "crown", rewardLabel: "Golden Crown", power: "Crown Crash" },
+        pamplona: { title: "Running of the Bulls", subtitle: "Free all the bulls from their pens!", timeLimit: 26, reward: "bandana", rewardLabel: "Red Bandana", power: "Bull Rush" }
       };
       var POWERUP_TYPES = ["speed", "rapid", "shield", "magnet", "ghost"];
       var chaseAlertPlayed = false;
@@ -5557,6 +5578,7 @@
           campaignMode = true;
           campaignStep = 0;
           campaignLastType = "level";
+          powerCharges = 0;
           state.currentLocationId = CAMPAIGN[0].id;
           resetGame();
           state.gameState = "playing";
@@ -5695,6 +5717,51 @@
       }
       function spawnPopup(x, y, text, color, size) {
         state.popups.push({ x, y, text, t: 0, color: color || "#ffd166", size: size || 16 });
+      }
+      function updatePowerHud() {
+        var show = powerCharges > 0 && !sceneGame.hidden && !miniGameId && state.gameState === "playing";
+        var btn = document.getElementById("btnPower");
+        if (btn) {
+          btn.hidden = !show;
+          if (show) btn.textContent = "\u26A1 Trap Blast \xD7" + powerCharges;
+        }
+        var mc = document.getElementById("mcPower");
+        if (mc) mc.hidden = !show;
+      }
+      function usePower() {
+        if (powerCharges <= 0 || miniGameId || state.gameState !== "playing") return;
+        var targets = state.enemies.filter(function(e) {
+          return e.state === "free";
+        });
+        if (!targets.length) return;
+        powerCharges--;
+        targets.forEach(function(en) {
+          en.state = "trapped";
+          en.bubbleTimer = 4.5;
+          en.stunT = 0;
+          state.bubbles.push({
+            x: en.x + en.w / 2,
+            y: en.y + en.h / 2,
+            r: 20,
+            age: 0,
+            state: "carrying",
+            trapped: en,
+            vx: 0,
+            vy: 0,
+            t: 0,
+            grown: true
+          });
+        });
+        slowT2 = Math.max(slowT2, 1.4);
+        screenFlash = 0.45;
+        screenFlashColor = "#7fe3ff";
+        shakeT = 0.4;
+        spawnParticles(W / 2, H / 2, "#7fe3ff", 28);
+        spawnPopup(W / 2, H / 2 - 30, "TRAP BLAST!", "#7fe3ff", 34);
+        pushKillFeed("\u26A1 TRAP BLAST \u2014 " + targets.length + " caught", "#7fe3ff");
+        playSound("powerup_big");
+        haptic(45);
+        updatePowerHud();
       }
       function tryJump(p) {
         if (state.gameState === "playing" && p && p.onGround) {
@@ -7334,9 +7401,9 @@
         startMiniGameMusic(id);
         document.querySelector(".hud").style.visibility = "hidden";
         if (id === "mediterranean") {
-          miniGameData = { boatX: 80, oarSide: "left", oarAnimL: 0, oarAnimR: 0, needed: 28, clicks: 0, wavePhase: 0 };
+          miniGameData = { boatX: 80, oarSide: "left", oarAnimL: 0, oarAnimR: 0, needed: 34, clicks: 0, wavePhase: 0 };
         } else if (id === "krakow") {
-          miniGameData = { beetroots: [], collected: 0, needed: 22, soupLevel: 0, splashT: 0 };
+          miniGameData = { beetroots: [], collected: 0, needed: 28, soupLevel: 0, splashT: 0 };
           for (var bsi = 0; bsi < 6; bsi++) mgSpawnBeetroot();
         } else if (id === "berlin") {
           var bCols = ["#ff44cc", "#44ccff", "#ffcc00", "#ff4444", "#44ff88"];
@@ -7345,20 +7412,20 @@
               return { x: sp.x, y: sp.y, r: 36, color: bCols[i], lit: false, litT: 0, hitAnim: 0 };
             }),
             activeSpot: -1,
-            litDuration: 0.9,
+            litDuration: 0.72,
             litTimer: 0,
             hits: 0,
-            needed: 22,
+            needed: 28,
             beatT: 0,
             beamPhase: 0
           };
           mgActivateSpot();
         } else if (id === "london") {
-          miniGameData = { guards: [], knocked: 0, needed: 12, spawnT: 0, speedMult: 1 };
+          miniGameData = { guards: [], knocked: 0, needed: 16, spawnT: 0, speedMult: 1 };
           mgSpawnGuard();
           mgSpawnGuard();
         } else if (id === "pamplona") {
-          miniGameData = { pens: [], freed: 0, needed: 10, spawnT: 0 };
+          miniGameData = { pens: [], freed: 0, needed: 13, spawnT: 0 };
           for (var psi = 0; psi < 4; psi++) mgSpawnPen();
         }
       }
@@ -7433,10 +7500,10 @@
         } else if (miniGameId === "london") {
           var d = miniGameData;
           d.spawnT -= dt;
-          d.speedMult = 1 + (1 - Math.max(0, miniGameTimer) / MINI_GAME_DEFS.london.timeLimit) * 1.4;
-          if (d.spawnT <= 0 && d.guards.length < 5) {
+          d.speedMult = 1 + (1 - Math.max(0, miniGameTimer) / MINI_GAME_DEFS.london.timeLimit) * 1.7;
+          if (d.spawnT <= 0 && d.guards.length < 6) {
             mgSpawnGuard();
-            d.spawnT = 1.2 + Math.random() * 0.8;
+            d.spawnT = 0.85 + Math.random() * 0.6;
           }
           for (var gi = d.guards.length - 1; gi >= 0; gi--) {
             var g = d.guards[gi];
@@ -7456,7 +7523,7 @@
           d.spawnT -= dt;
           if (d.spawnT <= 0 && d.pens.length < 6 && d.freed < d.needed) {
             mgSpawnPen();
-            d.spawnT = 1.5 + Math.random() * 1;
+            d.spawnT = 1.1 + Math.random() * 0.75;
           }
           for (var pi2 = 0; pi2 < d.pens.length; pi2++) {
             var pen = d.pens[pi2];
@@ -7486,6 +7553,10 @@
           try {
             localStorage.setItem("bbl_cosmetics", JSON.stringify(unlockedCosmetics));
           } catch (e) {
+          }
+          if (campaignMode) {
+            powerCharges++;
+            pushKillFeed("\u26A1 " + def.power + " earned \u2014 press E to unleash it", "#7fe3ff");
           }
           playSound("win");
           haptic(30);
@@ -9227,6 +9298,7 @@
         lastT = t;
         if (netRole === "guest") syncFromNet();
         if (!sceneGame.hidden) {
+          updatePowerHud();
           if (miniGameId) {
             updateMiniGame(dt);
             drawMiniGame();
@@ -9329,6 +9401,17 @@
         },
         adventureComplete: function() {
           return adventureComplete;
+        },
+        powerCharges: function() {
+          return powerCharges;
+        },
+        freeEnemyCount: function() {
+          return state.enemies.filter(function(e) {
+            return e.state === "free";
+          }).length;
+        },
+        usePower: function() {
+          usePower();
         },
         forceMiniGameWin: function() {
           if (miniGameId) {

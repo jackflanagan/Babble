@@ -63,6 +63,39 @@ test('P1 jump / bubble keys do not throw', async ({ page }) => {
   expect(await page.evaluate(() => window.__game.getState().gameState)).toBe('playing');
 });
 
+test('Trap Blast power: banked on a mini-game clear, bubbles every free enemy', async ({ page }) => {
+  test.setTimeout(30000);
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await enterLocation(page); // Glasgow, step 0
+
+  // Force-clear Glasgow so the run advances to the Mediterranean mini-game.
+  await page.waitForTimeout(3300);
+  for (let i = 0; i < 30; i++) {
+    if (await page.evaluate(() => window.__game.miniGameId())) break;
+    await page.evaluate(() => { window.__game.forceAllCollectiblesTaken(); window.__game.forceWave2(); });
+    await page.waitForTimeout(300);
+  }
+  expect(await page.evaluate(() => window.__game.miniGameId())).toBe('mediterranean');
+
+  // Win the mini-game -> a power charge is banked, HUD button appears.
+  await page.evaluate(() => window.__game.forceMiniGameWin());
+  await page.waitForFunction(() => !window.__game.miniGameId() && window.__game.getState().gameState === 'playing', null, { timeout: 8000 });
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__game.powerCharges())).toBe(1);
+  await expect(page.locator('#btnPower')).toBeVisible();
+
+  // Use it: every free enemy should be trapped, charge spent, button gone.
+  const freeBefore = await page.evaluate(() => window.__game.getEnemyTypes().length);
+  expect(freeBefore).toBeGreaterThan(0);
+  await page.locator('#btnPower').click();
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__game.powerCharges())).toBe(0);
+  expect(await page.evaluate(() => window.__game.freeEnemyCount())).toBe(0);
+  await expect(page.locator('#btnPower')).toBeHidden();
+  expect(errors, errors.join('\n')).toEqual([]);
+});
+
 test('clearing collectibles then both waves reaches the won state', async ({ page }) => {
   test.setTimeout(40000);
   await enterLocation(page);
