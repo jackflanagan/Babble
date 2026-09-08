@@ -60,7 +60,7 @@ export var ACHIEVEMENTS = [
   {id:'treasure',    label:'Treasure Hunt', desc:'Collect all treasures in a run',icon:'\uD83D\uDC8E', unlocked:false},
   {id:'powerup_all', label:'Power Mad',     desc:'Use all 3 power-up types',      icon:'\u26A1', unlocked:false},
   {id:'rat_friend',  label:'Rat Whisperer', desc:'Get the water rat companion',   icon:'\uD83D\uDC00', unlocked:false},
-  {id:'elephant_friend', label:'Elephant Keeper', desc:'Befriend the baby elephant in Kenya', icon:'\uD83D\uDC18', unlocked:false}
+  {id:'elephant_friend', label:'Elephant Keeper', desc:'Befriend the baby elephant in Amboseli', icon:'\uD83D\uDC18', unlocked:false}
 ];
 var unlockedAchievements = safeGet('gh_achievements_v1', []);
 ACHIEVEMENTS.forEach(function(a){ if(unlockedAchievements.indexOf(a.id)>-1) a.unlocked=true; });

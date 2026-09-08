@@ -11,7 +11,7 @@ const FILE_URL = 'file:///' + path.resolve(__dirname, '../index.html').replace(/
 const IGNORED_ERROR_RE = /CrazySDK is not initialized|crazygames|Failed to load resource/i;
 
 const LOCATION_IDS = ['glasgow', 'modena', 'paris', 'ireland', 'athens', 'kenya', 'tokyo', 'brazil', 'newyork', 'boss'];
-const LABELS = ['Glasgow', 'Modena', 'Paris', 'Ireland', 'Athens', 'Kenya', 'Tokyo', 'Brazil', 'New York', 'China'];
+const LABELS = ['Glasgow', 'Modena', 'Paris', 'Galway', 'Athens', 'Amboseli', 'Tokyo', 'Brazil', 'New York', 'Beijing'];
 
 async function dismissPortraitWarning(page) {
   await page.evaluate(() => { const el = document.getElementById('portraitWarning'); if (el) el.style.display = 'none'; });

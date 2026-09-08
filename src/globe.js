@@ -19,13 +19,13 @@ export var LOCATIONS = [
   { id:'glasgow', name:'Glasgow', lat:55.86, lon:-4.25, unlocked:true,  region:'europe' },
   { id:'modena',  name:'Modena',  lat:44.65, lon:10.93, unlocked:true,  region:'europe' },
   { id:'paris',   name:'Paris',   lat:48.85, lon:2.35,  unlocked:true,  region:'europe' },
-  { id:'ireland', name:'Ireland', lat:53.33, lon:-6.25, unlocked:true,  region:'europe' },
+  { id:'ireland', name:'Galway',  lat:53.27, lon:-9.05, unlocked:true,  region:'europe' },
   { id:'athens',  name:'Athens',  lat:37.98, lon:23.73, unlocked:false, region:'europe' },
-  { id:'kenya',   name:'Kenya',   lat:-1.28, lon:36.82, unlocked:false, region:'africa' },
+  { id:'kenya',   name:'Amboseli',lat:-2.65, lon:37.26, unlocked:false, region:'africa' },
   { id:'tokyo',   name:'Tokyo',   lat:35.68, lon:139.69,unlocked:false, region:'asia'   },
   { id:'brazil',  name:'Brazil',  lat:-22.90,lon:-43.17,unlocked:false, region:'americas'},
   { id:'newyork', name:'New York',lat:40.71, lon:-74.00,unlocked:false, region:'americas'},
-  { id:'boss',    name:'China',   lat:35.86, lon:104.19,unlocked:false, region:'asia'   }
+  { id:'boss',    name:'Beijing', lat:39.90, lon:116.41,unlocked:false, region:'asia'   }
 ];
 
 // Real, simplified world coastlines (Natural Earth 110m land polygons,

@@ -368,7 +368,7 @@ export var LEVELS = {
     locPowerup:{ type:'ferrari', label:'FERRARI!', color:'#e03030', glowColor:'rgba(220,48,48,0.4)', effect:function(p){ p.speedBoost = 10; } }
   },
   kenya:{
-    name:'Kenya',
+    name:'Amboseli',
     blurb:'Trap every wasp in a bubble, then bump it to pop it. Grab a coffee bean, Maasai bead, and befriend the baby elephant for a companion! Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
@@ -466,7 +466,7 @@ export var LEVELS = {
     locPowerup:{ type:'croissant', label:'CROISSANT!', color:'#f0c030', glowColor:'rgba(240,192,48,0.4)', effect:function(p){ doubleScoreT = 8; } }
   },
   ireland:{
-    name:'Ireland',
+    name:'Galway',
     blurb:'Trap every banshee in a bubble, then bump it to pop it. Grab a shamrock, golden harp and a pot of gold for bonus points. Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
@@ -703,7 +703,7 @@ export var LEVELS = {
     locPowerup:{ type:'olive', label:'OLIVE!', color:'#7ab840', glowColor:'rgba(122,184,64,0.4)', effect:function(p){ slowT = 5; } }
   },
   boss:{
-    name:'China',
+    name:'Beijing',
     blurb:'A mighty dragon guards the mountains. Three hits to defeat it — each hit makes it faster and angrier. This is the final test.',
     values:{ a:100, b:60, c:250, pop:500 },
     theme:{
