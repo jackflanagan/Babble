@@ -378,7 +378,6 @@
           po3.start(now + t);
           po3.stop(now + t + 0.1);
         });
-        o.stop(now);
       } else if (type === "win") {
         [[523, 0], [659, 0.1], [784, 0.2], [1047, 0.32]].forEach(function(f) {
           var po3 = c.createOscillator(), pg3 = c.createGain();
@@ -391,7 +390,6 @@
           po3.start(now + f[1]);
           po3.stop(now + f[1] + 0.2);
         });
-        o.stop(now);
       } else if (type === "beep") {
         o.type = "sine";
         o.frequency.setValueAtTime(880, now);
@@ -431,7 +429,6 @@
         pg2.gain.linearRampToValueAtTime(0, now + 0.85);
         po2.start(now + 0.48);
         po2.stop(now + 0.86);
-        o.stop(now);
       } else if (type === "chase") {
         [0, 0.15, 0.3].forEach(function(t) {
           var po3 = c.createOscillator(), pg3 = c.createGain();
@@ -444,7 +441,6 @@
           po3.start(now + t);
           po3.stop(now + t + 0.14);
         });
-        o.stop(now);
       } else if (type === "pop_combo") {
         o.type = "sine";
         o.frequency.setValueAtTime(520, now);
@@ -500,7 +496,6 @@
           po3.start(now + 0.35);
           po3.stop(now + 0.67);
         });
-        o.stop(now);
       } else if (type === "pop_glasgow") {
         o.type = "sine";
         o.frequency.setValueAtTime(320, now);
@@ -614,7 +609,6 @@
         pg.gain.linearRampToValueAtTime(0, now + 0.3);
         po.start(now + 0.16);
         po.stop(now + 0.32);
-        o.stop(now);
       } else if (type === "combo_4") {
         [[480, 0, 1200], [600, 0.07, 1500], [740, 0.14, 1800]].forEach(function(f) {
           var po3 = c.createOscillator(), pg3 = c.createGain();
@@ -637,7 +631,6 @@
         pg.gain.linearRampToValueAtTime(0, now + 0.5);
         po.start(now + 0.22);
         po.stop(now + 0.52);
-        o.stop(now);
       } else if (type === "combo_max") {
         [[400, 0], [520, 0.06], [640, 0.12], [800, 0.18], [1e3, 0.24], [1300, 0.3]].forEach(function(f) {
           var po3 = c.createOscillator(), pg3 = c.createGain();
@@ -671,7 +664,6 @@
           po3.start(now + t);
           po3.stop(now + t + 0.12);
         });
-        o.stop(now);
       } else if (type === "powerup_speed") {
         o.type = "sawtooth";
         o.frequency.setValueAtTime(200, now);
@@ -702,7 +694,6 @@
           po3.start(now + t);
           po3.stop(now + t + 0.05);
         });
-        o.stop(now);
       } else if (type === "powerup_shield") {
         [392, 523, 659].forEach(function(freq) {
           var po3 = c.createOscillator(), pg3 = c.createGain();
@@ -716,7 +707,6 @@
           po3.start(now);
           po3.stop(now + 0.57);
         });
-        o.stop(now);
       } else if (type === "powerup_magnet") {
         o.type = "sine";
         o.frequency.setValueAtTime(80, now);
@@ -748,7 +738,6 @@
           po3.start(now + t);
           po3.stop(now + t + 0.37);
         });
-        o.stop(now);
       } else if (type === "shield_block") {
         [200, 400, 600].forEach(function(freq) {
           var po3 = c.createOscillator(), pg3 = c.createGain();
@@ -761,7 +750,6 @@
           po3.start(now);
           po3.stop(now + 0.14);
         });
-        o.stop(now);
       } else if (type === "life_lost") {
         o.type = "sine";
         o.frequency.setValueAtTime(440, now);
@@ -793,7 +781,6 @@
           po3.start(now + f[1]);
           po3.stop(now + f[1] + f[2] + 0.02);
         });
-        o.stop(now);
       } else if (type === "land") {
         o.type = "sine";
         o.frequency.setValueAtTime(90, now);
@@ -4258,7 +4245,7 @@
         return LOCATIONS;
       });
       setDrawState(function() {
-        return { LEVELS, currentLocationId };
+        return { LEVELS, currentLocationId: state.currentLocationId };
       });
       var EVENTS = [
         { id: "bubble_storm", label: "BUBBLE STORM!", color: "#7fe3ff", duration: 10 },
@@ -4290,14 +4277,12 @@
       initStarfield();
       var sceneGlobe = document.getElementById("scene-globe");
       var sceneGame = document.getElementById("scene-game");
-      var currentLocationId = "glasgow";
-      var numPlayers = 1;
       function selectMode(modeStr) {
         document.querySelectorAll(".mode-btn").forEach(function(b) {
           b.classList.toggle("active", b.dataset.players === modeStr);
         });
         if (modeStr === "net") {
-          numPlayers = 2;
+          state.numPlayers = 2;
           document.getElementById("localControls").hidden = true;
           document.getElementById("localControlsHint").hidden = true;
           document.getElementById("p2Controls").hidden = true;
@@ -4308,8 +4293,8 @@
           document.getElementById("netPanel").hidden = true;
           document.getElementById("localControls").hidden = false;
           document.getElementById("localControlsHint").hidden = false;
-          numPlayers = modeStr === "2" ? 2 : 1;
-          document.getElementById("p2Controls").hidden = numPlayers !== 2;
+          state.numPlayers = modeStr === "2" ? 2 : 1;
+          document.getElementById("p2Controls").hidden = state.numPlayers !== 2;
           document.getElementById("btnStart").hidden = false;
         }
       }
@@ -4322,7 +4307,7 @@
         setGlobeRunning(false);
         sceneGlobe.hidden = true;
         sceneGame.hidden = false;
-        currentLocationId = loc.id;
+        state.currentLocationId = loc.id;
         var cIdx2 = -1;
         for (var ci5 = 0; ci5 < CAMPAIGN.length; ci5++) {
           if (CAMPAIGN[ci5].type === "level" && CAMPAIGN[ci5].id === loc.id) {
@@ -4337,7 +4322,7 @@
           campaignPlayedMgs = [];
         }
         if (netRole2) {
-          numPlayers = 2;
+          state.numPlayers = 2;
           document.getElementById("p2Controls").hidden = true;
         } else {
           selectMode("1");
@@ -4393,12 +4378,12 @@
         document.getElementById("overlayLeaderboard").style.display = "none";
       });
       function togglePause() {
-        if (gameState === "playing") {
-          gameState = "paused";
+        if (state.gameState === "playing") {
+          state.gameState = "paused";
           document.getElementById("btnPause").textContent = "\u25B6 Resume";
           suspendAudio();
-        } else if (gameState === "paused") {
-          gameState = "playing";
+        } else if (state.gameState === "paused") {
+          state.gameState = "playing";
           document.getElementById("btnPause").textContent = "\u23F8 Pause";
           resumeAudio();
         }
@@ -4462,6 +4447,25 @@
       initCanvas();
       var cv = document.getElementById("gameCanvas");
       var GRAVITY = 1500;
+      var state = {
+        players: null,
+        enemies: null,
+        bubbles: null,
+        collectibles: null,
+        particles: null,
+        popups: null,
+        powerups: null,
+        popBursts: null,
+        score: 0,
+        lives: 3,
+        gameState: "ready",
+        enemiesLeft: 0,
+        waveNumber: 1,
+        comboCount: 0,
+        startTime: 0,
+        currentLocationId: "glasgow",
+        numPlayers: 1
+      };
       cv.addEventListener("click", function(e) {
         handleMiniGameClick(e.clientX, e.clientY);
       });
@@ -4502,20 +4506,20 @@
             break;
           case "ArrowUp":
             keys2.p2Jump = true;
-            tryJump(numPlayers === 2 ? players[1] : players[0]);
+            tryJump(state.numPlayers === 2 ? state.players[1] : state.players[0]);
             break;
           case "Slash":
             keys2.p2Bubble = true;
-            tryShoot(numPlayers === 2 ? players[1] : players[0]);
+            tryShoot(state.numPlayers === 2 ? state.players[1] : state.players[0]);
             break;
           case "Escape":
           case "KeyP":
             togglePause();
             break;
           case "KeyR":
-            if (gameState === "lost" && netRole2 !== "guest") {
+            if (state.gameState === "lost" && netRole2 !== "guest") {
               resetGame();
-              gameState = "playing";
+              state.gameState = "playing";
               startMusic();
             }
             break;
@@ -4649,7 +4653,7 @@
         swipeStartY = e.touches[0].clientY;
       }, { passive: true });
       document.addEventListener("touchend", function(e) {
-        if (!isTouchDevice || gameState !== "playing") return;
+        if (!isTouchDevice || state.gameState !== "playing") return;
         var dy = swipeStartY - e.changedTouches[0].clientY;
         if (dy > 40) {
           localJumpPress();
@@ -4662,22 +4666,7 @@
       var PLATFORMS = [];
       var movingPlatforms = [];
       var BOSS_SPAWN = [{ x: 330, y: 390, w: 54, h: 46, vx: 100, hits: 3 }];
-      var players;
-      var enemies;
-      var bubbles;
-      var collectibles;
-      var particles;
-      var popups;
-      var powerups;
-      var popBursts;
-      var score = 0;
-      var lives2 = 3;
-      var gameState = "ready";
-      var enemiesLeft = 0;
-      var startTime = 0;
       var shakeT = 0;
-      var waveNumber = 1;
-      var comboCount = 0;
       var comboTimer = 0;
       var waveFlash = 0;
       var screenFlash = 0;
@@ -4777,13 +4766,13 @@
         };
       }
       function resetGame() {
-        players = [makePlayer(0, numPlayers === 2 ? 320 : 360, PALETTES_P1[selectedSkins.p1])];
-        if (numPlayers === 2) players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
-        var playCount = progress[currentLocationId] && progress[currentLocationId].playCount || 0;
+        state.players = [makePlayer(0, state.numPlayers === 2 ? 320 : 360, PALETTES_P1[selectedSkins.p1])];
+        if (state.numPlayers === 2) state.players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
+        var playCount = progress[state.currentLocationId] && progress[state.currentLocationId].playCount || 0;
         var diffMult = Math.min(1 + playCount * 0.12, 2.2);
         var adjustedChaseDelay = Math.max(5, CHASE_DELAY / diffMult);
-        var layout = LEVEL_LAYOUTS[currentLocationId];
-        var lvlPhys = LEVELS[currentLocationId] && LEVELS[currentLocationId].levelPhysics || {};
+        var layout = LEVEL_LAYOUTS[state.currentLocationId];
+        var lvlPhys = LEVELS[state.currentLocationId] && LEVELS[state.currentLocationId].levelPhysics || {};
         GRAVITY = lvlPhys.gravity || 1500;
         freezeT2 = 0;
         slowT2 = 0;
@@ -4794,8 +4783,8 @@
         });
         var currentEnemySpawns = layout.enemySpawns;
         var currentCollectibleSpots = layout.collectibleSpots;
-        if (currentLocationId === "boss") {
-          enemies = BOSS_SPAWN.map(function(s) {
+        if (state.currentLocationId === "boss") {
+          state.enemies = BOSS_SPAWN.map(function(s) {
             return {
               x: s.x,
               y: 60,
@@ -4814,10 +4803,10 @@
               shootT: rand(2, 4)
             };
           });
-          waveNumber = 99;
+          state.waveNumber = 99;
         } else {
           var variety1 = layout.enemyVariety;
-          enemies = currentEnemySpawns.map(function(s) {
+          state.enemies = currentEnemySpawns.map(function(s) {
             var useSpecial = variety1 && Math.random() < variety1.waveRatio * 0.45;
             var eType = useSpecial ? variety1.specialType : "normal";
             var ew = eType === "parmesan" ? 44 : eType === "buckfast" ? 20 : eType === "motorbike" ? 42 : eType === "armoured" ? 34 : eType === "fast" ? 22 : 28;
@@ -4844,16 +4833,16 @@
               wanderT: rand(3, 9)
             };
           });
-          waveNumber = 1;
+          state.waveNumber = 1;
         }
-        enemiesLeft = enemies.length;
-        bubbles = [];
-        particles = [];
-        popups = [];
-        powerups = [];
-        popBursts = [];
+        state.enemiesLeft = state.enemies.length;
+        state.bubbles = [];
+        state.particles = [];
+        state.popups = [];
+        state.powerups = [];
+        state.popBursts = [];
         chaseAlertPlayed = false;
-        comboCount = 0;
+        state.comboCount = 0;
         comboTimer = 0;
         waveFlash = 0;
         allClearFired = false;
@@ -4873,15 +4862,15 @@
         pandaProjectile = null;
         survivorUnlocked = false;
         usedPowerups = {};
-        var locPlayCount2 = progress[currentLocationId] && progress[currentLocationId].playCount || 0;
+        var locPlayCount2 = progress[state.currentLocationId] && progress[state.currentLocationId].playCount || 0;
         tutorialDone = locPlayCount2 > 0;
         tutorialT = 0;
         tutorialFirstPop = false;
         activeEvent = null;
         eventTimer = 0;
         nextEventIn = rand(20, 35);
-        var missedPrev = safeGet("gh_missed_" + currentLocationId, []);
-        collectibles = currentCollectibleSpots.map(function(c) {
+        var missedPrev = safeGet("gh_missed_" + state.currentLocationId, []);
+        state.collectibles = currentCollectibleSpots.map(function(c) {
           var wasMissed = missedPrev.some(function(m) {
             return m.x === c.x && m.y === c.y;
           });
@@ -4891,13 +4880,13 @@
         resetGame._diffMult = diffMult;
         resetGame._playCount = playCount;
         if (survivalMode) {
-          waveNumber = 99;
+          state.waveNumber = 99;
           survivalWave = 0;
-          enemiesLeft = 999;
-          enemies = [];
+          state.enemiesLeft = 999;
+          state.enemies = [];
           for (var si = 0; si < 3; si++) {
             var ss = currentEnemySpawns[si % currentEnemySpawns.length];
-            enemies.push({
+            state.enemies.push({
               x: ss.x,
               y: ss.y,
               w: 28,
@@ -4922,28 +4911,28 @@
         countdownBeep = 3;
         runAchievements = [];
         confettiParticles = [];
-        score = 0;
-        lives2 = 3;
-        gameState = "ready";
-        startTime = performance.now();
+        state.score = 0;
+        state.lives = 3;
+        state.gameState = "ready";
+        state.startTime = performance.now();
         updateHud2();
         document.getElementById("overlayWin").hidden = true;
         document.getElementById("overlayLose").hidden = true;
-        var pr = progress[currentLocationId] || { best: 0 };
+        var pr = progress[state.currentLocationId] || { best: 0 };
         document.getElementById("hudBest").textContent = pr.best;
       }
       resetGame._adjustedChaseDelay = CHASE_DELAY;
       resetGame._diffMult = 1;
       resetGame._playCount = 0;
       function stopGame() {
-        gameState = "stopped";
+        state.gameState = "stopped";
       }
       document.getElementById("btnStart").addEventListener("click", function() {
         if (netRole2 === "guest") return;
         resetGame();
         document.getElementById("howto").hidden = true;
-        gameState = "playing";
-        startTime = performance.now();
+        state.gameState = "playing";
+        state.startTime = performance.now();
         startMusic();
         adGameplayStart();
         netBroadcastScene("start");
@@ -4951,7 +4940,7 @@
       document.getElementById("btnRetry").addEventListener("click", function() {
         if (netRole2 === "guest") return;
         resetGame();
-        gameState = "playing";
+        state.gameState = "playing";
         startMusic();
         netBroadcastScene("retry");
       });
@@ -4969,7 +4958,7 @@
         document.getElementById("winNextHint").hidden = true;
         survivalMode = false;
         resetGame();
-        gameState = "playing";
+        state.gameState = "playing";
         startMusic();
         netBroadcastScene("winAgain");
       });
@@ -4977,8 +4966,8 @@
         survivalMode = true;
         resetGame();
         document.getElementById("howto").hidden = true;
-        gameState = "playing";
-        startTime = performance.now();
+        state.gameState = "playing";
+        state.startTime = performance.now();
         startMusic();
       });
       (function() {
@@ -4990,18 +4979,18 @@
         function saveName() {
           var val = nameInput.value.trim();
           if (!val) return;
-          var pr = progress[currentLocationId] || { best: 0, cleared: false };
+          var pr = progress[state.currentLocationId] || { best: 0, cleared: false };
           pr.name = val;
-          progress[currentLocationId] = pr;
+          progress[state.currentLocationId] = pr;
           safeSet("gh_progress_v2", progress);
           renderBestScores();
           if (!submitted && lbEnabled()) {
             submitted = true;
             var winScoreSubmit = document.getElementById("winScoreSubmit");
             winScoreSubmit.hidden = false;
-            winScoreSubmit.textContent = "Submitting score\u2026";
-            submitScore(currentLocationId, val, pr.best, function(ok) {
-              winScoreSubmit.textContent = ok ? "\u2713 On the leaderboard!" : "\u2717 Could not submit score";
+            winScoreSubmit.textContent = "Submitting state.score\u2026";
+            submitScore(state.currentLocationId, val, pr.best, function(ok) {
+              winScoreSubmit.textContent = ok ? "\u2713 On the leaderboard!" : "\u2717 Could not submit state.score";
             });
           }
         }
@@ -5037,8 +5026,8 @@
                 else selectedSkins.p2 = i;
                 safeSet("gh_skins_v1", selectedSkins);
                 buildSkinDots();
-                if (gameState === "playing") {
-                  players.forEach(function(p) {
+                if (state.gameState === "playing") {
+                  state.players.forEach(function(p) {
                     if (p.id === 0) p.palette = PALETTES_P1[selectedSkins.p1];
                     if (p.id === 1) p.palette = PALETTES_P2[selectedSkins.p2];
                   });
@@ -5053,12 +5042,12 @@
       }
       buildSkinDots();
       function updateHud2() {
-        document.getElementById("hudScore").textContent = score;
-        var pr = progress[currentLocationId] || { best: 0 };
+        document.getElementById("hudScore").textContent = state.score;
+        var pr = progress[state.currentLocationId] || { best: 0 };
         document.getElementById("hudBest").textContent = pr.best;
         var livesEl = document.getElementById("hudLives");
         livesEl.innerHTML = "";
-        for (var i = 0; i < lives2; i++) {
+        for (var i = 0; i < state.lives; i++) {
           var s = document.createElement("span");
           s.className = "life";
           s.textContent = "\u{1F98A}";
@@ -5084,7 +5073,7 @@
       }
       function spawnParticles(x, y, color, n) {
         for (var i = 0; i < n; i++) {
-          particles.push({
+          state.particles.push({
             x,
             y,
             vx: rand(-140, 140),
@@ -5097,17 +5086,17 @@
         }
       }
       function spawnPopup(x, y, text, color, size) {
-        popups.push({ x, y, text, t: 0, color: color || "#ffd166", size: size || 16 });
+        state.popups.push({ x, y, text, t: 0, color: color || "#ffd166", size: size || 16 });
       }
       function tryJump(p) {
-        if (gameState === "playing" && p && p.onGround) {
+        if (state.gameState === "playing" && p && p.onGround) {
           p.vy = -560;
           p.onGround = false;
           playSound("jump");
         }
       }
       function tryShoot(p) {
-        if (gameState === "playing" && p && p.shootCooldown <= 0) {
+        if (state.gameState === "playing" && p && p.shootCooldown <= 0) {
           p.shootCooldown = p.rapidFire > 0 ? 0.12 : 0.42;
           if (pandaSpecialUnlocked && pandaCooldown <= 0 && !pandaProjectile) {
             pandaChargeCount++;
@@ -5119,7 +5108,7 @@
             }
           }
           playSound("shoot");
-          bubbles.push({
+          state.bubbles.push({
             x: p.x + p.w / 2 + p.facing * 10,
             y: p.y + 6,
             vx: p.facing * 310,
@@ -5231,7 +5220,7 @@
         playSound("powerup_ghost");
       }
       function update(dt) {
-        if (gameState !== "playing") return;
+        if (state.gameState !== "playing") return;
         if (countdownT > 0) {
           var prevFloor = Math.ceil(countdownT);
           countdownT -= dt;
@@ -5242,8 +5231,8 @@
         } else if (countdownT > -0.5) {
           countdownT -= dt;
         }
-        if (survivalMode && gameState === "playing") {
-          var freeEnemies = enemies.filter(function(e) {
+        if (survivalMode && state.gameState === "playing") {
+          var freeEnemies = state.enemies.filter(function(e) {
             return e.state === "free" || e.state === "trapped";
           });
           if (freeEnemies.length === 0) {
@@ -5251,8 +5240,8 @@
             var count = Math.min(3 + survivalWave, 8);
             var sp = Math.min(70 + survivalWave * 15, 220);
             for (var si = 0; si < count; si++) {
-              var ss = LEVEL_LAYOUTS[currentLocationId].enemySpawns[si % LEVEL_LAYOUTS[currentLocationId].enemySpawns.length];
-              enemies.push({
+              var ss = LEVEL_LAYOUTS[state.currentLocationId].enemySpawns[si % LEVEL_LAYOUTS[state.currentLocationId].enemySpawns.length];
+              state.enemies.push({
                 x: ss.x,
                 y: ss.y,
                 w: 28,
@@ -5275,7 +5264,7 @@
             spawnPopup(W / 2, 60, "WAVE " + survivalWave + "!", "#ff5470");
           }
         }
-        if (gameState === "won") {
+        if (state.gameState === "won") {
           for (var ci = confettiParticles.length - 1; ci >= 0; ci--) {
             var cp = confettiParticles[ci];
             cp.t += dt;
@@ -5287,7 +5276,7 @@
           }
         }
         if (comboTimer > 0) comboTimer -= dt;
-        else comboCount = 0;
+        else state.comboCount = 0;
         if (waveFlash > 0) waveFlash -= dt;
         if (freezeT2 > 0) freezeT2 -= dt;
         if (slowT2 > 0) slowT2 -= dt;
@@ -5300,19 +5289,19 @@
           if (mp.axis === "x") mp.x = mp.ox + Math.sin(nowSec * mp.speed) * mp.amplitude;
           else mp.y = mp.oy + Math.sin(nowSec * mp.speed) * mp.amplitude;
         });
-        if (!tutorialDone && gameState === "playing") {
+        if (!tutorialDone && state.gameState === "playing") {
           tutorialT += dt;
           if (tutorialT > 12) tutorialDone = true;
         }
         var accel = 900, fric = 1300;
-        players.forEach(function(p) {
+        state.players.forEach(function(p) {
           if (p.speedBoost > 0) p.speedBoost -= dt;
           if (p.rapidFire > 0) p.rapidFire -= dt;
           if (p.shield > 0) p.shield -= dt;
           var maxSpeed = p.speedBoost > 0 ? 340 : 220;
           if (activeEvent && activeEvent.id === "speed_boost") maxSpeed += 80;
           var left, right, jump, bubble;
-          if (numPlayers === 1) {
+          if (state.numPlayers === 1) {
             left = keys2.p1Left || keys2.p2Left;
             right = keys2.p1Right || keys2.p2Right;
             jump = keys2.p1Jump || keys2.p2Jump;
@@ -5352,14 +5341,14 @@
           p.shootCooldown -= dt;
           if (bubble) tryShoot(p);
         });
-        var level = LEVELS[currentLocationId];
-        collectibles.forEach(function(c) {
+        var level = LEVELS[state.currentLocationId];
+        state.collectibles.forEach(function(c) {
           if (c.taken) return;
           c.bob += dt * 2;
-          if (magnetT > 0 && players.length > 0) {
-            var mpt = players[0];
-            for (var mpi = 1; mpi < players.length; mpi++) {
-              if (Math.abs(players[mpi].x - c.x) < Math.abs(mpt.x - c.x)) mpt = players[mpi];
+          if (magnetT > 0 && state.players.length > 0) {
+            var mpt = state.players[0];
+            for (var mpi = 1; mpi < state.players.length; mpi++) {
+              if (Math.abs(state.players[mpi].x - c.x) < Math.abs(mpt.x - c.x)) mpt = state.players[mpi];
             }
             var mcdx = mpt.x + mpt.w / 2 - c.x, mcdy = mpt.y + mpt.h / 2 - c.y;
             var mcdist = Math.sqrt(mcdx * mcdx + mcdy * mcdy) || 1;
@@ -5367,11 +5356,11 @@
             c.y += mcdy / mcdist * 240 * dt;
           }
           var box = { x: c.x - 14, y: c.y - 14, w: 28, h: 28 };
-          for (var pi = 0; pi < players.length; pi++) {
-            if (rectsOverlap(players[pi], box)) {
+          for (var pi = 0; pi < state.players.length; pi++) {
+            if (rectsOverlap(state.players[pi], box)) {
               c.taken = true;
               var v = (level.values[c.slot] || 50) * (c.ghost ? 2 : 1);
-              score += v;
+              state.score += v;
               if (c.ghost) {
                 spawnPopup(c.x, c.y, "+" + v + " GHOST BONUS!", "#00e5ff");
               } else {
@@ -5380,23 +5369,23 @@
               spawnParticles(c.x, c.y, c.ghost ? "#00e5ff" : "#ffd166", 10);
               playSound("collect");
               haptic(12);
-              if (currentLocationId === "modena" && c.slot === "c") {
-                players[pi].hasRat = true;
+              if (state.currentLocationId === "modena" && c.slot === "c") {
+                state.players[pi].hasRat = true;
                 unlockAchievement("rat_friend");
               }
-              if (currentLocationId === "kenya" && c.slot === "c") {
-                players[pi].hasElephant = true;
+              if (state.currentLocationId === "kenya" && c.slot === "c") {
+                state.players[pi].hasElephant = true;
                 unlockAchievement("elephant_friend");
               }
               break;
             }
           }
         });
-        if (gameState === "playing" && !survivalMode && currentLocationId !== "boss") {
-          var allTaken = collectibles.length > 0 && collectibles.every(function(c) {
+        if (state.gameState === "playing" && !survivalMode && state.currentLocationId !== "boss") {
+          var allTaken = state.collectibles.length > 0 && state.collectibles.every(function(c) {
             return c.taken;
           });
-          if (allTaken && enemies.length > 0 && !allClearFired) {
+          if (allTaken && state.enemies.length > 0 && !allClearFired) {
             allClearFired = true;
             var clearEffects = {
               glasgow: { color: "#7fe3ff", label: "BUBBLE SURGE!" },
@@ -5405,14 +5394,14 @@
               ireland: { color: "#7fff7f", label: "LUCKY BLAST!" },
               kenya: { color: "#ff9940", label: "SAFARI SWEEP!" }
             };
-            var fx = clearEffects[currentLocationId] || { color: "#fff", label: "CLEAR!" };
+            var fx = clearEffects[state.currentLocationId] || { color: "#fff", label: "CLEAR!" };
             spawnPopup(W / 2, H / 2 - 40, fx.label, fx.color, 28);
             playSound("win");
             shakeT = 0.6;
             screenFlash = 0.4;
-            enemies.forEach(function(en3) {
+            state.enemies.forEach(function(en3) {
               for (var ci4 = 0; ci4 < 8; ci4++) {
-                particles.push({
+                state.particles.push({
                   x: en3.x + en3.w / 2 + rand(-10, 10),
                   y: en3.y + en3.h / 2 + rand(-10, 10),
                   vx: rand(-180, 180),
@@ -5423,7 +5412,7 @@
                   r: rand(3, 8)
                 });
               }
-              particles.push({
+              state.particles.push({
                 x: en3.x + en3.w / 2,
                 y: en3.y + en3.h / 2,
                 vx: rand(-80, 80),
@@ -5433,7 +5422,7 @@
                 color: "#ffd700",
                 r: rand(5, 10)
               });
-              popBursts.push({
+              state.popBursts.push({
                 x: en3.x + en3.w / 2,
                 y: en3.y + en3.h / 2,
                 vx: rand(-260, 260),
@@ -5442,38 +5431,38 @@
                 rotV: rand(-14, 14),
                 t: 0,
                 life: 0.9,
-                drawFn: LEVELS[currentLocationId].enemyDraw,
+                drawFn: LEVELS[state.currentLocationId].enemyDraw,
                 w: en3.w,
                 h: en3.h,
                 hits: 0,
                 enType: en3.type
               });
-              score += Math.round(level.values.pop * 0.5);
+              state.score += Math.round(level.values.pop * 0.5);
             });
-            enemies = [];
-            enemiesLeft = 0;
+            state.enemies = [];
+            state.enemiesLeft = 0;
             allClearDelay = 1.8;
             unlockAchievement("treasure");
             var rainPalettes = { glasgow: ["#7fe3ff", "#ffffff"], modena: ["#ffd700", "#ff6600"], paris: ["#ff9fc4", "#ffffff"], ireland: ["#7fff7f", "#ffd700"], kenya: ["#ff9940", "#ffe066"] };
-            var rp = rainPalettes[currentLocationId] || ["#ffd700", "#ffffff"];
+            var rp = rainPalettes[state.currentLocationId] || ["#ffd700", "#ffffff"];
             spawnCelebrationRain(rp[0], rp[1]);
             pushKillFeed("ALL CLEAR!", rp[0]);
           }
         }
-        for (var bi = bubbles.length - 1; bi >= 0; bi--) {
-          var b = bubbles[bi];
+        for (var bi = state.bubbles.length - 1; bi >= 0; bi--) {
+          var b = state.bubbles[bi];
           b.age += dt;
           if (b.state === "flying") {
             if (b.boss) {
               b.x += b.vx * dt;
               b.y += b.vy * dt;
               if (b.age > 3 || b.x < -20 || b.x > W + 20 || b.y < -20 || b.y > H + 20) {
-                bubbles.splice(bi, 1);
+                state.bubbles.splice(bi, 1);
                 continue;
               }
               var bBox = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
               var hit = false;
-              players.forEach(function(p) {
+              state.players.forEach(function(p) {
                 if (!hit && p.invuln <= 0 && rectsOverlap(p, bBox)) {
                   loseLife(p, 0);
                   hit = true;
@@ -5481,7 +5470,7 @@
               });
               if (hit) {
                 spawnParticles(b.x, b.y, "#ff4040", 8);
-                bubbles.splice(bi, 1);
+                state.bubbles.splice(bi, 1);
               }
               continue;
             }
@@ -5491,12 +5480,12 @@
             b.y += b.vy * dt;
             b.r = Math.min(16, 6 + b.age * 30);
             if (b.age > 2.4 || b.x < -20 || b.x > W + 20 || b.y < -20 || b.y > H + 20) {
-              bubbles.splice(bi, 1);
+              state.bubbles.splice(bi, 1);
               continue;
             }
             if (b.decorative) continue;
-            for (var ei = 0; ei < enemies.length; ei++) {
-              var en = enemies[ei];
+            for (var ei = 0; ei < state.enemies.length; ei++) {
+              var en = state.enemies[ei];
               if (en.state !== "free") continue;
               var ebox = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
               if (rectsOverlap(ebox, en)) {
@@ -5523,14 +5512,14 @@
                 en2.vx = (en2.dir || 1) * 130;
                 en2.angry = 3;
                 en2.tauntT = 1.1;
-                bubbles.splice(bi, 1);
+                state.bubbles.splice(bi, 1);
                 continue;
               }
             }
             var pbox = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
             var popped = false;
-            for (var pj = 0; pj < players.length && !popped; pj++) {
-              if (rectsOverlap(players[pj], pbox)) popped = true;
+            for (var pj = 0; pj < state.players.length && !popped; pj++) {
+              if (rectsOverlap(state.players[pj], pbox)) popped = true;
             }
             if (popped) {
               if (en2 && en2.hits && en2.hits > 1) {
@@ -5540,36 +5529,36 @@
                 en2.state = "free";
                 en2.bubbleTimer = 0;
                 b.trapped = null;
-                bubbles.splice(bi, 1);
+                state.bubbles.splice(bi, 1);
                 spawnPopup(b.x, b.y - 10, "HIT! " + en2.hits + " to go", "#ff3030");
                 spawnParticles(b.x, b.y, "#ff3030", 14);
                 playSound("trap");
                 shakeT = 0.2;
                 continue;
               }
-              comboCount++;
+              state.comboCount++;
               comboTimer = 2.2;
               var basePoints = level.values.pop;
-              var multiplier = Math.min(comboCount, 6);
+              var multiplier = Math.min(state.comboCount, 6);
               var pts = basePoints * multiplier * (doubleScoreT2 > 0 ? 2 : 1);
               var label = multiplier > 1 ? "+" + pts + " x" + multiplier + "!" : "+" + pts;
               if (doubleScoreT2 > 0) label += " x2!";
               spawnPopup(b.x, b.y - 10, label, multiplier > 1 ? "#ff5470" : "#ff9c7a", multiplier > 1 ? 14 + multiplier * 4 : 16);
               spawnParticles(b.x, b.y, multiplier > 2 ? "#ff5470" : "#ff9c7a", 14);
-              score += pts;
-              var popSnd = comboCount >= 5 ? "combo_max" : comboCount >= 4 ? "combo_4" : comboCount >= 3 ? "combo_3" : comboCount >= 2 ? "pop_combo" : "pop_" + (currentLocationId || "glasgow");
+              state.score += pts;
+              var popSnd = state.comboCount >= 5 ? "combo_max" : state.comboCount >= 4 ? "combo_4" : state.comboCount >= 3 ? "combo_3" : state.comboCount >= 2 ? "pop_combo" : "pop_" + (state.currentLocationId || "glasgow");
               playSound(popSnd);
-              haptic(comboCount > 1 ? 20 : 10);
+              haptic(state.comboCount > 1 ? 20 : 10);
               tutorialFirstPop = true;
               unlockAchievement("first_pop");
-              if (comboCount >= 3) unlockAchievement("combo3");
-              fireMeter = Math.min(1, fireMeter + (comboCount >= 3 ? 0.28 : 0.14));
-              if (comboCount >= 3) pushKillFeed("x" + comboCount + " COMBO!", comboCount >= 5 ? "#ff2200" : comboCount >= 4 ? "#ff5500" : "#ff7744");
-              if (comboCount >= 4) platShake = Math.max(platShake, 0.35);
+              if (state.comboCount >= 3) unlockAchievement("combo3");
+              fireMeter = Math.min(1, fireMeter + (state.comboCount >= 3 ? 0.28 : 0.14));
+              if (state.comboCount >= 3) pushKillFeed("x" + state.comboCount + " COMBO!", state.comboCount >= 5 ? "#ff2200" : state.comboCount >= 4 ? "#ff5500" : "#ff7744");
+              if (state.comboCount >= 4) platShake = Math.max(platShake, 0.35);
               if (fireMeter >= 1 && fireBonus <= 0) {
                 fireBonus = 3;
                 fireMeter = 0;
-                players.forEach(function(fp2) {
+                state.players.forEach(function(fp2) {
                   fp2.speedBoost = Math.max(fp2.speedBoost, 3);
                   fp2.rapidFire = Math.max(fp2.rapidFire, 3);
                 });
@@ -5582,23 +5571,23 @@
                 playSound("achievement");
               }
               if (Math.random() < 0.35) {
-                var lvlPU = LEVELS[currentLocationId] && LEVELS[currentLocationId].locPowerup;
+                var lvlPU = LEVELS[state.currentLocationId] && LEVELS[state.currentLocationId].locPowerup;
                 var ptype;
                 if (lvlPU && Math.random() < 0.4) {
                   ptype = lvlPU.type;
                 } else {
                   ptype = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
                 }
-                powerups.push({ x: b.x, y: b.y, type: ptype, bob: 0, life: 7 });
+                state.powerups.push({ x: b.x, y: b.y, type: ptype, bob: 0, life: 7 });
               }
-              var idx = enemies.indexOf(en2);
+              var idx = state.enemies.indexOf(en2);
               if (idx > -1) {
-                enemies.splice(idx, 1);
-                enemiesLeft--;
+                state.enemies.splice(idx, 1);
+                state.enemiesLeft--;
               }
-              bubbles.splice(bi, 1);
+              state.bubbles.splice(bi, 1);
               shakeT = 0.15;
-              popBursts.push({
+              state.popBursts.push({
                 x: b.x,
                 y: b.y,
                 vx: rand(-220, 220),
@@ -5607,14 +5596,14 @@
                 rotV: rand(-12, 12),
                 t: 0,
                 life: 0.65,
-                drawFn: LEVELS[currentLocationId].enemyDraw,
+                drawFn: LEVELS[state.currentLocationId].enemyDraw,
                 w: en2.w,
                 h: en2.h,
                 hits: 0,
                 enType: en2.type
               });
               for (var ci2 = 0; ci2 < 5; ci2++) {
-                particles.push({
+                state.particles.push({
                   x: b.x + rand(-8, 8),
                   y: b.y + rand(-8, 8),
                   vx: rand(-90, 90),
@@ -5628,14 +5617,14 @@
             }
           }
         }
-        if (gameState === "playing") {
+        if (state.gameState === "playing") {
           var chainPopped = [];
-          for (var cai = 0; cai < bubbles.length; cai++) {
-            if (bubbles[cai].state !== "carrying") continue;
-            for (var cbi = cai + 1; cbi < bubbles.length; cbi++) {
-              if (bubbles[cbi].state !== "carrying") continue;
-              var cdx = bubbles[cai].x - bubbles[cbi].x, cdy = bubbles[cai].y - bubbles[cbi].y;
-              var cminD = bubbles[cai].r + bubbles[cbi].r;
+          for (var cai = 0; cai < state.bubbles.length; cai++) {
+            if (state.bubbles[cai].state !== "carrying") continue;
+            for (var cbi = cai + 1; cbi < state.bubbles.length; cbi++) {
+              if (state.bubbles[cbi].state !== "carrying") continue;
+              var cdx = state.bubbles[cai].x - state.bubbles[cbi].x, cdy = state.bubbles[cai].y - state.bubbles[cbi].y;
+              var cminD = state.bubbles[cai].r + state.bubbles[cbi].r;
               if (cdx * cdx + cdy * cdy < cminD * cminD) {
                 if (chainPopped.indexOf(cai) < 0) chainPopped.push(cai);
                 if (chainPopped.indexOf(cbi) < 0) chainPopped.push(cbi);
@@ -5646,28 +5635,28 @@
             return b2 - a;
           });
           chainPopped.forEach(function(cidx) {
-            var cb = bubbles[cidx];
+            var cb = state.bubbles[cidx];
             if (!cb || cb.state !== "carrying") return;
             var cen = cb.trapped;
             if (!cen) return;
-            comboCount++;
+            state.comboCount++;
             comboTimer = 2.2;
-            var pts2 = level.values.pop * Math.min(comboCount, 6);
+            var pts2 = level.values.pop * Math.min(state.comboCount, 6);
             spawnPopup(cb.x, cb.y - 10, "\u26D3 CHAIN +" + pts2, "#ff5470", 22);
             spawnParticles(cb.x, cb.y, "#ff5470", 18);
-            score += pts2;
+            state.score += pts2;
             playSound("combo_max");
             haptic(25);
             pushKillFeed("CHAIN POP!", "#ff8800");
             platShake = Math.max(platShake, 0.5);
             tutorialFirstPop = true;
-            var ei2 = enemies.indexOf(cen);
+            var ei2 = state.enemies.indexOf(cen);
             if (ei2 > -1) {
-              enemies.splice(ei2, 1);
-              enemiesLeft--;
+              state.enemies.splice(ei2, 1);
+              state.enemiesLeft--;
             }
-            bubbles.splice(cidx, 1);
-            popBursts.push({
+            state.bubbles.splice(cidx, 1);
+            state.popBursts.push({
               x: cb.x,
               y: cb.y,
               vx: rand(-220, 220),
@@ -5676,13 +5665,13 @@
               rotV: rand(-12, 12),
               t: 0,
               life: 0.65,
-              drawFn: LEVELS[currentLocationId].enemyDraw,
+              drawFn: LEVELS[state.currentLocationId].enemyDraw,
               w: cen.w,
               h: cen.h,
               hits: 0
             });
             for (var ci3 = 0; ci3 < 5; ci3++) {
-              particles.push({
+              state.particles.push({
                 x: cb.x + rand(-8, 8),
                 y: cb.y + rand(-8, 8),
                 vx: rand(-90, 90),
@@ -5707,7 +5696,7 @@
           if (eventTimer <= 0) activeEvent = null;
         }
         if (activeEvent && activeEvent.id === "bubble_storm" && Math.random() < 0.03) {
-          bubbles.push({ x: rand(20, W - 20), y: -20, vx: rand(-30, 30), vy: rand(20, 50), r: rand(8, 16), grown: true, age: 0, state: "flying", trapped: null, t: 0, decorative: true });
+          state.bubbles.push({ x: rand(20, W - 20), y: -20, vx: rand(-30, 30), vy: rand(20, 50), r: rand(8, 16), grown: true, age: 0, state: "flying", trapped: null, t: 0, decorative: true });
         }
         if (achievementQueue.length > 0 && !achievementToast) {
           setAchievementToast(achievementQueue.shift());
@@ -5718,14 +5707,14 @@
           setAchievementToastT(achievementToastT - dt);
           if (achievementToastT <= 0) setAchievementToast(null);
         }
-        var elapsed = (performance.now() - startTime) / 1e3;
+        var elapsed = (performance.now() - state.startTime) / 1e3;
         var currentChaseDelay = resetGame._adjustedChaseDelay || CHASE_DELAY;
         var chasing = elapsed >= currentChaseDelay;
-        if (chasing && elapsed - currentChaseDelay > 60 && !survivorUnlocked && lives2 > 0) {
+        if (chasing && elapsed - currentChaseDelay > 60 && !survivorUnlocked && state.lives > 0) {
           survivorUnlocked = true;
           unlockAchievement("survivor");
         }
-        enemies.forEach(function(en3) {
+        state.enemies.forEach(function(en3) {
           if ((en3.tauntT || 0) > 0) en3.tauntT -= dt;
           if (en3.state !== "free") return;
           if (freezeT2 > 0) return;
@@ -5738,7 +5727,7 @@
               smokeLevel = Math.min(1, smokeLevel + 0.55);
               playSound("motorbike_rev");
               for (var msi = 0; msi < 12; msi++) {
-                particles.push({
+                state.particles.push({
                   x: en3.x + en3.w / 2,
                   y: en3.y + en3.h / 2,
                   vx: rand(-80, 80),
@@ -5751,11 +5740,11 @@
               }
             }
           }
-          if (en3.type === "artist" && players.length > 0) {
+          if (en3.type === "artist" && state.players.length > 0) {
             en3.paintT = (en3.paintT !== void 0 ? en3.paintT : rand(2, 4)) - dt;
             if (en3.paintT <= 0) {
               en3.paintT = rand(3, 6);
-              var ptgt = players[0];
+              var ptgt = state.players[0];
               var pbx = en3.x + en3.w / 2, pby = en3.y + en3.h / 2;
               var pdx = ptgt.x + ptgt.w / 2 - pbx, pdy = ptgt.y + ptgt.h / 2 - pby;
               var pdist = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
@@ -5774,15 +5763,15 @@
               playSound("paint_splat");
             }
           }
-          var doChase = chasing && players.length > 0 && en3.type !== "lukekelly";
+          var doChase = chasing && state.players.length > 0 && en3.type !== "lukekelly";
           if (doChase) {
-            var nearest = players[0];
-            var bestDist = Math.abs(players[0].x - en3.x);
-            for (var cp2 = 1; cp2 < players.length; cp2++) {
-              var d = Math.abs(players[cp2].x - en3.x);
+            var nearest = state.players[0];
+            var bestDist = Math.abs(state.players[0].x - en3.x);
+            for (var cp2 = 1; cp2 < state.players.length; cp2++) {
+              var d = Math.abs(state.players[cp2].x - en3.x);
               if (d < bestDist) {
                 bestDist = d;
-                nearest = players[cp2];
+                nearest = state.players[cp2];
               }
             }
             en3.dir = nearest.x > en3.x ? 1 : -1;
@@ -5848,17 +5837,17 @@
               en3.hopT = rand(0.4, 1.6);
             }
           }
-          if (currentLocationId === "boss" && en3.state === "free" && gameState === "playing") {
+          if (state.currentLocationId === "boss" && en3.state === "free" && state.gameState === "playing") {
             en3.shootT = (en3.shootT || 3) - dt;
             if (en3.shootT <= 0) {
               en3.shootT = Math.max(1.2, rand(2.5, 4.5) - (3 - en3.hits) * 0.5);
-              var target = players[Math.floor(Math.random() * players.length)];
+              var target = state.players[Math.floor(Math.random() * state.players.length)];
               if (target) {
                 var bx = en3.x + en3.w / 2, by = en3.y + en3.h / 2;
                 var dx2 = target.x + target.w / 2 - bx, dy2 = target.y + target.h / 2 - by;
                 var dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) || 1;
                 var spd = 240;
-                bubbles.push({
+                state.bubbles.push({
                   x: bx,
                   y: by,
                   vx: dx2 / dist2 * spd,
@@ -5875,30 +5864,30 @@
               }
             }
           }
-          if (gameState === "playing") {
-            players.forEach(function(p) {
+          if (state.gameState === "playing") {
+            state.players.forEach(function(p) {
               if (p.invuln <= 0 && rectsOverlap(p, en3)) {
                 loseLife(p, en3.x + en3.w / 2 < p.x + p.w / 2 ? -1 : 1);
               }
             });
           }
         });
-        for (var pi2 = particles.length - 1; pi2 >= 0; pi2--) {
-          var pp = particles[pi2];
+        for (var pi2 = state.particles.length - 1; pi2 >= 0; pi2--) {
+          var pp = state.particles[pi2];
           pp.t += dt;
           if (pp.t > pp.life) {
-            particles.splice(pi2, 1);
+            state.particles.splice(pi2, 1);
             continue;
           }
           pp.x += pp.vx * dt;
           pp.y += pp.vy * dt;
           pp.vy += 500 * dt;
         }
-        for (var pbi = popBursts.length - 1; pbi >= 0; pbi--) {
-          var pb = popBursts[pbi];
+        for (var pbi = state.popBursts.length - 1; pbi >= 0; pbi--) {
+          var pb = state.popBursts[pbi];
           pb.t += dt;
           if (pb.t >= pb.life) {
-            popBursts.splice(pbi, 1);
+            state.popBursts.splice(pbi, 1);
             continue;
           }
           pb.x += pb.vx * dt;
@@ -5906,11 +5895,11 @@
           pb.vy += 600 * dt;
           pb.rot += pb.rotV * dt;
         }
-        for (var upi = popups.length - 1; upi >= 0; upi--) {
-          var up = popups[upi];
+        for (var upi = state.popups.length - 1; upi >= 0; upi--) {
+          var up = state.popups[upi];
           up.t += dt;
           if (up.t > 0.9) {
-            popups.splice(upi, 1);
+            state.popups.splice(upi, 1);
           }
         }
         if (shakeT > 0) shakeT -= dt;
@@ -5921,7 +5910,7 @@
         if (fireMeter > 0 && comboTimer <= 0) fireMeter = Math.max(0, fireMeter - dt * 0.06);
         if (fireBonus > 0) {
           fireBonus -= dt;
-          players.forEach(function(fp) {
+          state.players.forEach(function(fp) {
             fp.speedBoost = Math.max(fp.speedBoost, 0.12);
             fp.rapidFire = Math.max(fp.rapidFire, 0.12);
           });
@@ -5953,7 +5942,7 @@
               freezeT2 = Math.max(freezeT2, 3.5);
               slowT2 = Math.max(slowT2, 2.5);
               for (var si2 = 0; si2 < 40; si2++) {
-                particles.push({
+                state.particles.push({
                   x: pp3.x + rand(-25, 25),
                   y: pp3.y + rand(-15, 15),
                   vx: rand(-250, 250),
@@ -5982,21 +5971,21 @@
           chaseAlertPlayed = true;
           playSound("chase");
         }
-        for (var pui = powerups.length - 1; pui >= 0; pui--) {
-          var pu = powerups[pui];
+        for (var pui = state.powerups.length - 1; pui >= 0; pui--) {
+          var pu = state.powerups[pui];
           pu.bob += dt * 3;
           pu.life -= dt;
           if (pu.life <= 0) {
-            powerups.splice(pui, 1);
+            state.powerups.splice(pui, 1);
             continue;
           }
           var puBox = { x: pu.x - 12, y: pu.y - 12, w: 24, h: 24 };
           var picked = false;
-          for (var ppi = 0; ppi < players.length && !picked; ppi++) {
-            var pp2 = players[ppi];
+          for (var ppi = 0; ppi < state.players.length && !picked; ppi++) {
+            var pp2 = state.players[ppi];
             if (rectsOverlap(pp2, puBox)) {
               picked = true;
-              var lvlPU2 = LEVELS[currentLocationId] && LEVELS[currentLocationId].locPowerup;
+              var lvlPU2 = LEVELS[state.currentLocationId] && LEVELS[state.currentLocationId].locPowerup;
               if (pu.type === "speed") pp2.speedBoost = 6;
               else if (pu.type === "rapid") pp2.rapidFire = 6;
               else if (pu.type === "shield") pp2.shield = 6;
@@ -6024,7 +6013,7 @@
               puFlashColor = puCol;
               usedPowerups[pu.type] = true;
               if (usedPowerups.speed && usedPowerups.rapid && usedPowerups.shield) unlockAchievement("powerup_all");
-              powerups.splice(pui, 1);
+              state.powerups.splice(pui, 1);
             }
           }
         }
@@ -6037,8 +6026,8 @@
           pb2.y += pb2.vy * dt;
           pb2.vy += 400 * dt;
           var pbHit = false;
-          for (var pi2 = 0; pi2 < players.length; pi2++) {
-            var pp = players[pi2];
+          for (var pi2 = 0; pi2 < state.players.length; pi2++) {
+            var pp = state.players[pi2];
             if (pp.invuln <= 0 && Math.abs(pb2.x - (pp.x + pp.w / 2)) < 20 && Math.abs(pb2.y - (pp.y + pp.h / 2)) < 22) {
               slowT2 = Math.max(slowT2, 2.5);
               spawnPopup(pb2.x, pb2.y, "PAINT SPLASH!", pb2.color, 13);
@@ -6054,20 +6043,20 @@
           }
           if (pb2.t > pb2.life || pbHit) paintBlobs.splice(pbi, 1);
         }
-        if (enemiesLeft <= 0 && allClearDelay <= 0) {
-          if (waveNumber < 2) {
-            waveNumber++;
+        if (state.enemiesLeft <= 0 && allClearDelay <= 0) {
+          if (state.waveNumber < 2) {
+            state.waveNumber++;
             chaseAlertPlayed = false;
-            startTime = performance.now();
-            var speedMult = 1 + waveNumber * 0.3;
-            var layout2 = LEVEL_LAYOUTS[currentLocationId];
+            state.startTime = performance.now();
+            var speedMult = 1 + state.waveNumber * 0.3;
+            var layout2 = LEVEL_LAYOUTS[state.currentLocationId];
             var variety2 = layout2 && layout2.enemyVariety;
-            enemies = layout2.enemySpawns.map(function(s, si3) {
+            state.enemies = layout2.enemySpawns.map(function(s, si3) {
               var useSpecial = variety2 && Math.random() < variety2.waveRatio;
               var eType = useSpecial ? variety2.specialType : "normal";
               var ew = eType === "parmesan" ? 44 : eType === "buckfast" ? 20 : eType === "motorbike" ? 42 : eType === "armoured" ? 34 : eType === "fast" ? 22 : 28;
               var eh = eType === "parmesan" ? 38 : eType === "buckfast" ? 26 : eType === "motorbike" ? 28 : eType === "armoured" ? 30 : eType === "fast" ? 20 : 26;
-              var lvlSpd = LEVELS[currentLocationId] && LEVELS[currentLocationId].levelPhysics && LEVELS[currentLocationId].levelPhysics.enemySpeed || 1;
+              var lvlSpd = LEVELS[state.currentLocationId] && LEVELS[state.currentLocationId].levelPhysics && LEVELS[state.currentLocationId].levelPhysics.enemySpeed || 1;
               var baseSpd2 = eType === "buckfast" ? 130 : eType === "parmesan" ? 50 : eType === "motorbike" ? 160 : eType === "armoured" ? 60 : eType === "fast" ? 110 : 85;
               var spd = baseSpd2 * speedMult * lvlSpd;
               var ehits2 = eType === "parmesan" ? 3 : eType === "armoured" ? 2 : 1;
@@ -6091,8 +6080,8 @@
                 wanderT: rand(3, 9)
               };
             });
-            enemiesLeft = enemies.length;
-            allClearFired = collectibles.length > 0 && collectibles.every(function(c) {
+            state.enemiesLeft = state.enemies.length;
+            allClearFired = state.collectibles.length > 0 && state.collectibles.every(function(c) {
               return c.taken;
             });
             allClearDelay = 0;
@@ -6110,26 +6099,26 @@
           p.invuln = 0.5;
           return;
         }
-        lives2--;
+        state.lives--;
         p.invuln = 1.6;
         p.vy = -340;
         p.vx = (knockDir || 0) * 240;
         screenFlash = 0.35;
         screenFlashColor = "#ff1040";
         shakeT = 0.4;
-        playSound(lives2 > 0 ? "life_lost" : "lose");
+        playSound(state.lives > 0 ? "life_lost" : "lose");
         haptic(50);
         updateHud2();
-        if (lives2 > 0) {
+        if (state.lives > 0) {
           p.speedBoost = Math.max(p.speedBoost, 1.4);
           spawnPopup(p.x + p.w / 2, p.y - 24, "FIGHT BACK!", "#ff6644", 15);
           spawnParticles(p.x + p.w / 2, p.y + p.h / 2, "#ff8855", 8);
-          pushKillFeed("LIFE LOST - " + lives2 + " LEFT", "#ff6644");
+          pushKillFeed("LIFE LOST - " + state.lives + " LEFT", "#ff6644");
         }
-        if (lives2 <= 0) {
-          gameState = "lost";
+        if (state.lives <= 0) {
+          state.gameState = "lost";
           stopMusic();
-          var loseSummaryText = survivalMode ? "Reached wave " + survivalWave + " \xB7 Score: " + score : "Score " + score + " \xB7 try trapping enemies before they reach you.";
+          var loseSummaryText = survivalMode ? "Reached wave " + survivalWave + " \xB7 Score: " + state.score : "Score " + state.score + " \xB7 try trapping state.enemies before they reach you.";
           showAdBreak(function() {
             document.getElementById("loseSummary").textContent = loseSummaryText;
             document.getElementById("overlayLose").hidden = false;
@@ -6140,7 +6129,7 @@
       function getNextLocation() {
         var idx = -1;
         for (var i = 0; i < LOCATIONS.length; i++) {
-          if (LOCATIONS[i].id === currentLocationId) {
+          if (LOCATIONS[i].id === state.currentLocationId) {
             idx = i;
             break;
           }
@@ -6158,10 +6147,10 @@
         document.getElementById("overlayWin").hidden = true;
         document.getElementById("winNextHint").hidden = true;
         document.getElementById("btnWinNext").hidden = true;
-        currentLocationId = loc.id;
+        state.currentLocationId = loc.id;
         resetGame();
         document.getElementById("howto").hidden = true;
-        gameState = "playing";
+        state.gameState = "playing";
         startMusic();
       }
       function getNextCampaignItem() {
@@ -6213,11 +6202,11 @@
           if (item.type === "level") {
             campaignLastType = "level";
             stopMusic();
-            currentLocationId = item.id;
+            state.currentLocationId = item.id;
             resetGame();
             document.getElementById("howto").hidden = true;
-            gameState = "playing";
-            startTime = performance.now();
+            state.gameState = "playing";
+            state.startTime = performance.now();
             startMusic();
           } else {
             campaignLastType = "minigame";
@@ -6239,7 +6228,7 @@
       }
       function spawnCelebrationRain(col1, col2) {
         for (var i = 0; i < 50; i++) {
-          particles.push({
+          state.particles.push({
             x: rand(0, W),
             y: rand(-50, -5),
             vx: rand(-70, 70),
@@ -6597,7 +6586,7 @@
         miniGameId = id;
         miniGameTimer = MINI_GAME_DEFS[id].timeLimit;
         miniGamePhase = "playing";
-        gameState = "minigame";
+        state.gameState = "minigame";
         stopMusic();
         startMiniGameMusic(id);
         document.querySelector(".hud").style.visibility = "hidden";
@@ -7674,31 +7663,31 @@
       }
       function winLevel() {
         if (survivalMode) return;
-        if (gameState !== "playing") return;
-        gameState = "won";
+        if (state.gameState !== "playing") return;
+        state.gameState = "won";
         stopMusic();
         playSound("win");
-        var totalElapsed = (performance.now() - startTime) / 1e3;
+        var totalElapsed = (performance.now() - state.startTime) / 1e3;
         var elapsed = totalElapsed;
-        var collected = collectibles.filter(function(c) {
+        var collected = state.collectibles.filter(function(c) {
           return c.taken;
         }).length;
         var timeBonus = Math.max(0, Math.floor(500 - totalElapsed * 6));
         if (timeBonus > 0) {
-          score += timeBonus;
+          state.score += timeBonus;
           spawnPopup(W / 2, H / 2 - 40, "TIME BONUS +" + timeBonus, "#ffd700");
         }
         var stars = 1;
         if (collected >= 4) stars++;
         if (totalElapsed < 60) stars++;
-        var pr = progress[currentLocationId] || { best: 0, cleared: false };
+        var pr = progress[state.currentLocationId] || { best: 0, cleared: false };
         pr.cleared = true;
         pr.playCount = (pr.playCount || 0) + 1;
-        var isNewBest = score > pr.best;
-        if (isNewBest) pr.best = score;
-        progress[currentLocationId] = pr;
+        var isNewBest = state.score > pr.best;
+        if (isNewBest) pr.best = state.score;
+        progress[state.currentLocationId] = pr;
         safeSet("gh_progress_v2", progress);
-        if (currentLocationId === "boss" && !pandaSpecialUnlocked) {
+        if (state.currentLocationId === "boss" && !pandaSpecialUnlocked) {
           pandaSpecialUnlocked = true;
           try {
             localStorage.setItem("bbl_panda_special", "1");
@@ -7708,31 +7697,31 @@
           pushKillFeed("PANDA MOVE UNLOCKED!", "#ffffff");
         }
         if (totalElapsed < 40) unlockAchievement("speedrun");
-        if (collected >= collectibles.length) unlockAchievement("treasure");
+        if (collected >= state.collectibles.length) unlockAchievement("treasure");
         var allFiveCleared = ["glasgow", "modena", "kenya", "paris", "ireland"].every(function(id) {
           return progress[id] && progress[id].cleared;
         });
         if (allFiveCleared) unlockAchievement("globetrotter");
         var daily = safeGet("gh_daily_v1", { date: "", score: 0, done: false });
         var today2 = (/* @__PURE__ */ new Date()).toDateString();
-        if (currentLocationId === getDailyLocationId() && (!daily.done || daily.date !== today2)) {
+        if (state.currentLocationId === getDailyLocationId() && (!daily.done || daily.date !== today2)) {
           daily.date = today2;
-          daily.score = score;
+          daily.score = state.score;
           daily.done = true;
           safeSet("gh_daily_v1", daily);
           refreshDailyUI();
           spawnPopup(W / 2, H / 2 - 60, "DAILY COMPLETE!", "#ffd700");
         }
-        var missed = collectibles.filter(function(c) {
+        var missed = state.collectibles.filter(function(c) {
           return !c.taken;
         }).map(function(c) {
           return { x: c.x, y: c.y, slot: c.slot };
         });
-        safeSet("gh_missed_" + currentLocationId, missed);
+        safeSet("gh_missed_" + state.currentLocationId, missed);
         var playCount = resetGame._playCount || 0;
-        document.getElementById("winTitle").textContent = LEVELS[currentLocationId].name + " cleared!";
+        document.getElementById("winTitle").textContent = LEVELS[state.currentLocationId].name + " cleared!";
         document.getElementById("winStars").textContent = "\u2605".repeat(stars) + "\u2606".repeat(3 - stars);
-        document.getElementById("winSummary").textContent = "Score " + score + " \xB7 " + collected + "/" + collectibles.length + " treasures \xB7 Tier " + Math.min(playCount + 1, 10);
+        document.getElementById("winSummary").textContent = "Score " + state.score + " \xB7 " + collected + "/" + state.collectibles.length + " treasures \xB7 Tier " + Math.min(playCount + 1, 10);
         var acWinEl = document.getElementById("winAchievements");
         if (acWinEl) {
           if (runAchievements && runAchievements.length > 0) {
@@ -7759,9 +7748,9 @@
           nameEntryRow.hidden = true;
           if (pr.name && lbEnabled()) {
             winScoreSubmit.hidden = false;
-            winScoreSubmit.textContent = "Submitting score\u2026";
-            submitScore(currentLocationId, pr.name, score, function(ok) {
-              winScoreSubmit.textContent = ok ? "\u2713 Score submitted to leaderboard" : "\u2717 Could not submit score";
+            winScoreSubmit.textContent = "Submitting state.score\u2026";
+            submitScore(state.currentLocationId, pr.name, state.score, function(ok) {
+              winScoreSubmit.textContent = ok ? "\u2713 Score submitted to leaderboard" : "\u2717 Could not submit state.score";
             });
           }
         }
@@ -7815,7 +7804,7 @@
               }, 1e3);
               winNextTimer = setTimeout(function() {
                 clearInterval(tick);
-                if (gameState === "won") startNextLevel(nextLoc);
+                if (state.gameState === "won") startNextLevel(nextLoc);
               }, 5e3);
             } else {
               winNextHint.hidden = true;
@@ -7829,7 +7818,7 @@
       }
       updateHud2();
       function draw() {
-        var level = LEVELS[currentLocationId];
+        var level = LEVELS[state.currentLocationId];
         var theme = level.theme;
         ctx2.save();
         if (shakeT > 0) {
@@ -7855,7 +7844,7 @@
         });
         ctx2.restore();
         drawGround(theme);
-        collectibles.forEach(function(c) {
+        state.collectibles.forEach(function(c) {
           if (c.taken) return;
           if (c.ghost) {
             ctx2.save();
@@ -7869,7 +7858,7 @@
             level.collectibleDraw(c);
           }
         });
-        enemies.forEach(function(en) {
+        state.enemies.forEach(function(en) {
           if (en.state === "free") {
             if (en.type === "buckfast") drawBuckfastRef(en);
             else if (en.type === "parmesan") drawParmesanRef(en);
@@ -7877,7 +7866,7 @@
             else if (en.type === "artist") drawArtistRef(en);
             else if (en.type === "motorbike") drawMotorbikeRef(en);
             else level.enemyDraw(en);
-            if (waveNumber >= 2) {
+            if (state.waveNumber >= 2) {
               ctx2.save();
               ctx2.globalAlpha = 0.35;
               ctx2.fillStyle = "#ff2040";
@@ -7925,7 +7914,7 @@
           ctx2.globalAlpha = 1;
           ctx2.restore();
         }
-        popBursts.forEach(function(pb) {
+        state.popBursts.forEach(function(pb) {
           var frac = pb.t / pb.life;
           var fakeEn = {
             x: pb.x - pb.w / 2,
@@ -7956,8 +7945,8 @@
           else pb.drawFn(fakeEn);
           ctx2.restore();
         });
-        powerups.forEach(drawPowerup);
-        players.forEach(function(p) {
+        state.powerups.forEach(drawPowerup);
+        state.players.forEach(function(p) {
           var visible = p.invuln <= 0 || Math.floor(performance.now() / 80) % 2 === 0;
           if (visible) {
             if (p.shield > 0) {
@@ -8054,8 +8043,8 @@
             ctx2.restore();
           }
         });
-        bubbles.forEach(drawBubble);
-        bubbles.forEach(function(b) {
+        state.bubbles.forEach(drawBubble);
+        state.bubbles.forEach(function(b) {
           if (b.state === "carrying" && b.trapped && b.trapped.bubbleTimer) {
             var frac = b.trapped.bubbleTimer / 4.5;
             ctx2.save();
@@ -8075,7 +8064,7 @@
           ctx2.fillRect(0, 0, W, H);
           ctx2.restore();
         }
-        particles.forEach(function(pp) {
+        state.particles.forEach(function(pp) {
           ctx2.globalAlpha = clamp(1 - pp.t / pp.life, 0, 1);
           ctx2.fillStyle = pp.color;
           ctx2.beginPath();
@@ -8083,7 +8072,7 @@
           ctx2.fill();
           ctx2.globalAlpha = 1;
         });
-        popups.forEach(function(up) {
+        state.popups.forEach(function(up) {
           ctx2.globalAlpha = clamp(1 - up.t / 0.9, 0, 1);
           ctx2.fillStyle = up.color;
           ctx2.font = "700 " + (up.size || 16) + 'px "Space Mono", monospace';
@@ -8110,8 +8099,8 @@
           ctx2.fillRect(120, 46, barW, 6);
           ctx2.restore();
         }
-        if (!tutorialDone && gameState === "playing") {
-          var tMsg = tutorialFirstPop ? "Jump onto the trapped bubble to pop it!" : "Shoot enemies with bubbles! [Shift / bubble button]";
+        if (!tutorialDone && state.gameState === "playing") {
+          var tMsg = tutorialFirstPop ? "Jump onto the trapped bubble to pop it!" : "Shoot state.enemies with state.bubbles! [Shift / bubble button]";
           var tAlpha;
           if (!tutorialFirstPop) {
             tAlpha = Math.min(1, tutorialT * 3) * Math.min(1, (6 - tutorialT) * 2);
@@ -8192,8 +8181,8 @@
           ctx2.fillText(at.desc, cx + 72, cy + slideY + 86);
           ctx2.restore();
         }
-        if (gameState === "playing") {
-          var elapsedDraw = (performance.now() - startTime) / 1e3;
+        if (state.gameState === "playing") {
+          var elapsedDraw = (performance.now() - state.startTime) / 1e3;
           var currentChaseDelayDraw = resetGame._adjustedChaseDelay || CHASE_DELAY;
           var timeLeft = currentChaseDelayDraw - elapsedDraw;
           if (timeLeft > 0 && timeLeft <= 5) {
@@ -8213,13 +8202,13 @@
             ctx2.globalAlpha = 1;
           }
         }
-        if (gameState === "playing" && waveNumber > 1) {
+        if (state.gameState === "playing" && state.waveNumber > 1) {
           ctx2.fillStyle = "rgba(255,84,112,0.7)";
           ctx2.font = 'bold 11px "Fredoka",sans-serif';
           ctx2.textAlign = "right";
-          ctx2.fillText("WAVE " + waveNumber, W - 8, 26);
+          ctx2.fillText("WAVE " + state.waveNumber, W - 8, 26);
         }
-        if (gameState === "playing") {
+        if (state.gameState === "playing") {
           ctx2.font = 'bold 11px "Fredoka",sans-serif';
           ctx2.textAlign = "left";
           var bannerY = 38;
@@ -8244,14 +8233,14 @@
             bannerY += 14;
           }
         }
-        if (gameState === "playing" && players.length > 0) {
-          var px = players[0].x + players[0].w / 2;
-          enemies.forEach(function(en) {
+        if (state.gameState === "playing" && state.players.length > 0) {
+          var px = state.players[0].x + state.players[0].w / 2;
+          state.enemies.forEach(function(en) {
             if (en.state !== "free") return;
             var ex = en.x + en.w / 2, ey = en.y + en.h / 2;
-            if (Math.abs(ey - (players[0].y + players[0].h / 2)) < 120) return;
-            var angle = Math.atan2(ey - (players[0].y + 15), ex - px);
-            var ax = px + Math.cos(angle) * 50, ay = players[0].y + 15 + Math.sin(angle) * 50;
+            if (Math.abs(ey - (state.players[0].y + state.players[0].h / 2)) < 120) return;
+            var angle = Math.atan2(ey - (state.players[0].y + 15), ex - px);
+            var ax = px + Math.cos(angle) * 50, ay = state.players[0].y + 15 + Math.sin(angle) * 50;
             ax = clamp(ax, 12, W - 12);
             ay = clamp(ay, 12, H - 12);
             ctx2.save();
@@ -8298,7 +8287,7 @@
           ctx2.fillText("Here they come \u2014 faster!", W / 2, H / 2 + 24);
           ctx2.globalAlpha = 1;
         }
-        if (gameState === "playing" && countdownT > 0) {
+        if (state.gameState === "playing" && countdownT > 0) {
           var cn = Math.ceil(countdownT);
           var scale = 1 + (countdownT - Math.floor(countdownT)) * 0.5;
           ctx2.save();
@@ -8309,7 +8298,7 @@
           ctx2.fillText(cn <= 0 ? "GO!" : String(cn), W / 2, H / 2 + 20);
           ctx2.restore();
         }
-        if (gameState === "playing" && countdownT > -0.5 && countdownT <= 0) {
+        if (state.gameState === "playing" && countdownT > -0.5 && countdownT <= 0) {
           ctx2.save();
           ctx2.globalAlpha = Math.max(0, 1 + countdownT * 2);
           ctx2.fillStyle = "#ffd700";
@@ -8318,7 +8307,7 @@
           ctx2.fillText("GO!", W / 2, H / 2 + 20);
           ctx2.restore();
         }
-        if (survivalMode && gameState === "playing") {
+        if (survivalMode && state.gameState === "playing") {
           ctx2.save();
           ctx2.fillStyle = "rgba(255,84,112,0.85)";
           ctx2.font = 'bold 13px "Fredoka",sans-serif';
@@ -8326,7 +8315,7 @@
           ctx2.fillText("SURVIVAL \xB7 Wave " + survivalWave, W / 2, 26);
           ctx2.restore();
         }
-        if (gameState === "won") {
+        if (state.gameState === "won") {
           confettiParticles.forEach(function(c) {
             ctx2.save();
             ctx2.translate(c.x, c.y);
@@ -8337,7 +8326,7 @@
             ctx2.restore();
           });
         }
-        if (gameState === "paused") {
+        if (state.gameState === "paused") {
           ctx2.fillStyle = "rgba(10,17,40,0.65)";
           ctx2.fillRect(0, 0, W, H);
           ctx2.fillStyle = "#eef1fb";
@@ -8348,7 +8337,7 @@
           ctx2.fillStyle = "#a9b2d6";
           ctx2.fillText("Press P or Escape to resume", W / 2, H / 2 + 20);
         }
-        if (pandaProjectile && gameState === "playing") {
+        if (pandaProjectile && state.gameState === "playing") {
           var pp4 = pandaProjectile;
           var isSneeze = pp4.phase === "sneezing";
           if (isSneeze) {
@@ -8369,7 +8358,7 @@
           }
           drawPanda(pp4.x, pp4.y, pp4.t, isSneeze);
         }
-        if (pandaSpecialUnlocked && gameState === "playing") {
+        if (pandaSpecialUnlocked && state.gameState === "playing") {
           ctx2.save();
           var piX = 8, piY = H - 28;
           if (pandaCooldown > 0) {
@@ -8403,7 +8392,7 @@
           }
           ctx2.restore();
         }
-        if (gameState === "playing" && (fireMeter > 0.05 || fireBonus > 0)) {
+        if (state.gameState === "playing" && (fireMeter > 0.05 || fireBonus > 0)) {
           ctx2.save();
           var fmX = W / 2 - 70, fmY = H - 13, fmW = 140, fmH = 5;
           ctx2.fillStyle = "rgba(0,0,0,0.38)";
@@ -8423,7 +8412,7 @@
           ctx2.fillText(fmIsOnFire ? "ON FIRE!" : "HEAT", fmX - 4, fmY + fmH);
           ctx2.restore();
         }
-        if (killFeed.length > 0 && gameState === "playing") {
+        if (killFeed.length > 0 && state.gameState === "playing") {
           ctx2.save();
           ctx2.font = 'bold 11px "Space Mono",monospace';
           for (var kfi3 = 0; kfi3 < killFeed.length; kfi3++) {
@@ -8443,8 +8432,8 @@
           ctx2.globalAlpha = 1;
           ctx2.restore();
         }
-        if (gameState === "playing") {
-          enemies.forEach(function(en) {
+        if (state.gameState === "playing") {
+          state.enemies.forEach(function(en) {
             if (!(en.tauntT > 0)) return;
             var ta = Math.min(1, en.tauntT / 0.3) * Math.min(1, en.tauntT);
             var tx = en.x + en.w / 2, ty = en.y - 10;
@@ -8500,7 +8489,7 @@
               update(dt);
             }
             draw();
-            document.getElementById("hudScore").textContent = score;
+            document.getElementById("hudScore").textContent = state.score;
           }
           if (netRole2 === "guest") {
             netSendInputIfChanged();
@@ -8517,56 +8506,56 @@
       }
       var _netShared = {};
       function syncToNet() {
-        _netShared.players = players;
-        _netShared.enemies = enemies;
-        _netShared.bubbles = bubbles;
-        _netShared.collectibles = collectibles;
-        _netShared.score = score;
-        _netShared.lives = lives2;
-        _netShared.gameState = gameState;
-        _netShared.enemiesLeft = enemiesLeft;
-        _netShared.currentLocationId = currentLocationId;
-        _netShared.numPlayers = numPlayers;
-        _netShared.popups = popups;
-        _netShared.waveNumber = waveNumber;
-        _netShared.comboCount = comboCount;
-        _netShared.startTime = startTime;
+        _netShared.players = state.players;
+        _netShared.enemies = state.enemies;
+        _netShared.bubbles = state.bubbles;
+        _netShared.collectibles = state.collectibles;
+        _netShared.score = state.score;
+        _netShared.lives = state.lives;
+        _netShared.gameState = state.gameState;
+        _netShared.enemiesLeft = state.enemiesLeft;
+        _netShared.currentLocationId = state.currentLocationId;
+        _netShared.numPlayers = state.numPlayers;
+        _netShared.popups = state.popups;
+        _netShared.waveNumber = state.waveNumber;
+        _netShared.comboCount = state.comboCount;
+        _netShared.startTime = state.startTime;
         _netShared.LOCATIONS = LOCATIONS;
       }
       function syncFromNet() {
-        players = _netShared.players;
-        enemies = _netShared.enemies;
-        bubbles = _netShared.bubbles;
-        collectibles = _netShared.collectibles;
-        score = _netShared.score;
-        lives2 = _netShared.lives;
-        gameState = _netShared.gameState;
-        enemiesLeft = _netShared.enemiesLeft;
-        popups = _netShared.popups;
+        state.players = _netShared.players;
+        state.enemies = _netShared.enemies;
+        state.bubbles = _netShared.bubbles;
+        state.collectibles = _netShared.collectibles;
+        state.score = _netShared.score;
+        state.lives = _netShared.lives;
+        state.gameState = _netShared.gameState;
+        state.enemiesLeft = _netShared.enemiesLeft;
+        state.popups = _netShared.popups;
       }
       setNetState(_netShared);
       requestAnimationFrame(frame);
       window.__game = {
         getState: function() {
           return {
-            gameState,
-            waveNumber,
-            score,
-            lives: lives2,
-            enemiesLeft,
-            enemyCount: enemies.length,
-            collectiblesTaken: collectibles.filter(function(c) {
+            gameState: state.gameState,
+            waveNumber: state.waveNumber,
+            score: state.score,
+            lives: state.lives,
+            enemiesLeft: state.enemiesLeft,
+            enemyCount: state.enemies.length,
+            collectiblesTaken: state.collectibles.filter(function(c) {
               return c.taken;
             }).length,
-            collectiblesTotal: collectibles.length,
+            collectiblesTotal: state.collectibles.length,
             allClearFired,
             smokeLevel,
             paintBlobCount: paintBlobs.length,
-            currentLocationId
+            currentLocationId: state.currentLocationId
           };
         },
         getEnemyTypes: function() {
-          return enemies.map(function(e) {
+          return state.enemies.map(function(e) {
             return e.type;
           });
         },
@@ -8574,18 +8563,18 @@
           return typeof window[n] === "function";
         },
         forceAllCollectiblesTaken: function() {
-          collectibles.forEach(function(c) {
+          state.collectibles.forEach(function(c) {
             c.taken = true;
           });
         },
         forceWave2: function() {
-          enemies = [];
-          enemiesLeft = 0;
+          state.enemies = [];
+          state.enemiesLeft = 0;
           allClearFired = true;
           allClearDelay = 0;
         },
         spawnArtistEnemy: function() {
-          enemies.push({
+          state.enemies.push({
             x: 300,
             y: 150,
             w: 28,
@@ -8607,7 +8596,7 @@
           return "ok";
         },
         spawnMotorbikeEnemy: function() {
-          enemies.push({
+          state.enemies.push({
             x: 100,
             y: 400,
             w: 42,

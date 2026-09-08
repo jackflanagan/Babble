@@ -15,7 +15,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   setProgress(progress);
   setGlobeProgress(progress);
   setLocationsGetter(function(){ return LOCATIONS; });
-  setDrawState(function(){ return { LEVELS: LEVELS, currentLocationId: currentLocationId }; });
+  setDrawState(function(){ return { LEVELS: LEVELS, currentLocationId: state.currentLocationId }; });
 
   /* ---------- Feature 5: Random Mid-Level Events ---------- */
   var EVENTS = [
@@ -43,11 +43,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   /* ========================================================= */
   var sceneGlobe = document.getElementById('scene-globe');
   var sceneGame = document.getElementById('scene-game');
-  var currentLocationId = 'glasgow';
-  var numPlayers = 1;
 
   function setNumPlayers(n){
-    numPlayers = n;
+    state.numPlayers = n;
     document.querySelectorAll('.mode-btn').forEach(function(b){
       b.classList.toggle('active', b.dataset.players===String(n));
     });
@@ -58,7 +56,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       b.classList.toggle('active', b.dataset.players===modeStr);
     });
     if(modeStr==='net'){
-      numPlayers = 2;
+      state.numPlayers = 2;
       document.getElementById('localControls').hidden = true;
       document.getElementById('localControlsHint').hidden = true;
       document.getElementById('p2Controls').hidden = true;
@@ -69,8 +67,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       document.getElementById('netPanel').hidden = true;
       document.getElementById('localControls').hidden = false;
       document.getElementById('localControlsHint').hidden = false;
-      numPlayers = (modeStr==='2') ? 2 : 1;
-      document.getElementById('p2Controls').hidden = (numPlayers!==2);
+      state.numPlayers = (modeStr==='2') ? 2 : 1;
+      document.getElementById('p2Controls').hidden = (state.numPlayers!==2);
       document.getElementById('btnStart').hidden = false;
     }
   }
@@ -82,13 +80,13 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     setGlobeRunning(false);
     sceneGlobe.hidden = true;
     sceneGame.hidden = false;
-    currentLocationId = loc.id;
+    state.currentLocationId = loc.id;
     var cIdx2=-1;
     for(var ci5=0;ci5<CAMPAIGN.length;ci5++){ if(CAMPAIGN[ci5].type==='level'&&CAMPAIGN[ci5].id===loc.id){ cIdx2=ci5; break; } }
     campaignMode = cIdx2>=0; campaignLastType = 'level';
     if(campaignMode){ campaignPlayedLevels = [loc.id]; campaignPlayedMgs = []; }
     if(netRole){
-      numPlayers = 2;
+      state.numPlayers = 2;
       document.getElementById('p2Controls').hidden = true;
     } else {
       selectMode('1');
@@ -137,12 +135,12 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   });
 
   function togglePause(){
-    if(gameState==='playing'){
-      gameState='paused';
+    if(state.gameState==='playing'){
+      state.gameState='paused';
       document.getElementById('btnPause').textContent='▶ Resume';
       suspendAudio();
-    } else if(gameState==='paused'){
-      gameState='playing';
+    } else if(state.gameState==='paused'){
+      state.gameState='playing';
       document.getElementById('btnPause').textContent='⏸ Pause';
       resumeAudio();
     }
@@ -203,6 +201,27 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   initCanvas();
   var cv = document.getElementById('gameCanvas');
   var GRAVITY = 1500;
+
+  var state = {
+    players:           null,
+    enemies:           null,
+    bubbles:           null,
+    collectibles:      null,
+    particles:         null,
+    popups:            null,
+    powerups:          null,
+    popBursts:         null,
+    score:             0,
+    lives:             3,
+    gameState:         'ready',
+    enemiesLeft:       0,
+    waveNumber:        1,
+    comboCount:        0,
+    startTime:         0,
+    currentLocationId: 'glasgow',
+    numPlayers:        1
+  };
+
   cv.addEventListener('click', function(e){ handleMiniGameClick(e.clientX, e.clientY); });
   cv.addEventListener('touchstart', function(e){
     if(miniGameId){ e.preventDefault(); handleMiniGameClick(e.touches[0].clientX, e.touches[0].clientY); }
@@ -220,10 +239,10 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       case 'Space': keys.p1Jump = true; localJumpPress(); break;
       case 'ArrowLeft': keys.p2Left = true; break;
       case 'ArrowRight': keys.p2Right = true; break;
-      case 'ArrowUp': keys.p2Jump = true; tryJump(numPlayers===2 ? players[1] : players[0]); break;
-      case 'Slash': keys.p2Bubble = true; tryShoot(numPlayers===2 ? players[1] : players[0]); break;
+      case 'ArrowUp': keys.p2Jump = true; tryJump(state.numPlayers===2 ? state.players[1] : state.players[0]); break;
+      case 'Slash': keys.p2Bubble = true; tryShoot(state.numPlayers===2 ? state.players[1] : state.players[0]); break;
       case 'Escape': case 'KeyP': togglePause(); break;
-      case 'KeyR': if(gameState==='lost' && netRole!=='guest'){ resetGame(); gameState='playing'; startMusic(); } break;
+      case 'KeyR': if(state.gameState==='lost' && netRole!=='guest'){ resetGame(); state.gameState='playing'; startMusic(); } break;
       default: handled = false;
     }
     if(handled && e.cancelable) e.preventDefault();
@@ -308,7 +327,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     swipeStartY = e.touches[0].clientY;
   }, {passive:true});
   document.addEventListener('touchend', function(e){
-    if(!isTouchDevice || gameState !== 'playing') return;
+    if(!isTouchDevice || state.gameState !== 'playing') return;
     var dy = swipeStartY - e.changedTouches[0].clientY;
     if(dy > 40){ localJumpPress(); keys.p1Jump = true; setTimeout(function(){ keys.p1Jump = false; }, 120); }
   }, {passive:true});
@@ -318,9 +337,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 
   var BOSS_SPAWN = [{x:330, y:390, w:54, h:46, vx:100, hits:3}];
 
-  var players, enemies, bubbles, collectibles, particles, popups, powerups, popBursts;
-  var score = 0, lives = 3, gameState = 'ready', enemiesLeft = 0, startTime = 0;
-  var shakeT = 0, waveNumber = 1, comboCount = 0, comboTimer = 0, waveFlash = 0, screenFlash = 0, allClearFired = false, allClearDelay = 0;
+  var shakeT = 0, comboTimer = 0, waveFlash = 0, screenFlash = 0, allClearFired = false, allClearDelay = 0;
   var freezeT = 0, slowT = 0, doubleScoreT = 0, smokeLevel = 0; var paintBlobs = [];
   var magnetT = 0;
   var puFlash = 0, puFlashLabel = '', puFlashColor = '#fff';
@@ -372,16 +389,16 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   }
 
   function resetGame(){
-    players = [ makePlayer(0, numPlayers===2 ? 320 : 360, PALETTES_P1[selectedSkins.p1]) ];
-    if(numPlayers===2) players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
+    state.players = [ makePlayer(0, state.numPlayers===2 ? 320 : 360, PALETTES_P1[selectedSkins.p1]) ];
+    if(state.numPlayers===2) state.players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
 
     /* Feature 4: Escalating Difficulty */
-    var playCount = (progress[currentLocationId] && progress[currentLocationId].playCount) || 0;
+    var playCount = (progress[state.currentLocationId] && progress[state.currentLocationId].playCount) || 0;
     var diffMult = Math.min(1 + playCount * 0.12, 2.2);
     var adjustedChaseDelay = Math.max(5, CHASE_DELAY / diffMult);
 
-    var layout = LEVEL_LAYOUTS[currentLocationId];
-    var lvlPhys = (LEVELS[currentLocationId] && LEVELS[currentLocationId].levelPhysics) || {};
+    var layout = LEVEL_LAYOUTS[state.currentLocationId];
+    var lvlPhys = (LEVELS[state.currentLocationId] && LEVELS[state.currentLocationId].levelPhysics) || {};
     GRAVITY = lvlPhys.gravity || 1500;
     freezeT = 0; slowT = 0; doubleScoreT = 0;
     PLATFORMS = layout.platforms;
@@ -391,16 +408,16 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     var currentEnemySpawns = layout.enemySpawns;
     var currentCollectibleSpots = layout.collectibleSpots;
 
-    if(currentLocationId === 'boss'){
-      enemies = BOSS_SPAWN.map(function(s){
+    if(state.currentLocationId === 'boss'){
+      state.enemies = BOSS_SPAWN.map(function(s){
         return { x:s.x, y:60, w:s.w, h:s.h, vx:s.vx, vy:0, dir: Math.random()<0.5?1:-1, platform:0,
           state:'free', bubbleTimer:0, hopT: rand(1.5,3), angry:0, onGround:false, hits:s.hits,
           shootT: rand(2,4) };
       });
-      waveNumber = 99;
+      state.waveNumber = 99;
     } else {
       var variety1 = layout.enemyVariety;
-      enemies = currentEnemySpawns.map(function(s){
+      state.enemies = currentEnemySpawns.map(function(s){
         var useSpecial = variety1 && Math.random() < (variety1.waveRatio * 0.45);
         var eType = useSpecial ? variety1.specialType : 'normal';
         var ew = eType==='parmesan'?44 : eType==='buckfast'?20 : eType==='motorbike'?42 : eType==='armoured'?34 : eType==='fast'?22 : 28;
@@ -410,23 +427,23 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         return { x:s.x, y:s.y, w:ew, h:eh, vx:Math.round(baseSpd * diffMult * (lvlPhys.enemySpeed || 1)), vy:0, dir: Math.random()<0.5?1:-1, platform:s.platform,
           state:'free', bubbleTimer:0, hopT: rand(1,3), angry:0, onGround:false, type:eType, hits:ehits, wanderX:rand(40,680), wanderT:rand(3,9) };
       });
-      waveNumber = 1;
+      state.waveNumber = 1;
     }
-    enemiesLeft = enemies.length;
-    bubbles = [];
-    particles = [];
-    popups = [];
-    powerups = [];
-    popBursts = [];
+    state.enemiesLeft = state.enemies.length;
+    state.bubbles = [];
+    state.particles = [];
+    state.popups = [];
+    state.powerups = [];
+    state.popBursts = [];
     chaseAlertPlayed = false;
-    comboCount = 0; comboTimer = 0; waveFlash = 0; allClearFired = false; allClearDelay = 0; smokeLevel = 0; paintBlobs = [];
+    state.comboCount = 0; comboTimer = 0; waveFlash = 0; allClearFired = false; allClearDelay = 0; smokeLevel = 0; paintBlobs = [];
     magnetT = 0; puFlash = 0; screenFlashColor = '#ff1040';
     killFeed = []; fireMeter = 0; fireBonus = 0; platShake = 0;
     pandaChargeCount = 0; pandaChargeTimer = 0; pandaCooldown = 0; pandaProjectile = null;
     survivorUnlocked = false;
     usedPowerups = {};
 
-    var locPlayCount2 = (progress[currentLocationId] && progress[currentLocationId].playCount) || 0;
+    var locPlayCount2 = (progress[state.currentLocationId] && progress[state.currentLocationId].playCount) || 0;
     tutorialDone = locPlayCount2 > 0;
     tutorialT = 0;
     tutorialFirstPop = false;
@@ -434,9 +451,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     /* Feature 5: Reset events */
     activeEvent = null; eventTimer = 0; nextEventIn = rand(20,35);
 
-    /* Feature 6: Ghost collectibles */
-    var missedPrev = safeGet('gh_missed_'+currentLocationId, []);
-    collectibles = currentCollectibleSpots.map(function(c){
+    /* Feature 6: Ghost state.collectibles */
+    var missedPrev = safeGet('gh_missed_'+state.currentLocationId, []);
+    state.collectibles = currentCollectibleSpots.map(function(c){
       var wasMissed = missedPrev.some(function(m){ return m.x===c.x && m.y===c.y; });
       return {x:c.x, y:c.y, slot:c.slot, taken:false, bob:Math.random()*TAU, ghost:wasMissed};
     });
@@ -448,13 +465,13 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 
     /* Survival mode overrides */
     if(survivalMode){
-      waveNumber = 99;
+      state.waveNumber = 99;
       survivalWave = 0;
-      enemiesLeft = 999;
-      enemies = [];
+      state.enemiesLeft = 999;
+      state.enemies = [];
       for(var si=0; si<3; si++){
         var ss = currentEnemySpawns[si % currentEnemySpawns.length];
-        enemies.push({ x:ss.x, y:ss.y, w:28, h:26, vx:70, vy:0,
+        state.enemies.push({ x:ss.x, y:ss.y, w:28, h:26, vx:70, vy:0,
           dir:Math.random()<0.5?1:-1, platform:ss.platform,
           state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false, hits:1, type:'normal', wanderX:rand(40,680), wanderT:rand(3,9) });
       }
@@ -465,28 +482,28 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     runAchievements = [];
     confettiParticles = [];
 
-    score = 0;
-    lives = 3;
-    gameState = 'ready';
-    startTime = performance.now();
+    state.score = 0;
+    state.lives = 3;
+    state.gameState = 'ready';
+    state.startTime = performance.now();
     updateHud();
     document.getElementById('overlayWin').hidden = true;
     document.getElementById('overlayLose').hidden = true;
-    var pr = progress[currentLocationId] || {best:0};
+    var pr = progress[state.currentLocationId] || {best:0};
     document.getElementById('hudBest').textContent = pr.best;
   }
   resetGame._adjustedChaseDelay = CHASE_DELAY;
   resetGame._diffMult = 1;
   resetGame._playCount = 0;
 
-  function stopGame(){ gameState = 'stopped'; }
+  function stopGame(){ state.gameState = 'stopped'; }
 
   document.getElementById('btnStart').addEventListener('click', function(){
     if(netRole==='guest') return;
     resetGame();
     document.getElementById('howto').hidden = true;
-    gameState = 'playing';
-    startTime = performance.now();
+    state.gameState = 'playing';
+    state.startTime = performance.now();
     startMusic();
     adGameplayStart();
     netBroadcastScene('start');
@@ -495,7 +512,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     if(netRole==='guest') return;
     // survivalMode stays as-is (if they were in survival, retry stays survival)
     resetGame();
-    gameState = 'playing';
+    state.gameState = 'playing';
     startMusic();
     netBroadcastScene('retry');
   });
@@ -510,7 +527,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     document.getElementById('winNextHint').hidden = true;
     survivalMode = false;
     resetGame();
-    gameState = 'playing';
+    state.gameState = 'playing';
     startMusic();
     netBroadcastScene('winAgain');
   });
@@ -518,12 +535,12 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     survivalMode = true;
     resetGame();
     document.getElementById('howto').hidden = true;
-    gameState = 'playing';
-    startTime = performance.now();
+    state.gameState = 'playing';
+    state.startTime = performance.now();
     startMusic();
   });
 
-  // Name entry for best score
+  // Name entry for best state.score
   (function(){
     var nameInput = document.getElementById('nameInput');
     var submitted = false;
@@ -531,9 +548,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     function saveName(){
       var val = nameInput.value.trim();
       if(!val) return;
-      var pr = progress[currentLocationId] || {best:0,cleared:false};
+      var pr = progress[state.currentLocationId] || {best:0,cleared:false};
       pr.name = val;
-      progress[currentLocationId] = pr;
+      progress[state.currentLocationId] = pr;
       safeSet('gh_progress_v2', progress);
       renderBestScores();
       // Submit to leaderboard on first confirm
@@ -541,9 +558,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         submitted = true;
         var winScoreSubmit = document.getElementById('winScoreSubmit');
         winScoreSubmit.hidden = false;
-        winScoreSubmit.textContent = 'Submitting score…';
-        submitScore(currentLocationId, val, pr.best, function(ok){
-          winScoreSubmit.textContent = ok ? '✓ On the leaderboard!' : '✗ Could not submit score';
+        winScoreSubmit.textContent = 'Submitting state.score…';
+        submitScore(state.currentLocationId, val, pr.best, function(ok){
+          winScoreSubmit.textContent = ok ? '✓ On the leaderboard!' : '✗ Could not submit state.score';
         });
       }
     }
@@ -576,8 +593,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
             safeSet('gh_skins_v1', selectedSkins);
             buildSkinDots();
             // update player palettes if playing
-            if(gameState==='playing'){
-              players.forEach(function(p){
+            if(state.gameState==='playing'){
+              state.players.forEach(function(p){
                 if(p.id===0) p.palette = PALETTES_P1[selectedSkins.p1];
                 if(p.id===1) p.palette = PALETTES_P2[selectedSkins.p2];
               });
@@ -593,12 +610,12 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   buildSkinDots();
 
   function updateHud(){
-    document.getElementById('hudScore').textContent = score;
-    var pr = progress[currentLocationId] || {best:0};
+    document.getElementById('hudScore').textContent = state.score;
+    var pr = progress[state.currentLocationId] || {best:0};
     document.getElementById('hudBest').textContent = pr.best;
     var livesEl = document.getElementById('hudLives');
     livesEl.innerHTML = '';
-    for(var i=0;i<lives;i++){
+    for(var i=0;i<state.lives;i++){
       var s = document.createElement('span');
       s.className = 'life';
       s.textContent = '🦊';
@@ -630,28 +647,28 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 
   function spawnParticles(x,y,color,n){
     for(var i=0;i<n;i++){
-      particles.push({
+      state.particles.push({
         x:x, y:y, vx: rand(-140,140), vy: rand(-220,-40),
         life: rand(0.35,0.7), t:0, color: color, r: rand(2,4)
       });
     }
   }
   function spawnPopup(x,y,text,color,size){
-    popups.push({x:x,y:y,text:text,t:0,color:color||'#ffd166',size:size||16});
+    state.popups.push({x:x,y:y,text:text,t:0,color:color||'#ffd166',size:size||16});
   }
 
   // Trigger functions for jump/shoot. Called both from the per-frame input
   // poll (keyboard/touch holds) AND directly from the press event itself, so
   // a very quick tap can never slip between two animation frames unregistered.
   function tryJump(p){
-    if(gameState==='playing' && p && p.onGround){
+    if(state.gameState==='playing' && p && p.onGround){
       p.vy = -560;
       p.onGround = false;
       playSound('jump');
     }
   }
   function tryShoot(p){
-    if(gameState==='playing' && p && p.shootCooldown<=0){
+    if(state.gameState==='playing' && p && p.shootCooldown<=0){
       p.shootCooldown = p.rapidFire>0 ? 0.12 : 0.42;
       // panda triple-shoot detection
       if(pandaSpecialUnlocked && pandaCooldown <= 0 && !pandaProjectile){
@@ -664,7 +681,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         }
       }
       playSound('shoot');
-      bubbles.push({
+      state.bubbles.push({
         x: p.x + p.w/2 + p.facing*10, y: p.y+6,
         vx: p.facing*310, vy:55, r:4, grown:false, age:0,
         state:'flying', trapped:null, t:0
@@ -738,7 +755,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   }
 
   function update(dt){
-    if(gameState !== 'playing') return;
+    if(state.gameState !== 'playing') return;
     if(countdownT > 0){
       var prevFloor = Math.ceil(countdownT);
       countdownT -= dt;
@@ -750,15 +767,15 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       countdownT -= dt; // keep ticking so GO! fades out properly
     }
     /* Survival spawner */
-    if(survivalMode && gameState==='playing'){
-      var freeEnemies = enemies.filter(function(e){ return e.state==='free' || e.state==='trapped'; });
+    if(survivalMode && state.gameState==='playing'){
+      var freeEnemies = state.enemies.filter(function(e){ return e.state==='free' || e.state==='trapped'; });
       if(freeEnemies.length === 0){
         survivalWave++;
         var count = Math.min(3 + survivalWave, 8);
         var sp = Math.min(70 + survivalWave*15, 220);
         for(var si=0; si<count; si++){
-          var ss = LEVEL_LAYOUTS[currentLocationId].enemySpawns[si % LEVEL_LAYOUTS[currentLocationId].enemySpawns.length];
-          enemies.push({ x:ss.x, y:ss.y, w:28, h:26, vx:sp, vy:0,
+          var ss = LEVEL_LAYOUTS[state.currentLocationId].enemySpawns[si % LEVEL_LAYOUTS[state.currentLocationId].enemySpawns.length];
+          state.enemies.push({ x:ss.x, y:ss.y, w:28, h:26, vx:sp, vy:0,
             dir:Math.random()<0.5?1:-1, platform:ss.platform,
             state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false, hits:1, type:'normal', wanderX:rand(40,680), wanderT:rand(3,9) });
         }
@@ -766,14 +783,14 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       }
     }
     /* Confetti update */
-    if(gameState==='won'){
+    if(state.gameState==='won'){
       for(var ci=confettiParticles.length-1;ci>=0;ci--){
         var cp=confettiParticles[ci];
         cp.t+=dt; cp.x+=cp.vx*dt; cp.y+=cp.vy*dt; cp.vy+=200*dt; cp.rot+=cp.rotV*dt;
         if(cp.t>cp.life || cp.y>H+20) confettiParticles.splice(ci,1);
       }
     }
-    if(comboTimer>0) comboTimer -= dt; else comboCount = 0;
+    if(comboTimer>0) comboTimer -= dt; else state.comboCount = 0;
     if(waveFlash>0) waveFlash -= dt;
     if(freezeT>0) freezeT -= dt;
     if(slowT>0) slowT -= dt;
@@ -788,20 +805,20 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       else mp.y = mp.oy + Math.sin(nowSec * mp.speed) * mp.amplitude;
     });
     /* tutorial timer */
-    if(!tutorialDone && gameState==='playing'){
+    if(!tutorialDone && state.gameState==='playing'){
       tutorialT += dt;
       if(tutorialT > 12) tutorialDone = true;
     }
 
     var accel = 900, fric = 1300;
-    players.forEach(function(p){
+    state.players.forEach(function(p){
       if(p.speedBoost>0) p.speedBoost -= dt;
       if(p.rapidFire>0) p.rapidFire -= dt;
       if(p.shield>0) p.shield -= dt;
       var maxSpeed = p.speedBoost>0 ? 340 : 220;
       if(activeEvent && activeEvent.id==='speed_boost') maxSpeed += 80;
       var left, right, jump, bubble;
-      if(numPlayers===1){
+      if(state.numPlayers===1){
         left = keys.p1Left || keys.p2Left;
         right = keys.p1Right || keys.p2Right;
         jump = keys.p1Jump || keys.p2Jump;
@@ -836,26 +853,26 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       if(bubble) tryShoot(p);
     });
 
-    // collectibles bob + pickup (either player can collect)
-    var level = LEVELS[currentLocationId];
-    collectibles.forEach(function(c){
+    // state.collectibles bob + pickup (either player can collect)
+    var level = LEVELS[state.currentLocationId];
+    state.collectibles.forEach(function(c){
       if(c.taken) return;
       c.bob += dt*2;
-      if(magnetT > 0 && players.length > 0){
-        var mpt = players[0];
-        for(var mpi=1;mpi<players.length;mpi++){
-          if(Math.abs(players[mpi].x-c.x)<Math.abs(mpt.x-c.x)) mpt=players[mpi];
+      if(magnetT > 0 && state.players.length > 0){
+        var mpt = state.players[0];
+        for(var mpi=1;mpi<state.players.length;mpi++){
+          if(Math.abs(state.players[mpi].x-c.x)<Math.abs(mpt.x-c.x)) mpt=state.players[mpi];
         }
         var mcdx=mpt.x+mpt.w/2-c.x, mcdy=mpt.y+mpt.h/2-c.y;
         var mcdist=Math.sqrt(mcdx*mcdx+mcdy*mcdy)||1;
         c.x += (mcdx/mcdist)*240*dt; c.y += (mcdy/mcdist)*240*dt;
       }
       var box = {x:c.x-14,y:c.y-14,w:28,h:28};
-      for(var pi=0; pi<players.length; pi++){
-        if(rectsOverlap(players[pi], box)){
+      for(var pi=0; pi<state.players.length; pi++){
+        if(rectsOverlap(state.players[pi], box)){
           c.taken = true;
           var v = (level.values[c.slot] || 50) * (c.ghost ? 2 : 1);
-          score += v;
+          state.score += v;
           if(c.ghost){
             spawnPopup(c.x,c.y,'+'+v+' GHOST BONUS!','#00e5ff');
           } else {
@@ -864,13 +881,13 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           spawnParticles(c.x,c.y,c.ghost?'#00e5ff':'#ffd166',10);
           playSound('collect'); haptic(12);
           // water rat companion (Modena slot c)
-          if(currentLocationId==='modena' && c.slot==='c'){
-            players[pi].hasRat = true;
+          if(state.currentLocationId==='modena' && c.slot==='c'){
+            state.players[pi].hasRat = true;
             unlockAchievement('rat_friend');
           }
           // baby elephant companion (Kenya slot c)
-          if(currentLocationId==='kenya' && c.slot==='c'){
-            players[pi].hasElephant = true;
+          if(state.currentLocationId==='kenya' && c.slot==='c'){
+            state.players[pi].hasElephant = true;
             unlockAchievement('elephant_friend');
           }
           break;
@@ -878,10 +895,10 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       }
     });
 
-    /* All-collectibles clear: wipe ALL remaining enemies with a per-level effect */
-    if(gameState === 'playing' && !survivalMode && currentLocationId !== 'boss'){
-      var allTaken = collectibles.length > 0 && collectibles.every(function(c){ return c.taken; });
-      if(allTaken && enemies.length > 0 && !allClearFired){
+    /* All-state.collectibles clear: wipe ALL remaining state.enemies with a per-level effect */
+    if(state.gameState === 'playing' && !survivalMode && state.currentLocationId !== 'boss'){
+      var allTaken = state.collectibles.length > 0 && state.collectibles.every(function(c){ return c.taken; });
+      if(allTaken && state.enemies.length > 0 && !allClearFired){
         allClearFired = true;
         var clearEffects = {
           glasgow: {color:'#7fe3ff', label:'BUBBLE SURGE!'},
@@ -890,59 +907,59 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           ireland: {color:'#7fff7f', label:'LUCKY BLAST!'},
           kenya:   {color:'#ff9940', label:'SAFARI SWEEP!'}
         };
-        var fx = clearEffects[currentLocationId] || {color:'#fff', label:'CLEAR!'};
+        var fx = clearEffects[state.currentLocationId] || {color:'#fff', label:'CLEAR!'};
         spawnPopup(W/2, H/2 - 40, fx.label, fx.color, 28);
         playSound('win');
         shakeT = 0.6;
         screenFlash = 0.4;
-        enemies.forEach(function(en){
+        state.enemies.forEach(function(en){
           for(var ci4=0;ci4<8;ci4++){
-            particles.push({x:en.x+en.w/2+rand(-10,10), y:en.y+en.h/2+rand(-10,10),
+            state.particles.push({x:en.x+en.w/2+rand(-10,10), y:en.y+en.h/2+rand(-10,10),
               vx:rand(-180,180), vy:rand(-320,-80), life:1.0, t:0, color:fx.color, r:rand(3,8)});
           }
-          particles.push({x:en.x+en.w/2,y:en.y+en.h/2,
+          state.particles.push({x:en.x+en.w/2,y:en.y+en.h/2,
             vx:rand(-80,80),vy:rand(-220,-100),life:0.8,t:0,color:'#ffd700',r:rand(5,10)});
-          popBursts.push({x:en.x+en.w/2, y:en.y+en.h/2,
+          state.popBursts.push({x:en.x+en.w/2, y:en.y+en.h/2,
             vx:rand(-260,260), vy:rand(-400,-160),
             rot:0, rotV:rand(-14,14), t:0, life:0.9,
-            drawFn:LEVELS[currentLocationId].enemyDraw, w:en.w, h:en.h, hits:0, enType:en.type});
-          score += Math.round(level.values.pop * 0.5);
+            drawFn:LEVELS[state.currentLocationId].enemyDraw, w:en.w, h:en.h, hits:0, enType:en.type});
+          state.score += Math.round(level.values.pop * 0.5);
         });
-        enemies = [];
-        enemiesLeft = 0;
+        state.enemies = [];
+        state.enemiesLeft = 0;
         allClearDelay = 1.8;
         unlockAchievement('treasure');
         // location-specific confetti rain
         var rainPalettes = {glasgow:['#7fe3ff','#ffffff'],modena:['#ffd700','#ff6600'],paris:['#ff9fc4','#ffffff'],ireland:['#7fff7f','#ffd700'],kenya:['#ff9940','#ffe066']};
-        var rp = rainPalettes[currentLocationId]||['#ffd700','#ffffff'];
+        var rp = rainPalettes[state.currentLocationId]||['#ffd700','#ffffff'];
         spawnCelebrationRain(rp[0], rp[1]);
         pushKillFeed('ALL CLEAR!', rp[0]);
       }
     }
 
-    // bubbles
-    for(var bi=bubbles.length-1; bi>=0; bi--){
-      var b = bubbles[bi];
+    // state.bubbles
+    for(var bi=state.bubbles.length-1; bi>=0; bi--){
+      var b = state.bubbles[bi];
       b.age += dt;
       if(b.state==='flying'){
         if(b.boss){
           /* boss projectile: travels straight, hurts player */
           b.x += b.vx*dt; b.y += b.vy*dt;
-          if(b.age > 3 || b.x<-20 || b.x>W+20 || b.y<-20 || b.y>H+20){ bubbles.splice(bi,1); continue; }
+          if(b.age > 3 || b.x<-20 || b.x>W+20 || b.y<-20 || b.y>H+20){ state.bubbles.splice(bi,1); continue; }
           var bBox={x:b.x-b.r,y:b.y-b.r,w:b.r*2,h:b.r*2};
           var hit=false;
-          players.forEach(function(p){ if(!hit && p.invuln<=0 && rectsOverlap(p,bBox)){ loseLife(p,0); hit=true; } });
-          if(hit){ spawnParticles(b.x,b.y,'#ff4040',8); bubbles.splice(bi,1); }
+          state.players.forEach(function(p){ if(!hit && p.invuln<=0 && rectsOverlap(p,bBox)){ loseLife(p,0); hit=true; } });
+          if(hit){ spawnParticles(b.x,b.y,'#ff4040',8); state.bubbles.splice(bi,1); }
           continue;
         }
         b.vx *= 0.965;
         b.vy = lerp(b.vy, -70, dt*2.2);
         b.x += b.vx*dt; b.y += b.vy*dt;
         b.r = Math.min(16, 6 + b.age*30);
-        if(b.age > 2.4 || b.x<-20 || b.x>W+20 || b.y < -20 || b.y > H+20){ bubbles.splice(bi,1); continue; }
+        if(b.age > 2.4 || b.x<-20 || b.x>W+20 || b.y < -20 || b.y > H+20){ state.bubbles.splice(bi,1); continue; }
         if(b.decorative) continue;
-        for(var ei=0; ei<enemies.length; ei++){
-          var en = enemies[ei];
+        for(var ei=0; ei<state.enemies.length; ei++){
+          var en = state.enemies[ei];
           if(en.state !== 'free') continue;
           var ebox = {x:b.x-b.r,y:b.y-b.r,w:b.r*2,h:b.r*2};
           if(rectsOverlap(ebox, en)){
@@ -968,14 +985,14 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
             en2.vx = (en2.dir||1) * 130;
             en2.angry = 3;
             en2.tauntT = 1.1;
-            bubbles.splice(bi,1);
+            state.bubbles.splice(bi,1);
             continue;
           }
         }
         var pbox = {x:b.x-b.r,y:b.y-b.r,w:b.r*2,h:b.r*2};
         var popped = false;
-        for(var pj=0; pj<players.length && !popped; pj++){
-          if(rectsOverlap(players[pj], pbox)) popped = true;
+        for(var pj=0; pj<state.players.length && !popped; pj++){
+          if(rectsOverlap(state.players[pj], pbox)) popped = true;
         }
         if(popped){
           if(en2 && en2.hits && en2.hits > 1){
@@ -986,35 +1003,35 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
             en2.state = 'free';
             en2.bubbleTimer = 0;
             b.trapped = null;
-            bubbles.splice(bi,1);
+            state.bubbles.splice(bi,1);
             spawnPopup(b.x, b.y-10, 'HIT! '+en2.hits+' to go', '#ff3030');
             spawnParticles(b.x,b.y,'#ff3030',14);
             playSound('trap');
             shakeT = 0.2;
             continue;
           }
-          comboCount++;
+          state.comboCount++;
           comboTimer = 2.2;
           var basePoints = level.values.pop;
-          var multiplier = Math.min(comboCount, 6);
+          var multiplier = Math.min(state.comboCount, 6);
           var pts = basePoints * multiplier * (doubleScoreT > 0 ? 2 : 1);
           var label = multiplier>1 ? '+'+pts+' x'+multiplier+'!' : '+'+pts;
           if(doubleScoreT>0) label += ' x2!';
           spawnPopup(b.x, b.y-10, label, multiplier>1?'#ff5470':'#ff9c7a', multiplier>1 ? 14+multiplier*4 : 16);
           spawnParticles(b.x,b.y,multiplier>2?'#ff5470':'#ff9c7a',14);
-          score += pts;
-          var popSnd = comboCount>=5?'combo_max':comboCount>=4?'combo_4':comboCount>=3?'combo_3':comboCount>=2?'pop_combo':('pop_'+(currentLocationId||'glasgow'));
-          playSound(popSnd); haptic(comboCount>1?20:10);
+          state.score += pts;
+          var popSnd = state.comboCount>=5?'combo_max':state.comboCount>=4?'combo_4':state.comboCount>=3?'combo_3':state.comboCount>=2?'pop_combo':('pop_'+(state.currentLocationId||'glasgow'));
+          playSound(popSnd); haptic(state.comboCount>1?20:10);
           tutorialFirstPop = true;
           unlockAchievement('first_pop');
-          if(comboCount >= 3) unlockAchievement('combo3');
+          if(state.comboCount >= 3) unlockAchievement('combo3');
           // kill feed + fire meter + platform shake
-          fireMeter = Math.min(1, fireMeter + (comboCount>=3 ? 0.28 : 0.14));
-          if(comboCount >= 3) pushKillFeed('x'+comboCount+' COMBO!', comboCount>=5?'#ff2200':comboCount>=4?'#ff5500':'#ff7744');
-          if(comboCount >= 4) platShake = Math.max(platShake, 0.35);
+          fireMeter = Math.min(1, fireMeter + (state.comboCount>=3 ? 0.28 : 0.14));
+          if(state.comboCount >= 3) pushKillFeed('x'+state.comboCount+' COMBO!', state.comboCount>=5?'#ff2200':state.comboCount>=4?'#ff5500':'#ff7744');
+          if(state.comboCount >= 4) platShake = Math.max(platShake, 0.35);
           if(fireMeter >= 1 && fireBonus <= 0){
             fireBonus = 3; fireMeter = 0;
-            players.forEach(function(fp2){ fp2.speedBoost=Math.max(fp2.speedBoost,3); fp2.rapidFire=Math.max(fp2.rapidFire,3); });
+            state.players.forEach(function(fp2){ fp2.speedBoost=Math.max(fp2.speedBoost,3); fp2.rapidFire=Math.max(fp2.rapidFire,3); });
             screenFlash=0.5; screenFlashColor='#ff4400'; shakeT=0.4; platShake=0.6;
             pushKillFeed('ON FIRE!','#ff4400');
             spawnPopup(W/2, H/2-60, 'ON FIRE!', '#ff4400', 44);
@@ -1022,31 +1039,31 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           }
           // 35% chance to drop a power-up; 40% of drops are location-specific
           if(Math.random()<0.35){
-            var lvlPU = LEVELS[currentLocationId] && LEVELS[currentLocationId].locPowerup;
+            var lvlPU = LEVELS[state.currentLocationId] && LEVELS[state.currentLocationId].locPowerup;
             var ptype;
             if(lvlPU && Math.random()<0.4){
               ptype = lvlPU.type;
             } else {
               ptype = POWERUP_TYPES[Math.floor(Math.random()*POWERUP_TYPES.length)];
             }
-            powerups.push({x:b.x, y:b.y, type:ptype, bob:0, life:7});
+            state.powerups.push({x:b.x, y:b.y, type:ptype, bob:0, life:7});
           }
-          var idx = enemies.indexOf(en2);
-          if(idx>-1){ enemies.splice(idx,1); enemiesLeft--; }
-          bubbles.splice(bi,1);
+          var idx = state.enemies.indexOf(en2);
+          if(idx>-1){ state.enemies.splice(idx,1); state.enemiesLeft--; }
+          state.bubbles.splice(bi,1);
           shakeT = 0.15;
           // spinning ghost that flies off
-          popBursts.push({
+          state.popBursts.push({
             x:b.x, y:b.y,
             vx:rand(-220,220), vy:rand(-340,-140),
             rot:0, rotV:rand(-12,12),
             t:0, life:0.65,
-            drawFn:LEVELS[currentLocationId].enemyDraw,
+            drawFn:LEVELS[state.currentLocationId].enemyDraw,
             w:en2.w, h:en2.h, hits:0, enType:en2.type
           });
           // gold coin shower
           for(var ci2=0;ci2<5;ci2++){
-            particles.push({x:b.x+rand(-8,8), y:b.y+rand(-8,8),
+            state.particles.push({x:b.x+rand(-8,8), y:b.y+rand(-8,8),
               vx:rand(-90,90), vy:rand(-180,-60),
               life:0.7, t:0, color:'#ffd700', r:rand(3,6)});
           }
@@ -1054,15 +1071,15 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       }
     }
 
-    /* Chain-pop: carrying bubbles that touch each other both pop */
-    if(gameState==='playing'){
+    /* Chain-pop: carrying state.bubbles that touch each other both pop */
+    if(state.gameState==='playing'){
       var chainPopped = [];
-      for(var cai=0; cai<bubbles.length; cai++){
-        if(bubbles[cai].state!=='carrying') continue;
-        for(var cbi=cai+1; cbi<bubbles.length; cbi++){
-          if(bubbles[cbi].state!=='carrying') continue;
-          var cdx=bubbles[cai].x-bubbles[cbi].x, cdy=bubbles[cai].y-bubbles[cbi].y;
-          var cminD = bubbles[cai].r + bubbles[cbi].r;
+      for(var cai=0; cai<state.bubbles.length; cai++){
+        if(state.bubbles[cai].state!=='carrying') continue;
+        for(var cbi=cai+1; cbi<state.bubbles.length; cbi++){
+          if(state.bubbles[cbi].state!=='carrying') continue;
+          var cdx=state.bubbles[cai].x-state.bubbles[cbi].x, cdy=state.bubbles[cai].y-state.bubbles[cbi].y;
+          var cminD = state.bubbles[cai].r + state.bubbles[cbi].r;
           if(cdx*cdx+cdy*cdy < cminD*cminD){
             if(chainPopped.indexOf(cai)<0) chainPopped.push(cai);
             if(chainPopped.indexOf(cbi)<0) chainPopped.push(cbi);
@@ -1071,23 +1088,23 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       }
       chainPopped.sort(function(a,b){return b-a;});
       chainPopped.forEach(function(cidx){
-        var cb=bubbles[cidx]; if(!cb||cb.state!=='carrying') return;
+        var cb=state.bubbles[cidx]; if(!cb||cb.state!=='carrying') return;
         var cen=cb.trapped; if(!cen) return;
-        comboCount++; comboTimer=2.2;
-        var pts=(level.values.pop)*Math.min(comboCount,6);
+        state.comboCount++; comboTimer=2.2;
+        var pts=(level.values.pop)*Math.min(state.comboCount,6);
         spawnPopup(cb.x,cb.y-10,'\u26d3 CHAIN +'+pts,'#ff5470',22);
         spawnParticles(cb.x,cb.y,'#ff5470',18);
-        score+=pts; playSound('combo_max'); haptic(25);
+        state.score+=pts; playSound('combo_max'); haptic(25);
         pushKillFeed('CHAIN POP!','#ff8800'); platShake=Math.max(platShake,0.5);
         tutorialFirstPop=true;
-        var ei=enemies.indexOf(cen);
-        if(ei>-1){enemies.splice(ei,1);enemiesLeft--;}
-        bubbles.splice(cidx,1);
-        popBursts.push({x:cb.x,y:cb.y,vx:rand(-220,220),vy:rand(-340,-140),
+        var ei=state.enemies.indexOf(cen);
+        if(ei>-1){state.enemies.splice(ei,1);state.enemiesLeft--;}
+        state.bubbles.splice(cidx,1);
+        state.popBursts.push({x:cb.x,y:cb.y,vx:rand(-220,220),vy:rand(-340,-140),
           rot:0,rotV:rand(-12,12),t:0,life:0.65,
-          drawFn:LEVELS[currentLocationId].enemyDraw,w:cen.w,h:cen.h,hits:0});
+          drawFn:LEVELS[state.currentLocationId].enemyDraw,w:cen.w,h:cen.h,hits:0});
         for(var ci3=0;ci3<5;ci3++){
-          particles.push({x:cb.x+rand(-8,8),y:cb.y+rand(-8,8),
+          state.particles.push({x:cb.x+rand(-8,8),y:cb.y+rand(-8,8),
             vx:rand(-90,90),vy:rand(-180,-60),life:0.7,t:0,color:'#ffd700',r:rand(3,6)});
         }
       });
@@ -1107,7 +1124,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
     /* bubble_storm event: 3% chance per frame to spawn a decorative bubble */
     if(activeEvent && activeEvent.id==='bubble_storm' && Math.random()<0.03){
-      bubbles.push({x:rand(20,W-20), y:-20, vx:rand(-30,30), vy:rand(20,50), r:rand(8,16), grown:true, age:0, state:'flying', trapped:null, t:0, decorative:true});
+      state.bubbles.push({x:rand(20,W-20), y:-20, vx:rand(-30,30), vy:rand(20,50), r:rand(8,16), grown:true, age:0, state:'flying', trapped:null, t:0, decorative:true});
     }
 
     /* Feature 3: Achievement toast drain in update */
@@ -1118,18 +1135,18 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
     if(achievementToast){ setAchievementToastT(achievementToastT - dt); if(achievementToastT<=0) setAchievementToast(null); }
 
-    // enemies
-    var elapsed = (performance.now() - startTime) / 1000;
+    // state.enemies
+    var elapsed = (performance.now() - state.startTime) / 1000;
     var currentChaseDelay = resetGame._adjustedChaseDelay || CHASE_DELAY;
     var chasing = elapsed >= currentChaseDelay;
 
     /* Feature 3: Survivor achievement */
-    if(chasing && elapsed - currentChaseDelay > 60 && !survivorUnlocked && lives > 0){
+    if(chasing && elapsed - currentChaseDelay > 60 && !survivorUnlocked && state.lives > 0){
       survivorUnlocked = true;
       unlockAchievement('survivor');
     }
 
-    enemies.forEach(function(en){
+    state.enemies.forEach(function(en){
       if((en.tauntT||0) > 0) en.tauntT -= dt;
       if(en.state !== 'free') return;
       if(freezeT > 0) return;   // frozen — skip movement and collision entirely
@@ -1144,18 +1161,18 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           smokeLevel = Math.min(1, smokeLevel + 0.55);
           playSound('motorbike_rev');
           for(var msi=0;msi<12;msi++){
-            particles.push({x:en.x+en.w/2, y:en.y+en.h/2, vx:rand(-80,80), vy:rand(-60,20),
+            state.particles.push({x:en.x+en.w/2, y:en.y+en.h/2, vx:rand(-80,80), vy:rand(-60,20),
               life:rand(1.5,3), t:0, color:'rgba(120,120,120,0.6)', r:rand(10,22)});
           }
         }
       }
 
-      /* Artist: throw paint blobs at players */
-      if(en.type === 'artist' && players.length > 0){
+      /* Artist: throw paint blobs at state.players */
+      if(en.type === 'artist' && state.players.length > 0){
         en.paintT = ((en.paintT !== undefined) ? en.paintT : rand(2,4)) - dt;
         if(en.paintT <= 0){
           en.paintT = rand(3, 6);
-          var ptgt = players[0];
+          var ptgt = state.players[0];
           var pbx = en.x+en.w/2, pby = en.y+en.h/2;
           var pdx = ptgt.x+ptgt.w/2-pbx, pdy = ptgt.y+ptgt.h/2-pby;
           var pdist = Math.sqrt(pdx*pdx+pdy*pdy)||1;
@@ -1168,15 +1185,15 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       }
 
       /* Luke Kelly never chases — always wanders */
-      var doChase = chasing && players.length > 0 && en.type !== 'lukekelly';
+      var doChase = chasing && state.players.length > 0 && en.type !== 'lukekelly';
 
       if(doChase){
         // find nearest player
-        var nearest = players[0];
-        var bestDist = Math.abs(players[0].x - en.x);
-        for(var cp=1; cp<players.length; cp++){
-          var d = Math.abs(players[cp].x - en.x);
-          if(d < bestDist){ bestDist = d; nearest = players[cp]; }
+        var nearest = state.players[0];
+        var bestDist = Math.abs(state.players[0].x - en.x);
+        for(var cp=1; cp<state.players.length; cp++){
+          var d = Math.abs(state.players[cp].x - en.x);
+          if(d < bestDist){ bestDist = d; nearest = state.players[cp]; }
         }
         en.dir = nearest.x > en.x ? 1 : -1;
         var speed = en.vx * (en.angry>0 ? 1.8 : 1.3) * (slowT > 0 ? 0.4 : 1);
@@ -1230,17 +1247,17 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       }
 
       /* Boss bubble attack */
-      if(currentLocationId === 'boss' && en.state === 'free' && gameState === 'playing'){
+      if(state.currentLocationId === 'boss' && en.state === 'free' && state.gameState === 'playing'){
         en.shootT = (en.shootT || 3) - dt;
         if(en.shootT <= 0){
           en.shootT = Math.max(1.2, rand(2.5, 4.5) - (3 - en.hits) * 0.5);
-          var target = players[Math.floor(Math.random()*players.length)];
+          var target = state.players[Math.floor(Math.random()*state.players.length)];
           if(target){
             var bx = en.x + en.w/2, by = en.y + en.h/2;
             var dx2 = target.x + target.w/2 - bx, dy2 = target.y + target.h/2 - by;
             var dist2 = Math.sqrt(dx2*dx2+dy2*dy2) || 1;
             var spd = 240;
-            bubbles.push({x:bx, y:by, vx:(dx2/dist2)*spd, vy:(dy2/dist2)*spd,
+            state.bubbles.push({x:bx, y:by, vx:(dx2/dist2)*spd, vy:(dy2/dist2)*spd,
               r:14, grown:true, age:0, state:'flying', trapped:null, t:0,
               boss:true });
             playSound('shoot');
@@ -1248,8 +1265,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         }
       }
 
-      if(gameState === 'playing'){
-        players.forEach(function(p){
+      if(state.gameState === 'playing'){
+        state.players.forEach(function(p){
           if(p.invuln<=0 && rectsOverlap(p, en)){
             loseLife(p, en.x + en.w/2 < p.x + p.w/2 ? -1 : 1);
           }
@@ -1257,31 +1274,31 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       }
     });
 
-    // particles
-    for(var pi2=particles.length-1; pi2>=0; pi2--){
-      var pp = particles[pi2];
+    // state.particles
+    for(var pi2=state.particles.length-1; pi2>=0; pi2--){
+      var pp = state.particles[pi2];
       pp.t += dt;
-      if(pp.t>pp.life){ particles.splice(pi2,1); continue; }
+      if(pp.t>pp.life){ state.particles.splice(pi2,1); continue; }
       pp.x += pp.vx*dt; pp.y += pp.vy*dt; pp.vy += 500*dt;
     }
-    for(var pbi=popBursts.length-1; pbi>=0; pbi--){
-      var pb = popBursts[pbi];
+    for(var pbi=state.popBursts.length-1; pbi>=0; pbi--){
+      var pb = state.popBursts[pbi];
       pb.t += dt;
-      if(pb.t >= pb.life){ popBursts.splice(pbi,1); continue; }
+      if(pb.t >= pb.life){ state.popBursts.splice(pbi,1); continue; }
       pb.x += pb.vx*dt; pb.y += pb.vy*dt; pb.vy += 600*dt;
       pb.rot += pb.rotV*dt;
     }
-    for(var upi=popups.length-1; upi>=0; upi--){
-      var up = popups[upi];
+    for(var upi=state.popups.length-1; upi>=0; upi--){
+      var up = state.popups[upi];
       up.t += dt;
-      if(up.t>0.9){ popups.splice(upi,1); }
+      if(up.t>0.9){ state.popups.splice(upi,1); }
     }
     if(shakeT>0) shakeT -= dt;
     // kill feed drain
     for(var kfi2=killFeed.length-1;kfi2>=0;kfi2--){ killFeed[kfi2].t+=dt; if(killFeed[kfi2].t>killFeed[kfi2].life) killFeed.splice(kfi2,1); }
     // fire meter decay + on-fire bonus tick
     if(fireMeter>0 && comboTimer<=0) fireMeter=Math.max(0,fireMeter-dt*0.06);
-    if(fireBonus>0){ fireBonus-=dt; players.forEach(function(fp){ fp.speedBoost=Math.max(fp.speedBoost,0.12); fp.rapidFire=Math.max(fp.rapidFire,0.12); }); }
+    if(fireBonus>0){ fireBonus-=dt; state.players.forEach(function(fp){ fp.speedBoost=Math.max(fp.speedBoost,0.12); fp.rapidFire=Math.max(fp.rapidFire,0.12); }); }
     // platform shake
     if(platShake>0){ platShakeX=(Math.random()-0.5)*platShake*8; platShakeY=(Math.random()-0.5)*platShake*4; platShake=Math.max(0,platShake-dt*5); } else { platShakeX=0; platShakeY=0; }
     // panda charge timer + cooldown
@@ -1295,11 +1312,11 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         pp3.x+=pp3.vx*dt; pp3.y+=pp3.vy*dt; pp3.vy+=700*dt;
         if(pp3.y>=370 || pp3.t>2.8){
           pp3.phase='sneezing'; pp3.sneezeT=0; pp3.y=Math.min(pp3.y,370);
-          // sneeze effect: freeze + slow all enemies
+          // sneeze effect: freeze + slow all state.enemies
           freezeT=Math.max(freezeT,3.5); slowT=Math.max(slowT,2.5);
           // big sneeze particle burst
           for(var si2=0;si2<40;si2++){
-            particles.push({x:pp3.x+rand(-25,25),y:pp3.y+rand(-15,15),
+            state.particles.push({x:pp3.x+rand(-25,25),y:pp3.y+rand(-15,15),
               vx:rand(-250,250),vy:rand(-140,60),
               life:1.4,t:0,color:Math.random()<0.6?'#ccffee':'#aaddff',r:rand(5,16)});
           }
@@ -1319,18 +1336,18 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     if(!chaseAlertPlayed && elapsed >= currentChaseDelay){ chaseAlertPlayed = true; playSound('chase'); }
 
     // power-ups: bob, expire, pickup
-    for(var pui=powerups.length-1; pui>=0; pui--){
-      var pu = powerups[pui];
+    for(var pui=state.powerups.length-1; pui>=0; pui--){
+      var pu = state.powerups[pui];
       pu.bob += dt*3;
       pu.life -= dt;
-      if(pu.life<=0){ powerups.splice(pui,1); continue; }
+      if(pu.life<=0){ state.powerups.splice(pui,1); continue; }
       var puBox = {x:pu.x-12, y:pu.y-12, w:24, h:24};
       var picked = false;
-      for(var ppi=0; ppi<players.length && !picked; ppi++){
-        var pp2 = players[ppi];
+      for(var ppi=0; ppi<state.players.length && !picked; ppi++){
+        var pp2 = state.players[ppi];
         if(rectsOverlap(pp2, puBox)){
           picked = true;
-          var lvlPU2 = LEVELS[currentLocationId] && LEVELS[currentLocationId].locPowerup;
+          var lvlPU2 = LEVELS[state.currentLocationId] && LEVELS[state.currentLocationId].locPowerup;
           if(pu.type==='speed') pp2.speedBoost = 6;
           else if(pu.type==='rapid') pp2.rapidFire = 6;
           else if(pu.type==='shield') pp2.shield = 6;
@@ -1350,7 +1367,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           puFlash = 1.4; puFlashLabel = puLabel; puFlashColor = puCol;
           usedPowerups[pu.type] = true;
           if(usedPowerups.speed && usedPowerups.rapid && usedPowerups.shield) unlockAchievement('powerup_all');
-          powerups.splice(pui,1);
+          state.powerups.splice(pui,1);
         }
       }
     }
@@ -1363,8 +1380,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       var pb2 = paintBlobs[pbi];
       pb2.t += dt; pb2.x += pb2.vx*dt; pb2.y += pb2.vy*dt; pb2.vy += 400*dt;
       var pbHit = false;
-      for(var pi2=0;pi2<players.length;pi2++){
-        var pp = players[pi2];
+      for(var pi2=0;pi2<state.players.length;pi2++){
+        var pp = state.players[pi2];
         if(pp.invuln<=0 && Math.abs(pb2.x-(pp.x+pp.w/2))<20 && Math.abs(pb2.y-(pp.y+pp.h/2))<22){
           slowT = Math.max(slowT, 2.5);
           spawnPopup(pb2.x, pb2.y, 'PAINT SPLASH!', pb2.color, 13);
@@ -1377,20 +1394,20 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       if(pb2.t > pb2.life || pbHit) paintBlobs.splice(pbi,1);
     }
 
-    if(enemiesLeft<=0 && allClearDelay<=0){
-      if(waveNumber < 2){
-        waveNumber++;
+    if(state.enemiesLeft<=0 && allClearDelay<=0){
+      if(state.waveNumber < 2){
+        state.waveNumber++;
         chaseAlertPlayed = false;
-        startTime = performance.now();
-        var speedMult = 1 + waveNumber*0.3;
-        var layout2 = LEVEL_LAYOUTS[currentLocationId];
+        state.startTime = performance.now();
+        var speedMult = 1 + state.waveNumber*0.3;
+        var layout2 = LEVEL_LAYOUTS[state.currentLocationId];
         var variety2 = layout2 && layout2.enemyVariety;
-        enemies = layout2.enemySpawns.map(function(s, si){
+        state.enemies = layout2.enemySpawns.map(function(s, si){
           var useSpecial = variety2 && Math.random() < variety2.waveRatio;
           var eType = useSpecial ? variety2.specialType : 'normal';
           var ew = eType==='parmesan'?44 : eType==='buckfast'?20 : eType==='motorbike'?42 : eType==='armoured'?34 : eType==='fast'?22 : 28;
           var eh = eType==='parmesan'?38 : eType==='buckfast'?26 : eType==='motorbike'?28 : eType==='armoured'?30 : eType==='fast'?20 : 26;
-          var lvlSpd = (LEVELS[currentLocationId] && LEVELS[currentLocationId].levelPhysics && LEVELS[currentLocationId].levelPhysics.enemySpeed) || 1;
+          var lvlSpd = (LEVELS[state.currentLocationId] && LEVELS[state.currentLocationId].levelPhysics && LEVELS[state.currentLocationId].levelPhysics.enemySpeed) || 1;
           var baseSpd2 = eType==='buckfast'?130 : eType==='parmesan'?50 : eType==='motorbike'?160 : eType==='armoured'?60 : eType==='fast'?110 : 85;
           var spd = baseSpd2 * speedMult * lvlSpd;
           var ehits2 = eType==='parmesan'?3 : eType==='armoured'?2 : 1;
@@ -1399,9 +1416,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
             state:'free', bubbleTimer:0, hopT:rand(1,3), angry:0, onGround:false,
             type:eType, hits:ehits2, wanderX:rand(40,680), wanderT:rand(3,9) };
         });
-        enemiesLeft = enemies.length;
-        /* Don't re-trigger all-clear if collectibles were already all taken in wave 1 */
-        allClearFired = collectibles.length > 0 && collectibles.every(function(c){ return c.taken; });
+        state.enemiesLeft = state.enemies.length;
+        /* Don't re-trigger all-clear if state.collectibles were already all taken in wave 1 */
+        allClearFired = state.collectibles.length > 0 && state.collectibles.every(function(c){ return c.taken; });
         allClearDelay = 0;
         waveFlash = 2.5;
         spawnParticles(W/2, H/2, '#ff5470', 30);
@@ -1414,26 +1431,26 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 
   function loseLife(p, knockDir){
     if(p.shield>0){ playSound('shield_block'); p.invuln = 0.5; return; }
-    lives--;
+    state.lives--;
     p.invuln = 1.6;
     p.vy = -340;
     p.vx = (knockDir||0) * 240;
     screenFlash = 0.35; screenFlashColor = '#ff1040';
     shakeT = 0.4;
-    playSound(lives > 0 ? 'life_lost' : 'lose'); haptic(50);
+    playSound(state.lives > 0 ? 'life_lost' : 'lose'); haptic(50);
     updateHud();
-    if(lives > 0){
+    if(state.lives > 0){
       p.speedBoost = Math.max(p.speedBoost, 1.4);
       spawnPopup(p.x+p.w/2, p.y-24, 'FIGHT BACK!', '#ff6644', 15);
       spawnParticles(p.x+p.w/2, p.y+p.h/2, '#ff8855', 8);
-      pushKillFeed('LIFE LOST - '+lives+' LEFT', '#ff6644');
+      pushKillFeed('LIFE LOST - '+state.lives+' LEFT', '#ff6644');
     }
-    if(lives<=0){
-      gameState = 'lost';
+    if(state.lives<=0){
+      state.gameState = 'lost';
       stopMusic();
       var loseSummaryText = survivalMode
-        ? 'Reached wave ' + survivalWave + ' · Score: ' + score
-        : 'Score ' + score + ' · try trapping enemies before they reach you.';
+        ? 'Reached wave ' + survivalWave + ' · Score: ' + state.score
+        : 'Score ' + state.score + ' · try trapping state.enemies before they reach you.';
       showAdBreak(function(){
         document.getElementById('loseSummary').textContent = loseSummaryText;
         document.getElementById('overlayLose').hidden = false;
@@ -1445,7 +1462,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 
   function getNextLocation(){
     var idx = -1;
-    for(var i=0; i<LOCATIONS.length; i++){ if(LOCATIONS[i].id === currentLocationId){ idx=i; break; } }
+    for(var i=0; i<LOCATIONS.length; i++){ if(LOCATIONS[i].id === state.currentLocationId){ idx=i; break; } }
     for(var i = idx+1; i < LOCATIONS.length; i++){
       if(LOCATIONS[i].unlocked) return LOCATIONS[i];
     }
@@ -1462,15 +1479,15 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     endlessMode = true;
     endlessLoop = 1;
     endlessSpeedMult = 1.0;
-    currentLocationId = ENDLESS_ORDER[0];
+    state.currentLocationId = ENDLESS_ORDER[0];
     document.getElementById('overlayWin').hidden = true;
     resetGame();
-    gameState = 'playing';
+    state.gameState = 'playing';
     startMusic();
   }
 
   function endlessNextLevel(){
-    var idx = ENDLESS_ORDER.indexOf(currentLocationId);
+    var idx = ENDLESS_ORDER.indexOf(state.currentLocationId);
     var nextIdx = (idx + 1) % ENDLESS_ORDER.length;
     if(nextIdx === 0){
       endlessLoop++;
@@ -1478,10 +1495,10 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       var best = safeGet('gh_endless_best', 0);
       if(endlessLoop > best){ safeSet('gh_endless_best', endlessLoop); }
     }
-    currentLocationId = ENDLESS_ORDER[nextIdx];
+    state.currentLocationId = ENDLESS_ORDER[nextIdx];
     document.getElementById('overlayWin').hidden = true;
     resetGame();
-    gameState = 'playing';
+    state.gameState = 'playing';
     startMusic();
   }
 
@@ -1490,10 +1507,10 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     document.getElementById('overlayWin').hidden = true;
     document.getElementById('winNextHint').hidden = true;
     document.getElementById('btnWinNext').hidden = true;
-    currentLocationId = loc.id;
+    state.currentLocationId = loc.id;
     resetGame();
     document.getElementById('howto').hidden = true;
-    gameState = 'playing';
+    state.gameState = 'playing';
     startMusic();
   }
 
@@ -1539,11 +1556,11 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       if(item.type==='level'){
         campaignLastType = 'level';
         stopMusic();
-        currentLocationId = item.id;
+        state.currentLocationId = item.id;
         resetGame();
         document.getElementById('howto').hidden = true;
-        gameState = 'playing';
-        startTime = performance.now();
+        state.gameState = 'playing';
+        state.startTime = performance.now();
         startMusic();
       } else {
         campaignLastType = 'minigame';
@@ -1566,7 +1583,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   /* ── Celebration confetti rain ───────────────────────────────────────────── */
   function spawnCelebrationRain(col1, col2){
     for(var i=0; i<50; i++){
-      particles.push({
+      state.particles.push({
         x:rand(0,W), y:rand(-50,-5),
         vx:rand(-70,70), vy:rand(100,260),
         life:rand(1.5,3.2), t:0,
@@ -1764,7 +1781,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     miniGameId = id;
     miniGameTimer = MINI_GAME_DEFS[id].timeLimit;
     miniGamePhase = 'playing';
-    gameState = 'minigame';
+    state.gameState = 'minigame';
     stopMusic();
     startMiniGameMusic(id);
     document.querySelector('.hud').style.visibility = 'hidden';
@@ -2475,29 +2492,29 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 
   function winLevel(){
     if(survivalMode) return;
-    if(gameState !== 'playing') return;
-    gameState = 'won';
+    if(state.gameState !== 'playing') return;
+    state.gameState = 'won';
     stopMusic();
     playSound('win');
-    var totalElapsed = (performance.now()-startTime)/1000;
+    var totalElapsed = (performance.now()-state.startTime)/1000;
     var elapsed = totalElapsed; // kept for star rating compat
-    var collected = collectibles.filter(function(c){return c.taken;}).length;
+    var collected = state.collectibles.filter(function(c){return c.taken;}).length;
     // time bonus (based on total elapsed across both waves)
     var timeBonus = Math.max(0, Math.floor(500 - totalElapsed * 6));
-    if(timeBonus > 0){ score += timeBonus; spawnPopup(W/2,H/2-40,'TIME BONUS +'+timeBonus,'#ffd700'); }
+    if(timeBonus > 0){ state.score += timeBonus; spawnPopup(W/2,H/2-40,'TIME BONUS +'+timeBonus,'#ffd700'); }
     var stars = 1;
     if(collected >= 4) stars++;
     if(totalElapsed < 60) stars++;
-    var pr = progress[currentLocationId] || {best:0,cleared:false};
+    var pr = progress[state.currentLocationId] || {best:0,cleared:false};
     pr.cleared = true;
     pr.playCount = (pr.playCount||0) + 1;
-    var isNewBest = score > pr.best;
-    if(isNewBest) pr.best = score;
-    progress[currentLocationId] = pr;
+    var isNewBest = state.score > pr.best;
+    if(isNewBest) pr.best = state.score;
+    progress[state.currentLocationId] = pr;
     safeSet('gh_progress_v2', progress);
 
     /* Panda special unlock — beating the China boss */
-    if(currentLocationId === 'boss' && !pandaSpecialUnlocked){
+    if(state.currentLocationId === 'boss' && !pandaSpecialUnlocked){
       pandaSpecialUnlocked = true;
       try{ localStorage.setItem('bbl_panda_special','1'); }catch(e){}
       spawnPopup(W/2, H/2-80, 'PANDA SPECIAL UNLOCKED!', '#ffffff', 22);
@@ -2506,28 +2523,28 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 
     /* Feature 3: Achievements in winLevel */
     if(totalElapsed < 40) unlockAchievement('speedrun');
-    if(collected >= collectibles.length) unlockAchievement('treasure');
+    if(collected >= state.collectibles.length) unlockAchievement('treasure');
     var allFiveCleared = ['glasgow','modena','kenya','paris','ireland'].every(function(id){ return progress[id] && progress[id].cleared; });
     if(allFiveCleared) unlockAchievement('globetrotter');
 
     /* Feature 2: Daily challenge check */
     var daily = safeGet('gh_daily_v1', {date:'',score:0,done:false});
     var today2 = new Date().toDateString();
-    if(currentLocationId === getDailyLocationId() && (!daily.done || daily.date !== today2)){
-      daily.date = today2; daily.score = score; daily.done = true;
+    if(state.currentLocationId === getDailyLocationId() && (!daily.done || daily.date !== today2)){
+      daily.date = today2; daily.score = state.score; daily.done = true;
       safeSet('gh_daily_v1', daily);
       refreshDailyUI();
       spawnPopup(W/2, H/2-60, 'DAILY COMPLETE!', '#ffd700');
     }
 
-    /* Feature 6: Track missed collectibles */
-    var missed = collectibles.filter(function(c){ return !c.taken; }).map(function(c){ return {x:c.x, y:c.y, slot:c.slot}; });
-    safeSet('gh_missed_'+currentLocationId, missed);
+    /* Feature 6: Track missed state.collectibles */
+    var missed = state.collectibles.filter(function(c){ return !c.taken; }).map(function(c){ return {x:c.x, y:c.y, slot:c.slot}; });
+    safeSet('gh_missed_'+state.currentLocationId, missed);
 
     var playCount = resetGame._playCount || 0;
-    document.getElementById('winTitle').textContent = LEVELS[currentLocationId].name + ' cleared!';
+    document.getElementById('winTitle').textContent = LEVELS[state.currentLocationId].name + ' cleared!';
     document.getElementById('winStars').textContent = '★'.repeat(stars) + '☆'.repeat(3-stars);
-    document.getElementById('winSummary').textContent = 'Score ' + score + ' · ' + collected + '/' + collectibles.length + ' treasures · Tier ' + Math.min(playCount+1, 10);
+    document.getElementById('winSummary').textContent = 'Score ' + state.score + ' · ' + collected + '/' + state.collectibles.length + ' treasures · Tier ' + Math.min(playCount+1, 10);
     var acWinEl = document.getElementById('winAchievements');
     if(acWinEl){
       if(runAchievements && runAchievements.length > 0){
@@ -2548,12 +2565,12 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       setTimeout(function(){ nameInput.focus(); }, 100);
     } else {
       nameEntryRow.hidden = true;
-      /* Auto-submit score if we have a saved name */
+      /* Auto-submit state.score if we have a saved name */
       if(pr.name && lbEnabled()){
         winScoreSubmit.hidden = false;
-        winScoreSubmit.textContent = 'Submitting score…';
-        submitScore(currentLocationId, pr.name, score, function(ok){
-          winScoreSubmit.textContent = ok ? '✓ Score submitted to leaderboard' : '✗ Could not submit score';
+        winScoreSubmit.textContent = 'Submitting state.score…';
+        submitScore(state.currentLocationId, pr.name, state.score, function(ok){
+          winScoreSubmit.textContent = ok ? '✓ Score submitted to leaderboard' : '✗ Could not submit state.score';
         });
       }
     }
@@ -2600,7 +2617,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           }, 1000);
           winNextTimer = setTimeout(function(){
             clearInterval(tick);
-            if(gameState === 'won') startNextLevel(nextLoc);
+            if(state.gameState === 'won') startNextLevel(nextLoc);
           }, 5000);
         } else {
           winNextHint.hidden = true;
@@ -2617,7 +2634,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   updateHud();
 
   function draw(){
-    var level = LEVELS[currentLocationId];
+    var level = LEVELS[state.currentLocationId];
     var theme = level.theme;
     ctx.save();
     if(shakeT>0){
@@ -2640,7 +2657,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     ctx.restore();
     drawGround(theme);
 
-    collectibles.forEach(function(c){
+    state.collectibles.forEach(function(c){
       if(c.taken) return;
       if(c.ghost){
         ctx.save();
@@ -2654,7 +2671,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         level.collectibleDraw(c);
       }
     });
-    enemies.forEach(function(en){
+    state.enemies.forEach(function(en){
       if(en.state==='free'){
         if(en.type==='buckfast') drawBuckfastRef(en);
         else if(en.type==='parmesan') drawParmesanRef(en);
@@ -2662,7 +2679,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         else if(en.type==='artist') drawArtistRef(en);
         else if(en.type==='motorbike') drawMotorbikeRef(en);
         else level.enemyDraw(en);
-        if(waveNumber >= 2){
+        if(state.waveNumber >= 2){
           ctx.save();
           ctx.globalAlpha = 0.35;
           ctx.fillStyle = '#ff2040';
@@ -2702,7 +2719,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       ctx.restore();
     }
     // pop burst: spinning enemy ghost that flies off after being popped
-    popBursts.forEach(function(pb){
+    state.popBursts.forEach(function(pb){
       var frac = pb.t / pb.life;
       var fakeEn = {x:pb.x-pb.w/2, y:pb.y-pb.h/2, w:pb.w, h:pb.h,
                     state:'trapped', facing:1, dir:1, angry:0, hits:pb.hits, vx:0, vy:0, bubbleTimer:0, type:pb.enType||'normal'};
@@ -2720,8 +2737,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       else pb.drawFn(fakeEn);
       ctx.restore();
     });
-    powerups.forEach(drawPowerup);
-    players.forEach(function(p){
+    state.powerups.forEach(drawPowerup);
+    state.players.forEach(function(p){
       var visible = p.invuln<=0 || Math.floor(performance.now()/80)%2===0;
       if(visible){
         // shield glow
@@ -2790,8 +2807,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         ctx.restore();
       }
     });
-    bubbles.forEach(drawBubble);
-    bubbles.forEach(function(b){
+    state.bubbles.forEach(drawBubble);
+    state.bubbles.forEach(function(b){
       if(b.state==='carrying' && b.trapped && b.trapped.bubbleTimer){
         var frac=b.trapped.bubbleTimer/4.5;
         ctx.save();
@@ -2811,13 +2828,13 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       ctx.fillRect(0,0,W,H);
       ctx.restore();
     }
-    particles.forEach(function(pp){
+    state.particles.forEach(function(pp){
       ctx.globalAlpha = clamp(1-pp.t/pp.life,0,1);
       ctx.fillStyle = pp.color;
       ctx.beginPath(); ctx.arc(pp.x,pp.y,pp.r,0,TAU); ctx.fill();
       ctx.globalAlpha = 1;
     });
-    popups.forEach(function(up){
+    state.popups.forEach(function(up){
       ctx.globalAlpha = clamp(1-up.t/0.9,0,1);
       ctx.fillStyle = up.color;
       ctx.font = '700 ' + (up.size||16) + 'px "Space Mono", monospace';
@@ -2843,8 +2860,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       ctx.fillRect(120, 46, barW, 6);
       ctx.restore();
     }
-    if(!tutorialDone && gameState==='playing'){
-      var tMsg=tutorialFirstPop?'Jump onto the trapped bubble to pop it!':'Shoot enemies with bubbles! [Shift / bubble button]';
+    if(!tutorialDone && state.gameState==='playing'){
+      var tMsg=tutorialFirstPop?'Jump onto the trapped bubble to pop it!':'Shoot state.enemies with state.bubbles! [Shift / bubble button]';
       var tAlpha;
       if(!tutorialFirstPop){ tAlpha=Math.min(1,tutorialT*3)*Math.min(1,(6-tutorialT)*2); }
       else { tAlpha=Math.min(1,(tutorialT-6)*2)*Math.min(1,(12-tutorialT)*2); }
@@ -2932,8 +2949,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // chase warning
-    if(gameState==='playing'){
-      var elapsedDraw = (performance.now() - startTime) / 1000;
+    if(state.gameState==='playing'){
+      var elapsedDraw = (performance.now() - state.startTime) / 1000;
       var currentChaseDelayDraw = resetGame._adjustedChaseDelay || CHASE_DELAY;
       var timeLeft = currentChaseDelayDraw - elapsedDraw;
       if(timeLeft > 0 && timeLeft <= 5){
@@ -2956,15 +2973,15 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // wave label
-    if(gameState==='playing' && waveNumber>1){
+    if(state.gameState==='playing' && state.waveNumber>1){
       ctx.fillStyle='rgba(255,84,112,0.7)';
       ctx.font='bold 11px "Fredoka",sans-serif';
       ctx.textAlign='right';
-      ctx.fillText('WAVE '+waveNumber, W-8, 26);
+      ctx.fillText('WAVE '+state.waveNumber, W-8, 26);
     }
 
     // active loc power-up status banners
-    if(gameState==='playing'){
+    if(state.gameState==='playing'){
       ctx.font='bold 11px "Fredoka",sans-serif'; ctx.textAlign='left';
       var bannerY = 38;
       if(freezeT>0){ ctx.fillStyle='rgba(80,200,255,0.85)'; ctx.fillText('❄ FREEZE '+Math.ceil(freezeT)+'s', 8, bannerY); bannerY+=14; }
@@ -2973,16 +2990,16 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       if(magnetT>0){ ctx.fillStyle='rgba(255,80,255,0.9)'; ctx.fillText('MAGNET '+Math.ceil(magnetT)+'s', 8, bannerY); bannerY+=14; }
     }
 
-    // enemy indicator arrows (for enemies off the bottom third of screen)
-    if(gameState==='playing' && players.length>0){
-      var px = players[0].x + players[0].w/2;
-      enemies.forEach(function(en){
+    // enemy indicator arrows (for state.enemies off the bottom third of screen)
+    if(state.gameState==='playing' && state.players.length>0){
+      var px = state.players[0].x + state.players[0].w/2;
+      state.enemies.forEach(function(en){
         if(en.state!=='free') return;
         var ex = en.x+en.w/2, ey = en.y+en.h/2;
         // only show if enemy is more than 200px away vertically or near edge
-        if(Math.abs(ey - (players[0].y+players[0].h/2)) < 120) return;
-        var angle = Math.atan2(ey-(players[0].y+15), ex-px);
-        var ax = px + Math.cos(angle)*50, ay = (players[0].y+15) + Math.sin(angle)*50;
+        if(Math.abs(ey - (state.players[0].y+state.players[0].h/2)) < 120) return;
+        var angle = Math.atan2(ey-(state.players[0].y+15), ex-px);
+        var ax = px + Math.cos(angle)*50, ay = (state.players[0].y+15) + Math.sin(angle)*50;
         ax = clamp(ax,12,W-12); ay = clamp(ay,12,H-12);
         ctx.save(); ctx.translate(ax,ay); ctx.rotate(angle);
         ctx.fillStyle='rgba(255,84,112,0.75)';
@@ -3027,7 +3044,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // countdown overlay
-    if(gameState==='playing' && countdownT > 0){
+    if(state.gameState==='playing' && countdownT > 0){
       var cn = Math.ceil(countdownT);
       var scale = 1 + (countdownT - Math.floor(countdownT)) * 0.5;
       ctx.save();
@@ -3038,14 +3055,14 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       ctx.fillText(cn <= 0 ? 'GO!' : String(cn), W/2, H/2+20);
       ctx.restore();
     }
-    if(gameState==='playing' && countdownT > -0.5 && countdownT <= 0){
+    if(state.gameState==='playing' && countdownT > -0.5 && countdownT <= 0){
       ctx.save(); ctx.globalAlpha = Math.max(0, 1+countdownT*2);
       ctx.fillStyle='#ffd700'; ctx.font='bold 90px "Fredoka",sans-serif'; ctx.textAlign='center';
       ctx.fillText('GO!', W/2, H/2+20); ctx.restore();
     }
 
     // survival HUD
-    if(survivalMode && gameState==='playing'){
+    if(survivalMode && state.gameState==='playing'){
       ctx.save();
       ctx.fillStyle='rgba(255,84,112,0.85)';
       ctx.font='bold 13px "Fredoka",sans-serif'; ctx.textAlign='center';
@@ -3054,7 +3071,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // confetti (win screen)
-    if(gameState==='won'){
+    if(state.gameState==='won'){
       confettiParticles.forEach(function(c){
         ctx.save(); ctx.translate(c.x,c.y); ctx.rotate(c.rot);
         ctx.globalAlpha = Math.max(0, 1-c.t/c.life);
@@ -3065,7 +3082,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // paused overlay
-    if(gameState==='paused'){
+    if(state.gameState==='paused'){
       ctx.fillStyle='rgba(10,17,40,0.65)';
       ctx.fillRect(0,0,W,H);
       ctx.fillStyle='#eef1fb';
@@ -3078,7 +3095,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // ── panda projectile draw ─────────────────────────────────────────────────
-    if(pandaProjectile && gameState==='playing'){
+    if(pandaProjectile && state.gameState==='playing'){
       var pp4=pandaProjectile;
       var isSneeze=pp4.phase==='sneezing';
       // sneeze freeze cloud rings that pulse outward
@@ -3096,7 +3113,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // ── panda charge indicator (bottom-left when unlocked) ───────────────────
-    if(pandaSpecialUnlocked && gameState==='playing'){
+    if(pandaSpecialUnlocked && state.gameState==='playing'){
       ctx.save();
       var piX=8, piY=H-28;
       // cooldown ring or ready
@@ -3123,7 +3140,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // ── on-fire meter ────────────────────────────────────────────────────────
-    if(gameState==='playing' && (fireMeter > 0.05 || fireBonus > 0)){
+    if(state.gameState==='playing' && (fireMeter > 0.05 || fireBonus > 0)){
       ctx.save();
       var fmX=W/2-70, fmY=H-13, fmW=140, fmH=5;
       ctx.fillStyle='rgba(0,0,0,0.38)';
@@ -3140,7 +3157,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // ── kill feed ─────────────────────────────────────────────────────────────
-    if(killFeed.length>0 && gameState==='playing'){
+    if(killFeed.length>0 && state.gameState==='playing'){
       ctx.save();
       ctx.font='bold 11px "Space Mono",monospace';
       for(var kfi3=0;kfi3<killFeed.length;kfi3++){
@@ -3160,8 +3177,8 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     }
 
     // ── enemy taunt indicators ────────────────────────────────────────────────
-    if(gameState==='playing'){
-      enemies.forEach(function(en){
+    if(state.gameState==='playing'){
+      state.enemies.forEach(function(en){
         if(!(en.tauntT>0)) return;
         var ta=Math.min(1,en.tauntT/0.3)*Math.min(1,en.tauntT);
         var tx=en.x+en.w/2, ty=en.y-10;
@@ -3213,7 +3230,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       } else {
         if(netRole!=='guest'){ update(dt); }
         draw();
-        document.getElementById('hudScore').textContent = score;
+        document.getElementById('hudScore').textContent = state.score;
       }
       if(netRole==='guest'){
         netSendInputIfChanged();
@@ -3228,18 +3245,18 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   /* Shared mutable state object for net module — synced before/after net calls */
   var _netShared = {};
   function syncToNet(){
-    _netShared.players = players; _netShared.enemies = enemies; _netShared.bubbles = bubbles;
-    _netShared.collectibles = collectibles; _netShared.score = score; _netShared.lives = lives;
-    _netShared.gameState = gameState; _netShared.enemiesLeft = enemiesLeft;
-    _netShared.currentLocationId = currentLocationId; _netShared.numPlayers = numPlayers;
-    _netShared.popups = popups; _netShared.waveNumber = waveNumber; _netShared.comboCount = comboCount;
-    _netShared.startTime = startTime; _netShared.LOCATIONS = LOCATIONS;
+    _netShared.players = state.players; _netShared.enemies = state.enemies; _netShared.bubbles = state.bubbles;
+    _netShared.collectibles = state.collectibles; _netShared.score = state.score; _netShared.lives = state.lives;
+    _netShared.gameState = state.gameState; _netShared.enemiesLeft = state.enemiesLeft;
+    _netShared.currentLocationId = state.currentLocationId; _netShared.numPlayers = state.numPlayers;
+    _netShared.popups = state.popups; _netShared.waveNumber = state.waveNumber; _netShared.comboCount = state.comboCount;
+    _netShared.startTime = state.startTime; _netShared.LOCATIONS = LOCATIONS;
   }
   function syncFromNet(){
-    players = _netShared.players; enemies = _netShared.enemies; bubbles = _netShared.bubbles;
-    collectibles = _netShared.collectibles; score = _netShared.score; lives = _netShared.lives;
-    gameState = _netShared.gameState; enemiesLeft = _netShared.enemiesLeft;
-    popups = _netShared.popups;
+    state.players = _netShared.players; state.enemies = _netShared.enemies; state.bubbles = _netShared.bubbles;
+    state.collectibles = _netShared.collectibles; state.score = _netShared.score; state.lives = _netShared.lives;
+    state.gameState = _netShared.gameState; state.enemiesLeft = _netShared.enemiesLeft;
+    state.popups = _netShared.popups;
   }
   setNetState(_netShared);
 
@@ -3248,20 +3265,20 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   /* Debug hook — exposes internal state for automated playtests only.
      Never call __game in production code; use the public APIs instead. */
   window.__game = {
-    getState: function(){ return { gameState:gameState, waveNumber:waveNumber, score:score,
-      lives:lives, enemiesLeft:enemiesLeft, enemyCount:enemies.length,
-      collectiblesTaken: collectibles.filter(function(c){return c.taken;}).length,
-      collectiblesTotal: collectibles.length, allClearFired:allClearFired,
+    getState: function(){ return { gameState:state.gameState, waveNumber:state.waveNumber, score:state.score,
+      lives:state.lives, enemiesLeft:state.enemiesLeft, enemyCount:state.enemies.length,
+      collectiblesTaken: state.collectibles.filter(function(c){return c.taken;}).length,
+      collectiblesTotal: state.collectibles.length, allClearFired:allClearFired,
       smokeLevel:smokeLevel, paintBlobCount:paintBlobs.length,
-      currentLocationId:currentLocationId }; },
-    getEnemyTypes: function(){ return enemies.map(function(e){return e.type;}); },
+      currentLocationId:state.currentLocationId }; },
+    getEnemyTypes: function(){ return state.enemies.map(function(e){return e.type;}); },
     hasFn: function(n){ return typeof window[n]==='function'; },
-    forceAllCollectiblesTaken: function(){ collectibles.forEach(function(c){c.taken=true;}); },
-    forceWave2: function(){ enemies=[]; enemiesLeft=0; allClearFired=true; allClearDelay=0; },
-    spawnArtistEnemy: function(){ enemies.push({x:300,y:150,w:28,h:26,vx:80,vy:0,dir:1,
+    forceAllCollectiblesTaken: function(){ state.collectibles.forEach(function(c){c.taken=true;}); },
+    forceWave2: function(){ state.enemies=[]; state.enemiesLeft=0; allClearFired=true; allClearDelay=0; },
+    spawnArtistEnemy: function(){ state.enemies.push({x:300,y:150,w:28,h:26,vx:80,vy:0,dir:1,
       state:'free',bubbleTimer:0,hopT:0,angry:0,onGround:false,type:'artist',hits:1,
       wanderX:200,wanderT:5,paintT:0.05}); return 'ok'; },
-    spawnMotorbikeEnemy: function(){ enemies.push({x:100,y:400,w:42,h:28,vx:160,vy:0,dir:1,
+    spawnMotorbikeEnemy: function(){ state.enemies.push({x:100,y:400,w:42,h:28,vx:160,vy:0,dir:1,
       state:'free',bubbleTimer:0,hopT:0,angry:0,onGround:true,type:'motorbike',hits:1,
       wanderX:600,wanderT:5,smokeRevT:0.1}); return 'ok'; },
     drawFns: { buckfast: typeof drawBuckfastRef, parmesan: typeof drawParmesanRef,

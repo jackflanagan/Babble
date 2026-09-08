@@ -62,7 +62,6 @@ export function playSound(type){
         pg.gain.setValueAtTime(0.22,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.1);
         po.start(now+t); po.stop(now+t+0.1);
       });
-      o.stop(now); // unused
     } else if(type==='win'){
       [[523,0],[659,0.1],[784,0.2],[1047,0.32]].forEach(function(f){
         var po=c.createOscillator(), pg=c.createGain();
@@ -71,7 +70,6 @@ export function playSound(type){
         pg.gain.setValueAtTime(0.25,now+f[1]); pg.gain.linearRampToValueAtTime(0,now+f[1]+0.18);
         po.start(now+f[1]); po.stop(now+f[1]+0.2);
       });
-      o.stop(now);
     } else if(type==='beep'){
       o.type='sine'; o.frequency.setValueAtTime(880,now); o.frequency.linearRampToValueAtTime(880,now+0.08);
       g.gain.setValueAtTime(0.18,now); g.gain.linearRampToValueAtTime(0,now+0.1);
@@ -98,7 +96,6 @@ export function playSound(type){
       pg2.gain.setValueAtTime(0,now+0.48); pg2.gain.linearRampToValueAtTime(0.12,now+0.52);
       pg2.gain.linearRampToValueAtTime(0,now+0.85);
       po2.start(now+0.48); po2.stop(now+0.86);
-      o.stop(now);
     } else if(type==='chase'){
       [0,0.15,0.3].forEach(function(t){
         var po=c.createOscillator(), pg=c.createGain();
@@ -107,7 +104,6 @@ export function playSound(type){
         pg.gain.setValueAtTime(0.18,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.12);
         po.start(now+t); po.stop(now+t+0.14);
       });
-      o.stop(now);
     } else if(type==='pop_combo'){
       // Ascending sparkle pop — bright and snappy
       o.type='sine'; o.frequency.setValueAtTime(520,now); o.frequency.linearRampToValueAtTime(1400,now+0.13);
@@ -145,7 +141,6 @@ export function playSound(type){
         pg.gain.setValueAtTime(0.22,now+0.35); pg.gain.linearRampToValueAtTime(0,now+0.65);
         po.start(now+0.35); po.stop(now+0.67);
       });
-      o.stop(now);
     } else if(type==='pop_glasgow'){
       // Gritty heavy thud — low sine + fat noise burst
       o.type='sine'; o.frequency.setValueAtTime(320,now); o.frequency.linearRampToValueAtTime(50,now+0.18);
@@ -205,7 +200,6 @@ export function playSound(type){
       po.type='sine'; po.frequency.value=1568;
       pg.gain.setValueAtTime(0.18,now+0.16); pg.gain.linearRampToValueAtTime(0,now+0.3);
       po.start(now+0.16); po.stop(now+0.32);
-      o.stop(now);
     } else if(type==='combo_4'){
       // Three sparkles in cascade + bell
       [[480,0,1200],[600,0.07,1500],[740,0.14,1800]].forEach(function(f){
@@ -218,7 +212,6 @@ export function playSound(type){
       po.type='triangle'; po.frequency.value=2093;
       pg.gain.setValueAtTime(0.22,now+0.22); pg.gain.linearRampToValueAtTime(0,now+0.5);
       po.start(now+0.22); po.stop(now+0.52);
-      o.stop(now);
     } else if(type==='combo_max'){
       // 5+ combo: ascending cascade + bass thump + sparkle rain
       [[400,0],[520,0.06],[640,0.12],[800,0.18],[1000,0.24],[1300,0.3]].forEach(function(f){
@@ -237,7 +230,6 @@ export function playSound(type){
         pg.gain.setValueAtTime(0.12,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.1);
         po.start(now+t); po.stop(now+t+0.12);
       });
-      o.stop(now);
     } else if(type==='powerup_speed'){
       // Fast whoosh double-sweep
       o.type='sawtooth'; o.frequency.setValueAtTime(200,now); o.frequency.linearRampToValueAtTime(1800,now+0.12);
@@ -255,7 +247,6 @@ export function playSound(type){
         pg.gain.setValueAtTime(0.2,now+t); pg.gain.linearRampToValueAtTime(0,now+t+0.04);
         po.start(now+t); po.stop(now+t+0.05);
       });
-      o.stop(now);
     } else if(type==='powerup_shield'){
       // Resonant protective chord swell
       [392,523,659].forEach(function(freq){
@@ -265,7 +256,6 @@ export function playSound(type){
         pg.gain.linearRampToValueAtTime(0,now+0.55);
         po.start(now); po.stop(now+0.57);
       });
-      o.stop(now);
     } else if(type==='powerup_magnet'){
       // Low whump then magnetic snap upward
       o.type='sine'; o.frequency.setValueAtTime(80,now); o.frequency.linearRampToValueAtTime(30,now+0.15);
@@ -284,7 +274,6 @@ export function playSound(type){
         pg.gain.linearRampToValueAtTime(0,now+t+0.35);
         po.start(now+t); po.stop(now+t+0.37);
       });
-      o.stop(now);
     } else if(type==='shield_block'){
       // Metallic clank — layered sawtooth harmonics
       [200,400,600].forEach(function(freq){
@@ -293,7 +282,6 @@ export function playSound(type){
         pg.gain.setValueAtTime(0.16,now); pg.gain.linearRampToValueAtTime(0,now+0.13);
         po.start(now); po.stop(now+0.14);
       });
-      o.stop(now);
     } else if(type==='life_lost'){
       // Cartoon descending ouch
       o.type='sine'; o.frequency.setValueAtTime(440,now); o.frequency.linearRampToValueAtTime(200,now+0.2);
@@ -311,7 +299,6 @@ export function playSound(type){
         pg.gain.setValueAtTime(0.3,now+f[1]); pg.gain.linearRampToValueAtTime(0,now+f[1]+f[2]);
         po.start(now+f[1]); po.stop(now+f[1]+f[2]+0.02);
       });
-      o.stop(now);
     } else if(type==='land'){
       // Soft thud — low sine + tiny noise
       o.type='sine'; o.frequency.setValueAtTime(90,now); o.frequency.linearRampToValueAtTime(40,now+0.08);
