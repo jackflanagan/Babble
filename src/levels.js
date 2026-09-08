@@ -615,22 +615,4 @@ export var LEVELS = {
   }
 };
 
-setDrawState(function(){ return { LEVELS: LEVELS, currentLocationId: currentLocationId }; });
-/* Shared mutable state object for net module — synced before/after net calls */
-var _netShared = {};
-function syncToNet(){
-  _netShared.players = players; _netShared.enemies = enemies; _netShared.bubbles = bubbles;
-  _netShared.collectibles = collectibles; _netShared.score = score; _netShared.lives = lives;
-  _netShared.gameState = gameState; _netShared.enemiesLeft = enemiesLeft;
-  _netShared.currentLocationId = currentLocationId; _netShared.numPlayers = numPlayers;
-  _netShared.popups = popups; _netShared.waveNumber = waveNumber; _netShared.comboCount = comboCount;
-  _netShared.startTime = startTime; _netShared.LOCATIONS = LOCATIONS;
-}
-function syncFromNet(){
-  players = _netShared.players; enemies = _netShared.enemies; bubbles = _netShared.bubbles;
-  collectibles = _netShared.collectibles; score = _netShared.score; lives = _netShared.lives;
-  gameState = _netShared.gameState; enemiesLeft = _netShared.enemiesLeft;
-  popups = _netShared.popups;
-}
-setNetState(_netShared);
 

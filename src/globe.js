@@ -2,7 +2,7 @@
    GLOBE SCENE
 ========================================================= */
 
-import { TAU, rand, safeGet, safeSet } from './utils.js';
+import { TAU, clamp, rand, safeGet, safeSet } from './utils.js';
 
 /* injectable deps */
 var _progress = {};
@@ -26,7 +26,6 @@ export var LOCATIONS = [
   { id:'newyork', name:'New York',lat:40.71, lon:-74.00,unlocked:false, region:'americas'},
   { id:'boss',    name:'China',   lat:35.86, lon:104.19,unlocked:false, region:'asia'   }
 ];
-setLocationsGetter(function(){ return LOCATIONS; });
 
 // Real, simplified world coastlines (Natural Earth 110m land polygons,
 // Douglas-Peucker simplified to ~3.8k points). Each entry is a ring of
@@ -403,7 +402,6 @@ export function refreshClearedPin(){
     if(pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add('cleared');
   });
   renderBestScores();
-  buildSkinDots();
 }
 export function renderBestScores(){
   var el = document.getElementById('bestScoreLine');
