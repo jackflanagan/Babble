@@ -355,6 +355,25 @@ export function playSound(type){
       po.type='square'; po.frequency.value=440;
       pg.gain.setValueAtTime(0.1,now); pg.gain.linearRampToValueAtTime(0,now+0.05);
       po.start(now); po.stop(now+0.06);
+    } else if(type==='banshee_wail'){
+      // Eerie keening wail — detuned sine pair, slow vibrato, long fall
+      var dur=1.1;
+      [0,7].forEach(function(det){
+        var wo=c.createOscillator(), wg=c.createGain();
+        var lfo=c.createOscillator(), lg=c.createGain();
+        wo.type='sine';
+        wo.frequency.setValueAtTime(760+det,now);
+        wo.frequency.exponentialRampToValueAtTime(320+det,now+dur);
+        lfo.type='sine'; lfo.frequency.value=6.5;
+        lg.gain.value=22;
+        lfo.connect(lg); lg.connect(wo.frequency);
+        wg.gain.setValueAtTime(0,now);
+        wg.gain.linearRampToValueAtTime(0.12,now+0.15);
+        wg.gain.linearRampToValueAtTime(0,now+dur);
+        wo.connect(wg); wg.connect(getMasterGain());
+        wo.start(now); wo.stop(now+dur+0.02);
+        lfo.start(now); lfo.stop(now+dur+0.02);
+      });
     }
   } catch(e){}
 }

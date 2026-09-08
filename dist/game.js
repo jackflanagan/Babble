@@ -891,6 +891,29 @@
         pg.gain.linearRampToValueAtTime(0, now + 0.05);
         po.start(now);
         po.stop(now + 0.06);
+      } else if (type === "banshee_wail") {
+        var dur = 1.1;
+        [0, 7].forEach(function(det) {
+          var wo = c.createOscillator(), wg = c.createGain();
+          var lfo = c.createOscillator(), lg = c.createGain();
+          wo.type = "sine";
+          wo.frequency.setValueAtTime(760 + det, now);
+          wo.frequency.exponentialRampToValueAtTime(320 + det, now + dur);
+          lfo.type = "sine";
+          lfo.frequency.value = 6.5;
+          lg.gain.value = 22;
+          lfo.connect(lg);
+          lg.connect(wo.frequency);
+          wg.gain.setValueAtTime(0, now);
+          wg.gain.linearRampToValueAtTime(0.12, now + 0.15);
+          wg.gain.linearRampToValueAtTime(0, now + dur);
+          wo.connect(wg);
+          wg.connect(getMasterGain());
+          wo.start(now);
+          wo.stop(now + dur + 0.02);
+          lfo.start(now);
+          lfo.stop(now + dur + 0.02);
+        });
       }
     } catch (e) {
     }
@@ -6191,6 +6214,20 @@
             if (en3.onGround) en3.vx *= 0.9;
             return;
           }
+          if (state.currentLocationId === "ireland" && state.players.length) {
+            en3.wailT = (en3.wailT || 0) - dt;
+            if (en3.wailT <= 0) {
+              for (var wp = 0; wp < state.players.length; wp++) {
+                var wdx = state.players[wp].x + state.players[wp].w / 2 - (en3.x + en3.w / 2);
+                var wdy = state.players[wp].y + state.players[wp].h / 2 - (en3.y + en3.h / 2);
+                if (wdx * wdx + wdy * wdy < 130 * 130) {
+                  playSound("banshee_wail");
+                  en3.wailT = rand(1.6, 2.8);
+                  break;
+                }
+              }
+            }
+          }
           if (en3.type === "motorbike") {
             en3.smokeRevT = (en3.smokeRevT !== void 0 ? en3.smokeRevT : rand(3, 6)) - dt;
             if (en3.smokeRevT <= 0) {
@@ -6896,69 +6933,78 @@
             ];
             schedKrak();
           } else if (id === "berlin") {
-            let schedBerlin = function() {
+            let hat = function(startAt, dur, gain) {
+              try {
+                var buf = a.createBuffer(1, Math.ceil(a.sampleRate * dur), a.sampleRate);
+                var d = buf.getChannelData(0);
+                for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                var src = a.createBufferSource();
+                src.buffer = buf;
+                var flt = a.createBiquadFilter();
+                flt.type = "highpass";
+                flt.frequency.value = 8e3;
+                var env = a.createGain();
+                env.gain.setValueAtTime(gain * vol, startAt);
+                env.gain.exponentialRampToValueAtTime(1e-4, startAt + dur);
+                src.connect(flt);
+                flt.connect(env);
+                env.connect(mg);
+                src.start(startAt);
+                src.stop(startAt + dur + 0.01);
+              } catch (e) {
+              }
+            }, acid = function(freq, startAt, dur, gain, accent) {
+              var osc = a.createOscillator();
+              osc.type = "sawtooth";
+              osc.frequency.value = freq;
+              var flt = a.createBiquadFilter();
+              flt.type = "lowpass";
+              flt.Q.value = accent ? 14 : 8;
+              var fEnd = accent ? 320 : 180;
+              flt.frequency.setValueAtTime(accent ? 2600 : 1400, startAt);
+              flt.frequency.exponentialRampToValueAtTime(fEnd, startAt + dur);
+              var env = a.createGain();
+              env.gain.setValueAtTime(0, startAt);
+              env.gain.linearRampToValueAtTime(gain * vol * (accent ? 1.3 : 1), startAt + 8e-3);
+              env.gain.exponentialRampToValueAtTime(1e-4, startAt + dur);
+              osc.connect(flt);
+              flt.connect(env);
+              env.connect(mg);
+              osc.start(startAt);
+              osc.stop(startAt + dur + 0.02);
+            }, schedBerlin = function() {
               if (!miniGameId || miniGameId !== "berlin") return;
               var now = a.currentTime + 0.05;
-              var eighth = beat * 0.5;
+              var sixteenth = beat * 0.25;
               for (var i = 0; i < 16; i++) {
-                var t = now + i * eighth;
-                if (i === 0 || i === 4 || i === 8 || i === 12) {
-                  var osc2 = a.createOscillator();
-                  var env2 = a.createGain();
-                  osc2.type = "sine";
-                  osc2.frequency.setValueAtTime(160, t);
-                  osc2.frequency.exponentialRampToValueAtTime(40, t + 0.18);
-                  env2.gain.setValueAtTime(0.9 * vol, t);
-                  env2.gain.exponentialRampToValueAtTime(1e-3, t + 0.22);
-                  osc2.connect(env2);
-                  env2.connect(mg);
-                  osc2.start(t);
-                  osc2.stop(t + 0.23);
+                var t = now + i * sixteenth;
+                if (i % 4 === 0) {
+                  var ok = a.createOscillator(), ek = a.createGain();
+                  ok.type = "sine";
+                  ok.frequency.setValueAtTime(170, t);
+                  ok.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+                  ek.gain.setValueAtTime(1 * vol, t);
+                  ek.gain.exponentialRampToValueAtTime(1e-3, t + 0.26);
+                  ok.connect(ek);
+                  ek.connect(mg);
+                  ok.start(t);
+                  ok.stop(t + 0.27);
                 }
-                if (i === 4 || i === 12) noise(t, 0.15, 0.5);
-                note(bassFreqs[i], t, eighth * 0.8, "sawtooth", 0.35);
-                if (leadFreqs[i] > 0) note(leadFreqs[i], t, eighth * 0.65, "square", 0.22);
+                hat(t, i % 4 === 2 ? 0.11 : 0.035, i % 4 === 2 ? 0.22 : 0.12);
+                if (i === 4 || i === 12) noise(t, 0.14, 0.4);
+                if (acidSeq[i] > 0) acid(acidSeq[i], t, sixteenth * 1.05, 0.34, acidAccent[i]);
+                if (stabSeq[i] > 0) {
+                  note(stabSeq[i], t, beat * 0.5, "sawtooth", 0.16);
+                  note(stabSeq[i] * 1.5, t, beat * 0.5, "square", 0.1);
+                }
               }
-              var loopMs = 16 * eighth * 1e3;
+              var loopMs = 16 * sixteenth * 1e3;
               miniGameMusicHandle = setTimeout(schedBerlin, loopMs - 80);
             };
-            var bpm = 128, beat = 60 / bpm, bar = beat * 4;
-            var leadFreqs = [
-              0,
-              880,
-              0,
-              1046.5,
-              0,
-              783.99,
-              0,
-              698.46,
-              0,
-              880,
-              0,
-              1046.5,
-              0,
-              1174.66,
-              0,
-              987.77
-            ];
-            var bassFreqs = [
-              55,
-              55,
-              65.41,
-              55,
-              55,
-              55,
-              65.41,
-              82.41,
-              55,
-              55,
-              65.41,
-              55,
-              55,
-              55,
-              82.41,
-              73.42
-            ];
+            var bpm = 130, beat = 60 / bpm;
+            var acidSeq = [110, 0, 110, 220, 110, 0, 164.81, 110, 110, 0, 110, 130.81, 110, 146.83, 0, 110];
+            var acidAccent = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0];
+            var stabSeq = [0, 0, 0, 0, 220, 0, 0, 0, 0, 0, 0, 0, 261.63, 0, 293.66, 0];
             schedBerlin();
           } else if (id === "london") {
             let schedLondon = function() {

@@ -1188,6 +1188,22 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         return;
       }
 
+      /* Ireland banshees keen when a player strays close */
+      if(state.currentLocationId === 'ireland' && state.players.length){
+        en.wailT = (en.wailT || 0) - dt;
+        if(en.wailT <= 0){
+          for(var wp=0; wp<state.players.length; wp++){
+            var wdx = (state.players[wp].x + state.players[wp].w/2) - (en.x + en.w/2);
+            var wdy = (state.players[wp].y + state.players[wp].h/2) - (en.y + en.h/2);
+            if(wdx*wdx + wdy*wdy < 130*130){
+              playSound('banshee_wail');
+              en.wailT = rand(1.6, 2.8);
+              break;
+            }
+          }
+        }
+      }
+
       /* Motorbike: periodic smoke burst */
       if(en.type === 'motorbike'){
         en.smokeRevT = ((en.smokeRevT !== undefined) ? en.smokeRevT : rand(3,6)) - dt;
@@ -1750,38 +1766,74 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         schedKrak();
 
       } else if(id === 'berlin'){
-        /* 128 BPM electronic: sine-sweep kick, noise snare, sawtooth bass, square lead */
-        var bpm = 128, beat = 60/bpm, bar = beat*4;
-        var leadFreqs = [0,880,0,1046.5, 0,783.99,0,698.46,
-                         0,880,0,1046.5, 0,1174.66,0,987.77];
-        var bassFreqs = [55,55,65.41,55, 55,55,65.41,82.41,
-                         55,55,65.41,55, 55,55,82.41,73.42];
+        /* 130 BPM driving techno: four-on-the-floor kick, off-beat open hats,
+           rolling acid bassline through a resonant lowpass, sparse stab. */
+        var bpm = 130, beat = 60/bpm;
+        // 16-step sequencer (sixteenth notes). Acid bass pattern in A minor.
+        var acidSeq  = [110,0,110,220, 110,0,164.81,110, 110,0,110,130.81, 110,146.83,0,110];
+        var acidAccent=[1,  0,0,  1,   0,  0,1,     0,   1,  0,0,  0,      0,  1,     0,0];
+        var stabSeq  = [0,0,0,0, 220,0,0,0, 0,0,0,0, 261.63,0,293.66,0];
+
+        /* short filtered-noise hi-hat */
+        function hat(startAt, dur, gain){
+          try{
+            var buf = a.createBuffer(1, Math.ceil(a.sampleRate*dur), a.sampleRate);
+            var d = buf.getChannelData(0);
+            for(var i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+            var src = a.createBufferSource(); src.buffer = buf;
+            var flt = a.createBiquadFilter(); flt.type='highpass'; flt.frequency.value=8000;
+            var env = a.createGain();
+            env.gain.setValueAtTime(gain*vol, startAt);
+            env.gain.exponentialRampToValueAtTime(0.0001, startAt+dur);
+            src.connect(flt); flt.connect(env); env.connect(mg);
+            src.start(startAt); src.stop(startAt+dur+0.01);
+          }catch(e){}
+        }
+        /* resonant filtered saw — the "acid" voice */
+        function acid(freq, startAt, dur, gain, accent){
+          var osc = a.createOscillator(); osc.type='sawtooth'; osc.frequency.value=freq;
+          var flt = a.createBiquadFilter(); flt.type='lowpass';
+          flt.Q.value = accent ? 14 : 8;
+          var fEnd = accent ? 320 : 180;
+          flt.frequency.setValueAtTime(accent ? 2600 : 1400, startAt);
+          flt.frequency.exponentialRampToValueAtTime(fEnd, startAt+dur);
+          var env = a.createGain();
+          env.gain.setValueAtTime(0, startAt);
+          env.gain.linearRampToValueAtTime(gain*vol*(accent?1.3:1), startAt+0.008);
+          env.gain.exponentialRampToValueAtTime(0.0001, startAt+dur);
+          osc.connect(flt); flt.connect(env); env.connect(mg);
+          osc.start(startAt); osc.stop(startAt+dur+0.02);
+        }
         function schedBerlin(){
           if(!miniGameId || miniGameId!=='berlin') return;
           var now = a.currentTime + 0.05;
-          var eighth = beat*0.5;
+          var sixteenth = beat*0.25;
           for(var i=0;i<16;i++){
-            var t = now + i*eighth;
-            /* kick on 1 and 3 */
-            if(i===0||i===4||i===8||i===12){
-              var osc2 = a.createOscillator();
-              var env2 = a.createGain();
-              osc2.type = 'sine';
-              osc2.frequency.setValueAtTime(160, t);
-              osc2.frequency.exponentialRampToValueAtTime(40, t+0.18);
-              env2.gain.setValueAtTime(0.9*vol, t);
-              env2.gain.exponentialRampToValueAtTime(0.001, t+0.22);
-              osc2.connect(env2); env2.connect(mg);
-              osc2.start(t); osc2.stop(t+0.23);
+            var t = now + i*sixteenth;
+            /* four-on-the-floor kick on every beat */
+            if(i%4===0){
+              var ok = a.createOscillator(), ek = a.createGain();
+              ok.type='sine';
+              ok.frequency.setValueAtTime(170, t);
+              ok.frequency.exponentialRampToValueAtTime(42, t+0.14);
+              ek.gain.setValueAtTime(1.0*vol, t);
+              ek.gain.exponentialRampToValueAtTime(0.001, t+0.26);
+              ok.connect(ek); ek.connect(mg);
+              ok.start(t); ok.stop(t+0.27);
             }
-            /* snare on 2 and 4 */
-            if(i===4||i===12) noise(t, 0.15, 0.5);
-            /* bass */
-            note(bassFreqs[i], t, eighth*0.8, 'sawtooth', 0.35);
-            /* lead */
-            if(leadFreqs[i]>0) note(leadFreqs[i], t, eighth*0.65, 'square', 0.22);
+            /* closed hat every sixteenth, louder open hat on the off-beat */
+            hat(t, (i%4===2) ? 0.11 : 0.035, (i%4===2) ? 0.22 : 0.12);
+            /* clap layered on 2 and 4 */
+            if(i===4||i===12) noise(t, 0.14, 0.4);
+            /* acid bass */
+            if(acidSeq[i] > 0) acid(acidSeq[i], t, sixteenth*1.05, 0.34, acidAccent[i]);
+            /* sparse detuned stab */
+            if(stabSeq[i] > 0){
+              note(stabSeq[i], t, beat*0.5, 'sawtooth', 0.16);
+              note(stabSeq[i]*1.5, t, beat*0.5, 'square', 0.10);
+            }
           }
-          var loopMs = 16 * eighth * 1000;
+          var loopMs = 16 * sixteenth * 1000;
           miniGameMusicHandle = setTimeout(schedBerlin, loopMs - 80);
         }
         schedBerlin();
