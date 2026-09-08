@@ -84,28 +84,29 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     setGlobeRunning(false);
     sceneGlobe.hidden = true;
     sceneGame.hidden = false;
-    state.currentLocationId = loc.id;
-    var cIdx2=-1;
-    for(var ci5=0;ci5<CAMPAIGN.length;ci5++){ if(CAMPAIGN[ci5].type==='level'&&CAMPAIGN[ci5].id===loc.id){ cIdx2=ci5; break; } }
-    campaignMode = cIdx2>=0; campaignLastType = 'level';
-    if(campaignMode){ campaignPlayedLevels = [loc.id]; campaignPlayedMgs = []; }
+    // One fixed adventure — whichever pin was tapped, the run always starts at
+    // the top of CAMPAIGN and plays straight through to the boss.
+    campaignMode = true;
+    campaignStep = 0;
+    campaignLastType = 'level';
+    adventureComplete = false;
+    var first = LOCATIONS.filter(function(l){ return l.id === CAMPAIGN[0].id; })[0] || loc;
+    state.currentLocationId = first.id;
     if(netRole){
       state.numPlayers = 2;
       document.getElementById('p2Controls').hidden = true;
     } else {
       selectMode('1');
     }
-    var level = LEVELS[loc.id];
-    var locPlayCount = (progress[loc.id] && progress[loc.id].playCount) || 0;
-    var tier = Math.min(locPlayCount+1, 10);
-    document.getElementById('hudLocation').textContent = loc.name + (locPlayCount > 0 ? ' T' + tier : '');
-    document.getElementById('howtoTitle').textContent = 'Touch down in ' + loc.name;
+    var level = LEVELS[first.id];
+    document.getElementById('hudLocation').textContent = first.name + '  ·  1/' + CAMPAIGN.length;
+    document.getElementById('howtoTitle').textContent = 'Start the adventure — ' + first.name;
     document.getElementById('howtoBlurb').textContent = level.blurb;
     resetGame();
     document.getElementById('howto').hidden = false;
     netUiRefresh();
     netHudRefresh();
-    if(netRole==='host'){ netBroadcastScene('enterLocation', {locationId: loc.id}); }
+    if(netRole==='host'){ netBroadcastScene('enterLocation', {locationId: first.id}); }
   }
   setEnterLocation(enterLocation);
   setNetEnterLocation(enterLocation);
@@ -357,11 +358,15 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   var pandaChargeCount = 0, pandaChargeTimer = 0, pandaCooldown = 0;
   var pandaProjectile = null; // {x,y,vx,vy,t,phase:'flying'|'sneezing',sneezeT}
   var campaignMode = false, campaignLastType = 'minigame';
-  var campaignPlayedLevels = [], campaignPlayedMgs = [];
+  var campaignStep = 0;        // index into CAMPAIGN for the current run
+  var adventureComplete = false;
   var miniGameId = null, miniGameTimer = 0, miniGamePhase = 'playing', miniGameData = {};
   var miniGameMusicHandle = null;
   var unlockedCosmetics = (function(){ try{ return JSON.parse(localStorage.getItem('bbl_cosmetics')||'{}'); }catch(e){ return {}; } })();
   var CHASE_DELAY = 12;
+  /* The whole game is one fixed run: every level and mini-game once, in order,
+     ending with the China boss. Score carries across the whole thing and the
+     leaderboard is offered only on the final screen. */
   var CAMPAIGN = [
     {type:'level', id:'glasgow'},
     {type:'minigame', id:'mediterranean'},
@@ -370,7 +375,14 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     {type:'level', id:'paris'},
     {type:'minigame', id:'berlin'},
     {type:'level', id:'ireland'},
+    {type:'minigame', id:'london'},
+    {type:'level', id:'athens'},
+    {type:'minigame', id:'pamplona'},
     {type:'level', id:'kenya'},
+    {type:'level', id:'tokyo'},
+    {type:'level', id:'brazil'},
+    {type:'level', id:'newyork'},
+    {type:'level', id:'boss'},
   ];
   var MINI_GAME_DEFS = {
     mediterranean:{title:'Mediterranean Sea',subtitle:'Row to the other side!',timeLimit:25,reward:'sailingHat',rewardLabel:'Sailing Hat'},
@@ -393,7 +405,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       speedBoost:0, rapidFire:0, shield:0, hasRat:false, ratPhase:0, hasElephant:false, elephantPhase:0 };
   }
 
-  function resetGame(){
+  function resetGame(keepScore){
     state.players = [ makePlayer(0, state.numPlayers===2 ? 320 : 360, PALETTES_P1[selectedSkins.p1]) ];
     if(state.numPlayers===2) state.players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
 
@@ -487,7 +499,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     runAchievements = [];
     confettiParticles = [];
 
-    state.score = 0;
+    state.score = keepScore ? state.score : 0;
     state.lives = 3;
     state.gameState = 'ready';
     state.startTime = performance.now();
@@ -530,7 +542,20 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     if(netRole==='guest') return;
     if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
     document.getElementById('winNextHint').hidden = true;
+    document.getElementById('overlayWin').hidden = true;
     survivalMode = false;
+    if(adventureComplete){
+      // Start a whole new run from the top.
+      adventureComplete = false;
+      campaignMode = true;
+      campaignStep = 0;
+      campaignLastType = 'level';
+      state.currentLocationId = CAMPAIGN[0].id;
+      resetGame();                 // fresh cumulative score
+      state.gameState = 'playing';
+      startMusic();
+      return;
+    }
     resetGame();
     state.gameState = 'playing';
     startMusic();
@@ -553,9 +578,10 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     function saveName(){
       var val = nameInput.value.trim();
       if(!val) return;
-      var pr = progress[state.currentLocationId] || {best:0,cleared:false};
+      var boardId = adventureComplete ? 'adventure' : state.currentLocationId;
+      var pr = progress[boardId] || {best:0,cleared:false};
       pr.name = val;
-      progress[state.currentLocationId] = pr;
+      progress[boardId] = pr;
       safeSet('gh_progress_v2', progress);
       renderBestScores();
       // Submit to leaderboard on first confirm
@@ -564,7 +590,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
         var winScoreSubmit = document.getElementById('winScoreSubmit');
         winScoreSubmit.hidden = false;
         winScoreSubmit.textContent = 'Submitting score…';
-        submitScore(state.currentLocationId, val, pr.best, function(ok){
+        submitScore(boardId, val, pr.best, function(ok){
           winScoreSubmit.textContent = ok ? '✓ On the leaderboard!' : '✗ Could not submit score';
         });
       }
@@ -1536,6 +1562,11 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     if(state.lives<=0){
       state.gameState = 'lost';
       stopMusic();
+      if(campaignMode){
+        // The adventure is a single run — no per-level retries. End it here.
+        finishAdventure(false);
+        return;
+      }
       var loseSummaryText = survivalMode
         ? 'Reached wave ' + survivalWave + ' · Score: ' + state.score
         : 'Score ' + state.score + ' · try trapping enemies before they reach you.';
@@ -1605,23 +1636,59 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   // ── Campaign & mini-game system ──────────────────────────────────────────
 
   function getNextCampaignItem(){
-    var allLevelIds = ['glasgow','modena','paris','ireland','kenya'];
-    var allMgIds = ['mediterranean','krakow','berlin','london','pamplona'];
-    if(campaignLastType === 'level'){
-      // pick a mini-game not yet played this campaign; reset pool if all done
-      var mgPool = allMgIds.filter(function(id){ return campaignPlayedMgs.indexOf(id)<0; });
-      if(!mgPool.length){ campaignPlayedMgs = []; mgPool = allMgIds.slice(); }
-      var mgPick = mgPool[Math.floor(Math.random()*mgPool.length)];
-      campaignPlayedMgs.push(mgPick);
-      return {type:'minigame', id:mgPick};
+    campaignStep++;
+    if(campaignStep >= CAMPAIGN.length) return null;   // run complete
+    var item = CAMPAIGN[campaignStep];
+    campaignLastType = item.type;
+    return item;
+  }
+
+  /* End of the run (cleared everything, or ran out of lives) — final score +
+     the one leaderboard for the whole adventure. */
+  function finishAdventure(won){
+    if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
+    campaignMode = false;
+    adventureComplete = true;
+    survivalMode = false;
+    state.gameState = 'won';
+    stopMusic();
+    playSound(won ? 'win' : 'lose');
+    var reached = LEVELS[state.currentLocationId] ? LEVELS[state.currentLocationId].name : state.currentLocationId;
+    var finalScore = state.score;
+
+    document.getElementById('overlayLose').hidden = true;
+    document.getElementById('winTitle').textContent = won ? 'Adventure complete!' : 'Adventure over';
+    document.getElementById('winStars').textContent = won ? '★★★' : '';
+    document.getElementById('winSummary').textContent = won
+      ? ('You cleared every stop · final score ' + finalScore)
+      : ('You made it to ' + reached + ' · final score ' + finalScore);
+    var acEl = document.getElementById('winAchievements'); if(acEl) acEl.hidden = true;
+    document.getElementById('btnWinNext').hidden = true;
+    document.getElementById('winNextHint').hidden = true;
+    var btnAgain = document.getElementById('btnWinAgain');
+    if(btnAgain) btnAgain.textContent = 'New adventure';
+
+    var pr = progress.adventure || {best:0};
+    if(finalScore > (pr.best || 0)) pr.best = finalScore;
+    progress.adventure = pr;
+    safeSet('gh_progress_v2', progress);
+    document.getElementById('hudBest').textContent = pr.best;
+
+    var nameEntryRow = document.getElementById('nameEntryRow');
+    var nameInput = document.getElementById('nameInput');
+    var winScoreSubmit = document.getElementById('winScoreSubmit');
+    if(window._resetLbSubmit) window._resetLbSubmit();
+    winScoreSubmit.hidden = true;
+    if(lbEnabled()){
+      nameEntryRow.hidden = false;
+      nameInput.value = pr.name || '';
+      setTimeout(function(){ nameInput.focus(); }, 100);
     } else {
-      // pick a level not yet played this campaign; reset pool if all done
-      var lvlPool = allLevelIds.filter(function(id){ return campaignPlayedLevels.indexOf(id)<0; });
-      if(!lvlPool.length){ campaignPlayedLevels = []; lvlPool = allLevelIds.slice(); }
-      var lvlPick = lvlPool[Math.floor(Math.random()*lvlPool.length)];
-      campaignPlayedLevels.push(lvlPick);
-      return {type:'level', id:lvlPick};
+      nameEntryRow.hidden = true;
     }
+
+    spawnCelebrationRain('#ffd700', '#7fe3ff');
+    showAdBreak(function(){ document.getElementById('overlayWin').hidden = false; });
   }
 
   function startCampaignTransition(){
@@ -1637,15 +1704,23 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       document.getElementById('overlayLose').hidden = true;
       document.getElementById('howto').hidden = true;
       var item = getNextCampaignItem();
+      if(!item){
+        el.style.display = 'none'; el.innerHTML = '';
+        finishAdventure(true);
+        return;
+      }
+      var stepNo = campaignStep + 1;
       var locName = item.type==='level' ? (LEVELS[item.id] ? LEVELS[item.id].name : item.id) : MINI_GAME_DEFS[item.id].title;
-      var sub = item.type==='minigame' ? MINI_GAME_DEFS[item.id].subtitle : 'Get ready!';
+      var sub = item.type==='minigame' ? MINI_GAME_DEFS[item.id].subtitle : ('Stop ' + stepNo + ' of ' + CAMPAIGN.length);
       el.innerHTML = '<div style="color:#fff;font-family:Fredoka,sans-serif;font-size:42px;font-weight:bold;text-align:center;text-shadow:0 0 30px rgba(255,255,255,0.4);">'+locName+'</div>'
         +'<div style="color:#aabbc8;font-family:Nunito,sans-serif;font-size:20px;margin-top:10px;text-align:center;">'+sub+'</div>';
       if(item.type==='level'){
         campaignLastType = 'level';
         stopMusic();
         state.currentLocationId = item.id;
-        resetGame();
+        resetGame(true);   // carry the cumulative score
+        document.getElementById('hudLocation').textContent =
+          LEVELS[item.id].name + '  ·  ' + stepNo + '/' + CAMPAIGN.length;
         document.getElementById('howto').hidden = true;
         state.gameState = 'playing';
         state.startTime = performance.now();
@@ -2683,20 +2758,25 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     var winScoreSubmit = document.getElementById('winScoreSubmit');
     winScoreSubmit.hidden = true;
     if(window._resetLbSubmit) window._resetLbSubmit();
-    if(isNewBest){
-      nameEntryRow.hidden = false;
-      nameInput.value = pr.name || '';
-      setTimeout(function(){ nameInput.focus(); }, 100);
+    // Per-level name entry / leaderboard only applies to standalone play. In the
+    // adventure the leaderboard is handled once, at the very end.
+    if(!campaignMode){
+      if(isNewBest){
+        nameEntryRow.hidden = false;
+        nameInput.value = pr.name || '';
+        setTimeout(function(){ nameInput.focus(); }, 100);
+      } else {
+        nameEntryRow.hidden = true;
+        if(pr.name && lbEnabled()){
+          winScoreSubmit.hidden = false;
+          winScoreSubmit.textContent = 'Submitting score…';
+          submitScore(state.currentLocationId, pr.name, state.score, function(ok){
+            winScoreSubmit.textContent = ok ? '✓ Score submitted to leaderboard' : '✗ Could not submit score';
+          });
+        }
+      }
     } else {
       nameEntryRow.hidden = true;
-      /* Auto-submit state.score if we have a saved name */
-      if(pr.name && lbEnabled()){
-        winScoreSubmit.hidden = false;
-        winScoreSubmit.textContent = 'Submitting score…';
-        submitScore(state.currentLocationId, pr.name, state.score, function(ok){
-          winScoreSubmit.textContent = ok ? '✓ Score submitted to leaderboard' : '✗ Could not submit score';
-        });
-      }
     }
     for(var ci=0; ci<60; ci++){
       confettiParticles.push({
@@ -3402,6 +3482,10 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     hasFn: function(n){ return typeof window[n]==='function'; },
     forceAllCollectiblesTaken: function(){ state.collectibles.forEach(function(c){c.taken=true;}); },
     forceWave2: function(){ state.enemies=[]; state.enemiesLeft=0; allClearFired=true; allClearDelay=0; },
+    miniGameId: function(){ return miniGameId; },
+    campaignStep: function(){ return campaignStep; },
+    adventureComplete: function(){ return adventureComplete; },
+    forceMiniGameWin: function(){ if(miniGameId){ finishMiniGame(true); return true; } return false; },
     spawnArtistEnemy: function(){ state.enemies.push({x:300,y:150,w:28,h:26,vx:80,vy:0,dir:1,
       state:'free',bubbleTimer:0,hopT:0,angry:0,onGround:false,type:'artist',hits:1,
       wanderX:200,wanderT:5,paintT:0.05}); return 'ok'; },

@@ -4890,38 +4890,30 @@
         setGlobeRunning(false);
         sceneGlobe.hidden = true;
         sceneGame.hidden = false;
-        state.currentLocationId = loc.id;
-        var cIdx2 = -1;
-        for (var ci5 = 0; ci5 < CAMPAIGN.length; ci5++) {
-          if (CAMPAIGN[ci5].type === "level" && CAMPAIGN[ci5].id === loc.id) {
-            cIdx2 = ci5;
-            break;
-          }
-        }
-        campaignMode = cIdx2 >= 0;
+        campaignMode = true;
+        campaignStep = 0;
         campaignLastType = "level";
-        if (campaignMode) {
-          campaignPlayedLevels = [loc.id];
-          campaignPlayedMgs = [];
-        }
+        adventureComplete = false;
+        var first = LOCATIONS.filter(function(l) {
+          return l.id === CAMPAIGN[0].id;
+        })[0] || loc;
+        state.currentLocationId = first.id;
         if (netRole) {
           state.numPlayers = 2;
           document.getElementById("p2Controls").hidden = true;
         } else {
           selectMode("1");
         }
-        var level = LEVELS[loc.id];
-        var locPlayCount = progress[loc.id] && progress[loc.id].playCount || 0;
-        var tier = Math.min(locPlayCount + 1, 10);
-        document.getElementById("hudLocation").textContent = loc.name + (locPlayCount > 0 ? " T" + tier : "");
-        document.getElementById("howtoTitle").textContent = "Touch down in " + loc.name;
+        var level = LEVELS[first.id];
+        document.getElementById("hudLocation").textContent = first.name + "  \xB7  1/" + CAMPAIGN.length;
+        document.getElementById("howtoTitle").textContent = "Start the adventure \u2014 " + first.name;
         document.getElementById("howtoBlurb").textContent = level.blurb;
         resetGame();
         document.getElementById("howto").hidden = false;
         netUiRefresh();
         netHudRefresh();
         if (netRole === "host") {
-          netBroadcastScene("enterLocation", { locationId: loc.id });
+          netBroadcastScene("enterLocation", { locationId: first.id });
         }
       }
       setEnterLocation(enterLocation);
@@ -5284,8 +5276,8 @@
       var pandaProjectile = null;
       var campaignMode = false;
       var campaignLastType = "minigame";
-      var campaignPlayedLevels = [];
-      var campaignPlayedMgs = [];
+      var campaignStep = 0;
+      var adventureComplete = false;
       var miniGameId = null;
       var miniGameTimer = 0;
       var miniGamePhase = "playing";
@@ -5307,7 +5299,14 @@
         { type: "level", id: "paris" },
         { type: "minigame", id: "berlin" },
         { type: "level", id: "ireland" },
-        { type: "level", id: "kenya" }
+        { type: "minigame", id: "london" },
+        { type: "level", id: "athens" },
+        { type: "minigame", id: "pamplona" },
+        { type: "level", id: "kenya" },
+        { type: "level", id: "tokyo" },
+        { type: "level", id: "brazil" },
+        { type: "level", id: "newyork" },
+        { type: "level", id: "boss" }
       ];
       var MINI_GAME_DEFS = {
         mediterranean: { title: "Mediterranean Sea", subtitle: "Row to the other side!", timeLimit: 25, reward: "sailingHat", rewardLabel: "Sailing Hat" },
@@ -5349,7 +5348,7 @@
           elephantPhase: 0
         };
       }
-      function resetGame() {
+      function resetGame(keepScore) {
         state.players = [makePlayer(0, state.numPlayers === 2 ? 320 : 360, PALETTES_P1[selectedSkins.p1])];
         if (state.numPlayers === 2) state.players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
         var playCount = progress[state.currentLocationId] && progress[state.currentLocationId].playCount || 0;
@@ -5495,7 +5494,7 @@
         countdownBeep = 3;
         runAchievements = [];
         confettiParticles = [];
-        state.score = 0;
+        state.score = keepScore ? state.score : 0;
         state.lives = 3;
         state.gameState = "ready";
         state.startTime = performance.now();
@@ -5540,7 +5539,19 @@
           winNextTimer = null;
         }
         document.getElementById("winNextHint").hidden = true;
+        document.getElementById("overlayWin").hidden = true;
         survivalMode = false;
+        if (adventureComplete) {
+          adventureComplete = false;
+          campaignMode = true;
+          campaignStep = 0;
+          campaignLastType = "level";
+          state.currentLocationId = CAMPAIGN[0].id;
+          resetGame();
+          state.gameState = "playing";
+          startMusic();
+          return;
+        }
         resetGame();
         state.gameState = "playing";
         startMusic();
@@ -5563,9 +5574,10 @@
         function saveName() {
           var val = nameInput.value.trim();
           if (!val) return;
-          var pr = progress[state.currentLocationId] || { best: 0, cleared: false };
+          var boardId = adventureComplete ? "adventure" : state.currentLocationId;
+          var pr = progress[boardId] || { best: 0, cleared: false };
           pr.name = val;
-          progress[state.currentLocationId] = pr;
+          progress[boardId] = pr;
           safeSet("gh_progress_v2", progress);
           renderBestScores();
           if (!submitted && lbEnabled()) {
@@ -5573,7 +5585,7 @@
             var winScoreSubmit = document.getElementById("winScoreSubmit");
             winScoreSubmit.hidden = false;
             winScoreSubmit.textContent = "Submitting score\u2026";
-            submitScore(state.currentLocationId, val, pr.best, function(ok) {
+            submitScore(boardId, val, pr.best, function(ok) {
               winScoreSubmit.textContent = ok ? "\u2713 On the leaderboard!" : "\u2717 Could not submit score";
             });
           }
@@ -6790,6 +6802,10 @@
         if (state.lives <= 0) {
           state.gameState = "lost";
           stopMusic();
+          if (campaignMode) {
+            finishAdventure(false);
+            return;
+          }
           var loseSummaryText = survivalMode ? "Reached wave " + survivalWave + " \xB7 Score: " + state.score : "Score " + state.score + " \xB7 try trapping enemies before they reach you.";
           showAdBreak(function() {
             document.getElementById("loseSummary").textContent = loseSummaryText;
@@ -6826,31 +6842,58 @@
         startMusic();
       }
       function getNextCampaignItem() {
-        var allLevelIds = ["glasgow", "modena", "paris", "ireland", "kenya"];
-        var allMgIds = ["mediterranean", "krakow", "berlin", "london", "pamplona"];
-        if (campaignLastType === "level") {
-          var mgPool = allMgIds.filter(function(id) {
-            return campaignPlayedMgs.indexOf(id) < 0;
-          });
-          if (!mgPool.length) {
-            campaignPlayedMgs = [];
-            mgPool = allMgIds.slice();
-          }
-          var mgPick = mgPool[Math.floor(Math.random() * mgPool.length)];
-          campaignPlayedMgs.push(mgPick);
-          return { type: "minigame", id: mgPick };
-        } else {
-          var lvlPool = allLevelIds.filter(function(id) {
-            return campaignPlayedLevels.indexOf(id) < 0;
-          });
-          if (!lvlPool.length) {
-            campaignPlayedLevels = [];
-            lvlPool = allLevelIds.slice();
-          }
-          var lvlPick = lvlPool[Math.floor(Math.random() * lvlPool.length)];
-          campaignPlayedLevels.push(lvlPick);
-          return { type: "level", id: lvlPick };
+        campaignStep++;
+        if (campaignStep >= CAMPAIGN.length) return null;
+        var item = CAMPAIGN[campaignStep];
+        campaignLastType = item.type;
+        return item;
+      }
+      function finishAdventure(won) {
+        if (winNextTimer) {
+          clearTimeout(winNextTimer);
+          winNextTimer = null;
         }
+        campaignMode = false;
+        adventureComplete = true;
+        survivalMode = false;
+        state.gameState = "won";
+        stopMusic();
+        playSound(won ? "win" : "lose");
+        var reached = LEVELS[state.currentLocationId] ? LEVELS[state.currentLocationId].name : state.currentLocationId;
+        var finalScore = state.score;
+        document.getElementById("overlayLose").hidden = true;
+        document.getElementById("winTitle").textContent = won ? "Adventure complete!" : "Adventure over";
+        document.getElementById("winStars").textContent = won ? "\u2605\u2605\u2605" : "";
+        document.getElementById("winSummary").textContent = won ? "You cleared every stop \xB7 final score " + finalScore : "You made it to " + reached + " \xB7 final score " + finalScore;
+        var acEl = document.getElementById("winAchievements");
+        if (acEl) acEl.hidden = true;
+        document.getElementById("btnWinNext").hidden = true;
+        document.getElementById("winNextHint").hidden = true;
+        var btnAgain = document.getElementById("btnWinAgain");
+        if (btnAgain) btnAgain.textContent = "New adventure";
+        var pr = progress.adventure || { best: 0 };
+        if (finalScore > (pr.best || 0)) pr.best = finalScore;
+        progress.adventure = pr;
+        safeSet("gh_progress_v2", progress);
+        document.getElementById("hudBest").textContent = pr.best;
+        var nameEntryRow = document.getElementById("nameEntryRow");
+        var nameInput = document.getElementById("nameInput");
+        var winScoreSubmit = document.getElementById("winScoreSubmit");
+        if (window._resetLbSubmit) window._resetLbSubmit();
+        winScoreSubmit.hidden = true;
+        if (lbEnabled()) {
+          nameEntryRow.hidden = false;
+          nameInput.value = pr.name || "";
+          setTimeout(function() {
+            nameInput.focus();
+          }, 100);
+        } else {
+          nameEntryRow.hidden = true;
+        }
+        spawnCelebrationRain("#ffd700", "#7fe3ff");
+        showAdBreak(function() {
+          document.getElementById("overlayWin").hidden = false;
+        });
       }
       function startCampaignTransition() {
         if (winNextTimer) {
@@ -6868,14 +6911,22 @@
           document.getElementById("overlayLose").hidden = true;
           document.getElementById("howto").hidden = true;
           var item = getNextCampaignItem();
+          if (!item) {
+            el.style.display = "none";
+            el.innerHTML = "";
+            finishAdventure(true);
+            return;
+          }
+          var stepNo = campaignStep + 1;
           var locName = item.type === "level" ? LEVELS[item.id] ? LEVELS[item.id].name : item.id : MINI_GAME_DEFS[item.id].title;
-          var sub = item.type === "minigame" ? MINI_GAME_DEFS[item.id].subtitle : "Get ready!";
+          var sub = item.type === "minigame" ? MINI_GAME_DEFS[item.id].subtitle : "Stop " + stepNo + " of " + CAMPAIGN.length;
           el.innerHTML = '<div style="color:#fff;font-family:Fredoka,sans-serif;font-size:42px;font-weight:bold;text-align:center;text-shadow:0 0 30px rgba(255,255,255,0.4);">' + locName + '</div><div style="color:#aabbc8;font-family:Nunito,sans-serif;font-size:20px;margin-top:10px;text-align:center;">' + sub + "</div>";
           if (item.type === "level") {
             campaignLastType = "level";
             stopMusic();
             state.currentLocationId = item.id;
-            resetGame();
+            resetGame(true);
+            document.getElementById("hudLocation").textContent = LEVELS[item.id].name + "  \xB7  " + stepNo + "/" + CAMPAIGN.length;
             document.getElementById("howto").hidden = true;
             state.gameState = "playing";
             state.startTime = performance.now();
@@ -8419,21 +8470,25 @@
         var winScoreSubmit = document.getElementById("winScoreSubmit");
         winScoreSubmit.hidden = true;
         if (window._resetLbSubmit) window._resetLbSubmit();
-        if (isNewBest) {
-          nameEntryRow.hidden = false;
-          nameInput.value = pr.name || "";
-          setTimeout(function() {
-            nameInput.focus();
-          }, 100);
+        if (!campaignMode) {
+          if (isNewBest) {
+            nameEntryRow.hidden = false;
+            nameInput.value = pr.name || "";
+            setTimeout(function() {
+              nameInput.focus();
+            }, 100);
+          } else {
+            nameEntryRow.hidden = true;
+            if (pr.name && lbEnabled()) {
+              winScoreSubmit.hidden = false;
+              winScoreSubmit.textContent = "Submitting score\u2026";
+              submitScore(state.currentLocationId, pr.name, state.score, function(ok) {
+                winScoreSubmit.textContent = ok ? "\u2713 Score submitted to leaderboard" : "\u2717 Could not submit score";
+              });
+            }
+          }
         } else {
           nameEntryRow.hidden = true;
-          if (pr.name && lbEnabled()) {
-            winScoreSubmit.hidden = false;
-            winScoreSubmit.textContent = "Submitting score\u2026";
-            submitScore(state.currentLocationId, pr.name, state.score, function(ok) {
-              winScoreSubmit.textContent = ok ? "\u2713 Score submitted to leaderboard" : "\u2717 Could not submit score";
-            });
-          }
         }
         for (var ci = 0; ci < 60; ci++) {
           confettiParticles.push({
@@ -9254,6 +9309,22 @@
           state.enemiesLeft = 0;
           allClearFired = true;
           allClearDelay = 0;
+        },
+        miniGameId: function() {
+          return miniGameId;
+        },
+        campaignStep: function() {
+          return campaignStep;
+        },
+        adventureComplete: function() {
+          return adventureComplete;
+        },
+        forceMiniGameWin: function() {
+          if (miniGameId) {
+            finishMiniGame(true);
+            return true;
+          }
+          return false;
         },
         spawnArtistEnemy: function() {
           state.enemies.push({
