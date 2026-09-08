@@ -3255,6 +3255,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     _netShared.startTime = state.startTime; _netShared.LOCATIONS = LOCATIONS;
   }
   function syncFromNet(){
+    // Nothing to sync until the host's first state snapshot arrives — otherwise
+    // draw() would read undefined collectibles/enemies and crash the frame loop.
+    if(!_netShared.players || !_netShared.collectibles) return;
     state.players = _netShared.players; state.enemies = _netShared.enemies; state.bubbles = _netShared.bubbles;
     state.collectibles = _netShared.collectibles; state.score = _netShared.score; state.lives = _netShared.lives;
     state.gameState = _netShared.gameState; state.enemiesLeft = _netShared.enemiesLeft;

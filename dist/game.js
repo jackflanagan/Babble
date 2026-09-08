@@ -8537,6 +8537,7 @@
         _netShared.LOCATIONS = LOCATIONS;
       }
       function syncFromNet() {
+        if (!_netShared.players || !_netShared.collectibles) return;
         state.players = _netShared.players;
         state.enemies = _netShared.enemies;
         state.bubbles = _netShared.bubbles;
