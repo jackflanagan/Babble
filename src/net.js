@@ -18,6 +18,10 @@ var _tryJump = function(){};
 var _tryShoot = function(){};
 export function setNetTryJump(fn){ _tryJump = fn; }
 export function setNetTryShoot(fn){ _tryShoot = fn; }
+var _keys = {};
+export function setNetKeys(k){ _keys = k; }
+var _updateHud = function(){};
+export function setNetUpdateHud(fn){ _updateHud = fn; }
 var NET_APP_ID = 'globehopper-jack-gift-v1';
 var NET_IMPORT_URL = 'https://esm.run/trystero';
 var netJoinRoomFn = null;
@@ -133,10 +137,10 @@ export function netSetupRoomHandlers(){
   if(netRole==='host'){
     actions.input.onMessage = function(data){
       if(!data) return;
-      keys.p2Left = !!data.left;
-      keys.p2Right = !!data.right;
-      keys.p2Jump = !!data.jump;
-      keys.p2Bubble = !!data.bubble;
+      _keys.p2Left = !!data.left;
+      _keys.p2Right = !!data.right;
+      _keys.p2Jump = !!data.jump;
+      _keys.p2Bubble = !!data.bubble;
     };
     actions.press.onMessage = function(data){
       if(!_getState().players || _getState().players.length<2) return;
@@ -232,7 +236,7 @@ export function netSendPress(kind){
 
 export function netSendInputIfChanged(){
   if(!(netRole==='guest' && netConnected && netActions)) return;
-  var cur = { left: !!keys.p1Left, right: !!keys.p1Right, jump: !!keys.p1Jump, bubble: !!keys.p1Bubble };
+  var cur = { left: !!_keys.p1Left, right: !!_keys.p1Right, jump: !!_keys.p1Jump, bubble: !!_keys.p1Bubble };
   var last = netLastSentInput;
   if(!last || last.left!==cur.left || last.right!==cur.right || last.jump!==cur.jump || last.bubble!==cur.bubble){
     netActions.input.send(cur);
@@ -257,7 +261,7 @@ export function applyRemoteState(data){
   _getState().bubbles = data.bubbles || [];
   _getState().collectibles = data.collectibles || [];
   _getState().popups = data.popups || [];
-  updateHud();
+  _updateHud();
   var winEl = document.getElementById('overlayWin');
   var loseEl = document.getElementById('overlayLose');
   if(_getState().gameState==='won'){

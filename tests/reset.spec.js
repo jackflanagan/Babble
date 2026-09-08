@@ -4,6 +4,10 @@ const path = require('path');
 
 const FILE_URL = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
 
+async function dismissPortraitWarning(page) {
+  await page.evaluate(() => { var el = document.getElementById('portraitWarning'); if (el) el.style.display = 'none'; });
+}
+
 test('Reset button clears localStorage', async ({ page }) => {
   // Inject stubs before page scripts run: bypass headless confirm suppression
   // and prevent the reload from navigating away mid-test
@@ -14,6 +18,7 @@ test('Reset button clears localStorage', async ({ page }) => {
 
   await page.goto(FILE_URL);
   await page.waitForSelector('#scene-globe', { state: 'visible', timeout: 10000 });
+  await dismissPortraitWarning(page);
 
   // Seed some progress keys
   await page.evaluate(() => {

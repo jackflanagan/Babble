@@ -3,6 +3,7 @@
 ========================================================= */
 
 import { TAU, clamp, rand, safeGet, safeSet } from './utils.js';
+import { netRole, netConnected } from './net.js';
 
 /* injectable deps */
 var _progress = {};

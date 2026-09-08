@@ -1,5 +1,7 @@
 /* ---------- per-location theming ---------- */
 
+import { TAU } from './utils.js';
+import { ctx, W, H } from './canvas.js';
 import { drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef } from './draw.js';
 export function drawSkylineRow(buildings, color, baseY){
   ctx.fillStyle = color;
