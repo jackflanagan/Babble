@@ -1124,6 +1124,9 @@
   function setNetUpdateHud(fn) {
     _updateHud = fn;
   }
+  function setNetLivePlayers(fn) {
+    _livePlayers = fn;
+  }
   function setNetStateAccum(v) {
     netStateAccum = v;
   }
@@ -1406,16 +1409,18 @@
       netSendPress("jump");
       return;
     }
-    _tryJump(_getState().players[0]);
+    var p = _livePlayers()[0];
+    if (p) _tryJump(p);
   }
   function localBubblePress() {
     if (netRole === "guest") {
       netSendPress("bubble");
       return;
     }
-    _tryShoot(_getState().players[0]);
+    var p = _livePlayers()[0];
+    if (p) _tryShoot(p);
   }
-  var _state, _enterLocation, _backToMap, _playSound, _tryJump, _tryShoot, _keys, _updateHud, NET_APP_ID, NET_IMPORT_URL, netJoinRoomFn, netRole, netRoomCode, netRoom, netActions, netConnected, netPeerId, netLastSentInput, netStateAccum;
+  var _state, _enterLocation, _backToMap, _playSound, _tryJump, _tryShoot, _keys, _updateHud, _livePlayers, NET_APP_ID, NET_IMPORT_URL, netJoinRoomFn, netRole, netRoomCode, netRoom, netActions, netConnected, netPeerId, netLastSentInput, netStateAccum;
   var init_net = __esm({
     "src/net.js"() {
       init_utils();
@@ -1430,6 +1435,9 @@
       };
       _keys = {};
       _updateHud = function() {
+      };
+      _livePlayers = function() {
+        return [];
       };
       NET_APP_ID = "globehopper-jack-gift-v1";
       NET_IMPORT_URL = "https://esm.run/trystero";
@@ -5052,6 +5060,9 @@
       }, { passive: false });
       var keys = {};
       setNetKeys(keys);
+      setNetLivePlayers(function() {
+        return state.players;
+      });
       window.addEventListener("keydown", function(e) {
         var code = e.code, handled = true;
         switch (code) {

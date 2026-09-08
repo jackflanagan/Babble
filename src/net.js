@@ -22,6 +22,8 @@ var _keys = {};
 export function setNetKeys(k){ _keys = k; }
 var _updateHud = function(){};
 export function setNetUpdateHud(fn){ _updateHud = fn; }
+var _livePlayers = function(){ return []; };
+export function setNetLivePlayers(fn){ _livePlayers = fn; }
 var NET_APP_ID = 'globehopper-jack-gift-v1';
 var NET_IMPORT_URL = 'https://esm.run/trystero';
 var netJoinRoomFn = null;
@@ -303,11 +305,13 @@ export function applyRemoteScene(data){
 
 export function localJumpPress(){
   if(netRole==='guest'){ netSendPress('jump'); return; }
-  _tryJump(_getState().players[0]);
+  var p = _livePlayers()[0];
+  if(p) _tryJump(p);
 }
 export function localBubblePress(){
   if(netRole==='guest'){ netSendPress('bubble'); return; }
-  _tryShoot(_getState().players[0]);
+  var p = _livePlayers()[0];
+  if(p) _tryShoot(p);
 }
 
 document.getElementById('netTabHost').addEventListener('click', function(){

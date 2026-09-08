@@ -45,6 +45,24 @@ test('lose overlay stays hidden while the player is alive', async ({ page }) => 
   await expect(page.locator('#overlayLose')).toBeHidden();
 });
 
+test('P1 jump / bubble keys do not throw', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await enterLocation(page);
+  await page.waitForTimeout(3300); // clear the countdown
+  const canvas = page.locator('#gameCanvas');
+  await canvas.focus().catch(() => {});
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('KeyW');
+    await page.keyboard.press('Space');
+    await page.keyboard.press('ShiftLeft');
+    await page.keyboard.press('KeyD');
+    await page.waitForTimeout(120);
+  }
+  expect(errors, errors.join('\n')).toEqual([]);
+  expect(await page.evaluate(() => window.__game.getState().gameState)).toBe('playing');
+});
+
 test('clearing collectibles then both waves reaches the won state', async ({ page }) => {
   test.setTimeout(40000);
   await enterLocation(page);
