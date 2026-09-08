@@ -5952,17 +5952,26 @@
               }
             }
             var pbox = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
-            var popped = false;
+            var popped = false, popper = null;
             for (var pj = 0; pj < state.players.length && !popped; pj++) {
-              if (rectsOverlap(state.players[pj], pbox)) popped = true;
+              if (rectsOverlap(state.players[pj], pbox)) {
+                popped = true;
+                popper = state.players[pj];
+              }
             }
             if (popped) {
               if (en2 && en2.hits && en2.hits > 1) {
                 en2.hits--;
                 en2.angry = 5;
-                en2.vx = Math.min(en2.vx * 1.4, 300);
                 en2.state = "free";
                 en2.bubbleTimer = 0;
+                var ppr = popper || state.players[0];
+                var away = en2.x + en2.w / 2 < ppr.x + ppr.w / 2 ? -1 : 1;
+                en2.vx = 300 * away;
+                en2.vy = -340;
+                en2.dir = away;
+                en2.onGround = false;
+                en2.stunT = en2.type === "parmesan" ? 1.8 : 1.1;
                 b.trapped = null;
                 state.bubbles.splice(bi, 1);
                 spawnPopup(b.x, b.y - 10, "HIT! " + en2.hits + " to go", "#ff3030");
@@ -6022,15 +6031,17 @@
               }
               state.bubbles.splice(bi, 1);
               shakeT = 0.15;
+              var isParm = en2.type === "parmesan";
               state.popBursts.push({
                 x: b.x,
                 y: b.y,
-                vx: rand(-220, 220),
-                vy: rand(-340, -140),
+                vx: isParm ? rand(-360, 360) : rand(-220, 220),
+                vy: isParm ? rand(-420, -260) : rand(-340, -140),
                 rot: 0,
                 rotV: rand(-12, 12),
                 t: 0,
-                life: 0.65,
+                life: isParm ? 1.5 : 0.65,
+                bounce: isParm,
                 drawFn: LEVELS[state.currentLocationId].enemyDraw,
                 w: en2.w,
                 h: en2.h,
@@ -6155,6 +6166,31 @@
           if (freezeT2 > 0) return;
           if (en3.angry > 0) en3.angry -= dt;
           en3.hopT -= dt;
+          if ((en3.stunT || 0) > 0) {
+            en3.stunT -= dt;
+            en3.x += en3.vx * dt;
+            en3.vy += GRAVITY * dt;
+            en3.y += en3.vy * dt;
+            if (en3.x < 4) {
+              en3.x = 4;
+              en3.vx = Math.abs(en3.vx) * 0.8;
+            }
+            if (en3.x + en3.w > W - 4) {
+              en3.x = W - 4 - en3.w;
+              en3.vx = -Math.abs(en3.vx) * 0.8;
+            }
+            resolvePlatformCollision(en3);
+            if (en3.y + en3.h > 445) {
+              en3.y = 445 - en3.h;
+              en3.vy = -Math.abs(en3.vy) * 0.45;
+              en3.vx *= 0.7;
+              if (Math.abs(en3.vy) < 60) {
+                en3.vy = 0;
+              }
+            }
+            if (en3.onGround) en3.vx *= 0.9;
+            return;
+          }
           if (en3.type === "motorbike") {
             en3.smokeRevT = (en3.smokeRevT !== void 0 ? en3.smokeRevT : rand(3, 6)) - dt;
             if (en3.smokeRevT <= 0) {
@@ -6209,8 +6245,30 @@
                 nearest = state.players[cp2];
               }
             }
-            en3.dir = nearest.x > en3.x ? 1 : -1;
+            var enCx = en3.x + en3.w / 2;
+            var playerAbove = nearest.y + nearest.h < en3.y - 6;
+            var targetX = nearest.x + nearest.w / 2;
+            if (playerAbove) {
+              var allP = PLATFORMS.concat(movingPlatforms), standPl = null;
+              for (var pk = 0; pk < allP.length; pk++) {
+                var pl = allP[pk];
+                if (nearest.x + nearest.w > pl.x && nearest.x < pl.x + pl.w && Math.abs(nearest.y + nearest.h - pl.y) < 12) {
+                  standPl = pl;
+                  break;
+                }
+              }
+              if (standPl && !(enCx > standPl.x - 6 && enCx < standPl.x + standPl.w + 6)) {
+                targetX = enCx < standPl.x ? standPl.x + 8 : standPl.x + standPl.w - 8;
+              }
+            }
+            if (!en3.onGround && (en3.climbT || 0) > 0) {
+              en3.climbT -= dt;
+              en3.dir = en3.climbDir;
+            } else {
+              en3.dir = Math.abs(targetX - enCx) < 6 ? 0 : targetX > enCx ? 1 : -1;
+            }
             var speed = en3.vx * (en3.angry > 0 ? 1.8 : 1.3) * (slowT2 > 0 ? 0.4 : 1);
+            if (!en3.onGround && (en3.climbT || 0) > 0) speed *= 1.15;
             en3.x += speed * en3.dir * dt;
             en3.vy += GRAVITY * dt;
             en3.y += en3.vy * dt;
@@ -6222,23 +6280,23 @@
             }
             en3.stuckX = en3.stuckX !== void 0 ? en3.stuckX : en3.x;
             en3.stuckT = (en3.stuckT !== void 0 ? en3.stuckT : 0) + dt;
-            if (en3.stuckT >= 1.5) {
-              if (Math.abs(en3.x - en3.stuckX) < 28) {
-                if (en3.onGround) {
-                  en3.vy = rand(-520, -380);
-                  en3.onGround = false;
-                }
-                en3.dir *= -1;
+            if (en3.stuckT >= 1.2) {
+              if (Math.abs(en3.x - en3.stuckX) < 24 && en3.onGround) {
+                en3.vy = rand(-560, -440);
+                en3.onGround = false;
+                en3.climbDir = playerAbove ? targetX > enCx ? 1 : -1 : -en3.dir || 1;
+                en3.climbT = 1;
               }
               en3.stuckX = en3.x;
               en3.stuckT = 0;
             }
             if (en3.onGround) {
-              var playerAbove = nearest.y < en3.y - 40;
               if (playerAbove || en3.hopT <= 0 && Math.random() < 0.35) {
-                en3.vy = rand(-530, -380);
+                en3.vy = rand(-560, -430);
                 en3.onGround = false;
                 en3.hopT = rand(0.4, 1);
+                en3.climbDir = Math.abs(targetX - enCx) > 10 ? targetX > enCx ? 1 : -1 : en3.dir || 1;
+                en3.climbT = 0.9;
               }
             }
           } else {
@@ -6301,7 +6359,7 @@
           }
           if (state.gameState === "playing") {
             state.players.forEach(function(p) {
-              if (p.invuln <= 0 && rectsOverlap(p, en3)) {
+              if (p.invuln <= 0 && (en3.stunT || 0) <= 0 && rectsOverlap(p, en3)) {
                 loseLife(p, en3.x + en3.w / 2 < p.x + p.w / 2 ? -1 : 1);
               }
             });
@@ -6327,8 +6385,23 @@
           }
           pb.x += pb.vx * dt;
           pb.y += pb.vy * dt;
-          pb.vy += 600 * dt;
+          pb.vy += (pb.bounce ? 380 : 600) * dt;
           pb.rot += pb.rotV * dt;
+          if (pb.bounce) {
+            if (pb.x < 12) {
+              pb.x = 12;
+              pb.vx = Math.abs(pb.vx) * 0.85;
+            }
+            if (pb.x > W - 12) {
+              pb.x = W - 12;
+              pb.vx = -Math.abs(pb.vx) * 0.85;
+            }
+            if (pb.y > 445) {
+              pb.y = 445;
+              pb.vy = -Math.abs(pb.vy) * 0.6;
+              pb.vx *= 0.85;
+            }
+          }
         }
         for (var upi = state.popups.length - 1; upi >= 0; upi--) {
           var up = state.popups[upi];

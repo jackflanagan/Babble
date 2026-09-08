@@ -996,18 +996,26 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           }
         }
         var pbox = {x:b.x-b.r,y:b.y-b.r,w:b.r*2,h:b.r*2};
-        var popped = false;
+        var popped = false, popper = null;
         for(var pj=0; pj<state.players.length && !popped; pj++){
-          if(rectsOverlap(state.players[pj], pbox)) popped = true;
+          if(rectsOverlap(state.players[pj], pbox)){ popped = true; popper = state.players[pj]; }
         }
         if(popped){
           if(en2 && en2.hits && en2.hits > 1){
-            // Boss multi-hit: reduce HP instead of removing
+            // Multi-hit (parmesan / armoured / boss): reduce HP, then launch the
+            // enemy clear of the player and let it tumble instead of dropping it
+            // in their lap where it would immediately land a hit.
             en2.hits--;
             en2.angry = 5;
-            en2.vx = Math.min(en2.vx*1.4, 300);
             en2.state = 'free';
             en2.bubbleTimer = 0;
+            var ppr = popper || state.players[0];
+            var away = (en2.x + en2.w/2) < (ppr.x + ppr.w/2) ? -1 : 1;
+            en2.vx = 300 * away;
+            en2.vy = -340;
+            en2.dir = away;
+            en2.onGround = false;
+            en2.stunT = en2.type === 'parmesan' ? 1.8 : 1.1; // parmesan careens around longer
             b.trapped = null;
             state.bubbles.splice(bi,1);
             spawnPopup(b.x, b.y-10, 'HIT! '+en2.hits+' to go', '#ff3030');
@@ -1058,12 +1066,13 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           if(idx>-1){ state.enemies.splice(idx,1); state.enemiesLeft--; }
           state.bubbles.splice(bi,1);
           shakeT = 0.15;
-          // spinning ghost that flies off
+          // spinning ghost that flies off — parmesan careens around the map
+          var isParm = en2.type === 'parmesan';
           state.popBursts.push({
             x:b.x, y:b.y,
-            vx:rand(-220,220), vy:rand(-340,-140),
+            vx:isParm?rand(-360,360):rand(-220,220), vy:isParm?rand(-420,-260):rand(-340,-140),
             rot:0, rotV:rand(-12,12),
-            t:0, life:0.65,
+            t:0, life:isParm?1.5:0.65, bounce:isParm,
             drawFn:LEVELS[state.currentLocationId].enemyDraw,
             w:en2.w, h:en2.h, hits:0, enType:en2.type
           });
@@ -1159,6 +1168,26 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       if(en.angry>0) en.angry -= dt;
       en.hopT -= dt;
 
+      /* Knocked-back after a non-final pop: tumble through the air, ricochet off
+         walls and the floor, and deal no contact damage until it settles. */
+      if((en.stunT || 0) > 0){
+        en.stunT -= dt;
+        en.x += en.vx * dt;
+        en.vy += GRAVITY * dt;
+        en.y += en.vy * dt;
+        if(en.x < 4){ en.x = 4; en.vx = Math.abs(en.vx) * 0.8; }
+        if(en.x + en.w > W - 4){ en.x = W - 4 - en.w; en.vx = -Math.abs(en.vx) * 0.8; }
+        resolvePlatformCollision(en);
+        if(en.y + en.h > 445){
+          en.y = 445 - en.h;
+          en.vy = -Math.abs(en.vy) * 0.45;
+          en.vx *= 0.7;
+          if(Math.abs(en.vy) < 60){ en.vy = 0; }
+        }
+        if(en.onGround) en.vx *= 0.9;
+        return;
+      }
+
       /* Motorbike: periodic smoke burst */
       if(en.type === 'motorbike'){
         en.smokeRevT = ((en.smokeRevT !== undefined) ? en.smokeRevT : rand(3,6)) - dt;
@@ -1201,32 +1230,64 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
           var d = Math.abs(state.players[cp].x - en.x);
           if(d < bestDist){ bestDist = d; nearest = state.players[cp]; }
         }
-        en.dir = nearest.x > en.x ? 1 : -1;
+
+        var enCx = en.x + en.w/2;
+        var playerAbove = nearest.y + nearest.h < en.y - 6;
+
+        /* If the target is above us, aim for the nearest edge of the platform
+           it's standing on, so we can hop onto the ledge instead of jittering
+           around directly underneath it. */
+        var targetX = nearest.x + nearest.w/2;
+        if(playerAbove){
+          var allP = PLATFORMS.concat(movingPlatforms), standPl = null;
+          for(var pk=0; pk<allP.length; pk++){
+            var pl = allP[pk];
+            if(nearest.x + nearest.w > pl.x && nearest.x < pl.x + pl.w &&
+               Math.abs((nearest.y + nearest.h) - pl.y) < 12){ standPl = pl; break; }
+          }
+          if(standPl && !(enCx > standPl.x - 6 && enCx < standPl.x + standPl.w + 6)){
+            targetX = enCx < standPl.x ? standPl.x + 8 : standPl.x + standPl.w - 8;
+          }
+        }
+
+        /* Hold a committed heading through a climb hop so we actually land on
+           the ledge rather than drifting back to where we launched. */
+        if(!en.onGround && (en.climbT || 0) > 0){
+          en.climbT -= dt;
+          en.dir = en.climbDir;
+        } else {
+          en.dir = Math.abs(targetX - enCx) < 6 ? 0 : (targetX > enCx ? 1 : -1);
+        }
+
         var speed = en.vx * (en.angry>0 ? 1.8 : 1.3) * (slowT > 0 ? 0.4 : 1);
+        if(!en.onGround && (en.climbT || 0) > 0) speed *= 1.15; // extra reach mid-hop
         en.x += speed * en.dir * dt;
         en.vy += GRAVITY * dt;
         en.y += en.vy * dt;
         resolvePlatformCollision(en);
         if(en.y + en.h > 445){ en.y = 445 - en.h; en.vy = 0; en.onGround = true; }
 
-        /* Stuck detection: if enemy hasn't moved much in 1.5 s, force a jump/redirect */
+        /* Stuck detection: no horizontal progress for 1.2 s -> committed hop. */
         en.stuckX = (en.stuckX !== undefined) ? en.stuckX : en.x;
         en.stuckT = ((en.stuckT !== undefined) ? en.stuckT : 0) + dt;
-        if(en.stuckT >= 1.5){
-          if(Math.abs(en.x - en.stuckX) < 28){
-            if(en.onGround){ en.vy = rand(-520, -380); en.onGround = false; }
-            en.dir *= -1;
+        if(en.stuckT >= 1.2){
+          if(Math.abs(en.x - en.stuckX) < 24 && en.onGround){
+            en.vy = rand(-560, -440);
+            en.onGround = false;
+            en.climbDir = playerAbove ? (targetX > enCx ? 1 : -1) : (-en.dir || 1);
+            en.climbT = 1.0;
           }
           en.stuckX = en.x; en.stuckT = 0;
         }
 
-        /* Jump: immediately if player is above; randomly to traverse platforms */
+        /* Jump: climb toward a target above, or hop to traverse platforms. */
         if(en.onGround){
-          var playerAbove = nearest.y < en.y - 40;
           if(playerAbove || (en.hopT <= 0 && Math.random() < 0.35)){
-            en.vy = rand(-530, -380);
+            en.vy = rand(-560, -430);
             en.onGround = false;
             en.hopT = rand(0.4, 1.0);
+            en.climbDir = Math.abs(targetX - enCx) > 10 ? (targetX > enCx ? 1 : -1) : (en.dir || 1);
+            en.climbT = 0.9;
           }
         }
       } else {
@@ -1273,7 +1334,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 
       if(state.gameState === 'playing'){
         state.players.forEach(function(p){
-          if(p.invuln<=0 && rectsOverlap(p, en)){
+          if(p.invuln<=0 && (en.stunT||0)<=0 && rectsOverlap(p, en)){
             loseLife(p, en.x + en.w/2 < p.x + p.w/2 ? -1 : 1);
           }
         });
@@ -1291,8 +1352,13 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
       var pb = state.popBursts[pbi];
       pb.t += dt;
       if(pb.t >= pb.life){ state.popBursts.splice(pbi,1); continue; }
-      pb.x += pb.vx*dt; pb.y += pb.vy*dt; pb.vy += 600*dt;
+      pb.x += pb.vx*dt; pb.y += pb.vy*dt; pb.vy += (pb.bounce ? 380 : 600)*dt;
       pb.rot += pb.rotV*dt;
+      if(pb.bounce){
+        if(pb.x < 12){ pb.x = 12; pb.vx = Math.abs(pb.vx)*0.85; }
+        if(pb.x > W-12){ pb.x = W-12; pb.vx = -Math.abs(pb.vx)*0.85; }
+        if(pb.y > 445){ pb.y = 445; pb.vy = -Math.abs(pb.vy)*0.6; pb.vx *= 0.85; }
+      }
     }
     for(var upi=state.popups.length-1; upi>=0; upi--){
       var up = state.popups[upi];
