@@ -20,8 +20,13 @@ test('Reset button clears localStorage', async ({ page }) => {
   await page.waitForSelector('#scene-globe', { state: 'visible', timeout: 10000 });
   await dismissPortraitWarning(page);
 
-  // Seed some progress keys
+  // Seed some progress keys (canonical + legacy + unrelated)
   await page.evaluate(() => {
+    localStorage.setItem('bbl_progression_v1', JSON.stringify({
+      version: 2, visitedLocations: ['glasgow'],
+      levelRecords: { glasgow: { bestScore: 9999, completions: 3, stars: { completion: true, collection: true, performance: true } } },
+      bestAdventureScore: 12000, totalAdventures: 2,
+    }));
     localStorage.setItem('gh_progress_v2', JSON.stringify({ glasgow: { best: 9999, cleared: true } }));
     localStorage.setItem('gh_streak', '5');
     localStorage.setItem('bbl_panda_special', '1');

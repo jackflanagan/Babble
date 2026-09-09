@@ -29,7 +29,7 @@ test('clean profile: defaults in memory, nothing written to localStorage', async
   await bootGlobe(page);
   const prog = await page.evaluate(() => window.__game.getProgression());
   expect(prog).toEqual({
-    version: 1,
+    version: 2,
     visitedLocations: [],
     levelRecords: {},
     bestAdventureScore: 0,
@@ -42,8 +42,8 @@ test('clean profile: defaults in memory, nothing written to localStorage', async
 test('loading progression: a stored profile is read back and sanitised', async ({ page }) => {
   await bootGlobe(page);
   await page.evaluate((k) => localStorage.setItem(k, JSON.stringify({
-    version: 1,
-    visitedLocations: ['glasgow', 'modena', 'glasgow'], // dupe should collapse
+    version: 2,
+    visitedLocations: ['glasgow', 'modena', 'glasgow'], // dupe collapses; v2 canonical seed
     levelRecords: { glasgow: { bestScore: 1200, completions: 2, stars: { completion: true, collection: false, performance: true } } },
     bestAdventureScore: 5000,
     totalAdventures: 3,
@@ -86,7 +86,7 @@ test('corrupted / malformed localStorage falls back to defaults without errors',
     await page.waitForFunction(() => window.__game && window.__game.getProgression, null, { timeout: 5000 });
 
     const prog = await page.evaluate(() => window.__game.getProgression());
-    expect(prog.version, `bad value: ${bad}`).toBe(1);
+    expect(prog.version, `bad value: ${bad}`).toBe(2);
     expect(prog.visitedLocations, `bad value: ${bad}`).toEqual([]);
     expect(prog.levelRecords, `bad value: ${bad}`).toEqual({});
     expect(prog.bestAdventureScore, `bad value: ${bad}`).toBe(0);
@@ -121,7 +121,7 @@ test('completing a location records it as visited and persists (save + load roun
   const prog = await page.evaluate(() => window.__game.getProgression());
   expect(prog.visitedLocations).toContain('glasgow');
   const stored = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)), KEY);
-  expect(stored.version).toBe(1);
+  expect(stored.version).toBe(2);
   expect(stored.visitedLocations).toContain('glasgow');
   expect(stored.totalAdventures).toBe(0); // adventure not finished yet
 

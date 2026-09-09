@@ -93,9 +93,29 @@ function buildLbTabs(LOCATIONS){
   });
 }
 
-/* progress is passed via setProgress so loadLbTab can access it */
+/* Canonical progression object (from progression.js) is passed via
+   setProgress so loadLbTab can highlight the player's own row. */
 var _progress = null;
 export function setProgress(p){ _progress = p; }
+
+/* Player name / leaderboard identity — kept separate from the progression
+   profile on purpose. Keyed by board id ('adventure' or a location id). */
+var LB_NAMES_KEY = 'bbl_lb_names_v1';
+function readLbNames(){
+  try{ return JSON.parse(localStorage.getItem(LB_NAMES_KEY)) || {}; }catch(e){ return {}; }
+}
+export function getLbName(boardId){
+  var n = readLbNames()[boardId];
+  return typeof n === 'string' ? n : '';
+}
+export function setLbName(boardId, name){
+  if(!boardId || typeof name !== 'string' || !name) return;
+  try{
+    var m = readLbNames();
+    m[boardId] = name;
+    localStorage.setItem(LB_NAMES_KEY, JSON.stringify(m));
+  }catch(e){ /* storage disabled — never crash */ }
+}
 
 function loadLbTab(locationId){
   var tableEl = document.getElementById('lbTable');
@@ -109,8 +129,8 @@ function loadLbTab(locationId){
       tableEl.innerHTML = '<p style="text-align:center;color:var(--dim-text);font-size:14px;">No scores yet \u2014 be the first!</p>';
       return;
     }
-    var progress = _progress || {};
-    var localBest = (progress[locationId] && progress[locationId].best) || 0;
+    var lr = (_progress && _progress.levelRecords) || {};
+    var localBest = (lr[locationId] && lr[locationId].bestScore) || 0;
     var html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">';
     html += '<tr style="color:var(--dim-text);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">';
     html += '<th style="padding:4px 8px;text-align:left;">#</th>';

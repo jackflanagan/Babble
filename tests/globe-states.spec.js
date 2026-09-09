@@ -8,8 +8,7 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 
 const FILE_URL = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
-const PROG_KEY = 'bbl_progression_v1';
-const CAMP_KEY = 'gh_progress_v2';
+const PROG_KEY = 'bbl_progression_v1';   // the single canonical store
 
 test.beforeEach(() => {
   test.skip(test.info().project.name !== 'desktop', 'run once on desktop');
@@ -22,25 +21,25 @@ async function boot(page) {
   await page.waitForFunction(() => window.__game && window.__game.getState && window.__game.replayMode, null, { timeout: 5000 });
 }
 
-/** Seed locations as cleared (unlocks pins) + visited (enables replay).
- *  records: { id: bestScore } or { id: { best, stars } } */
+/** Seed canonical progression. records: { id: bestScore } or { id: { best, stars } } */
 async function seed(page, records) {
-  await page.evaluate(({ ck, pk, records }) => {
-    const camp = {};
+  await page.evaluate(({ pk, records }) => {
     const visited = [];
     const levelRecords = {};
     Object.keys(records).forEach(id => {
       const r = typeof records[id] === 'object' ? records[id] : { best: records[id] };
-      camp[id] = { best: r.best || 0, cleared: true };
       visited.push(id);
-      if (r.stars) levelRecords[id] = { bestScore: r.best || 0, completions: 1, stars: r.stars };
+      levelRecords[id] = {
+        bestScore: r.best || 0,
+        completions: 1,
+        stars: r.stars || { completion: true, collection: false, performance: false },
+      };
     });
-    localStorage.setItem(ck, JSON.stringify(camp));
     localStorage.setItem(pk, JSON.stringify({
-      version: 1, visitedLocations: visited, levelRecords,
+      version: 2, visitedLocations: visited, levelRecords,
       bestAdventureScore: 0, totalAdventures: 0,
     }));
-  }, { ck: CAMP_KEY, pk: PROG_KEY, records });
+  }, { pk: PROG_KEY, records });
 }
 
 const pin = (name) => `.pin[aria-label*="${name}"]`;

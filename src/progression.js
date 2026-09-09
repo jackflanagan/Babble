@@ -1,23 +1,36 @@
 /* =========================================================
-   PLAYER PROGRESSION  —  persistent, cross-adventure profile
+   PLAYER PROGRESSION  —  the single canonical persistence layer
 
-   A deliberately tiny localStorage layer, kept out of main.js's
-   in-memory `state`. This is step 1 of the replayability system:
-   it only *records* progress. Nothing in here changes how the
-   fixed campaign plays for a first-time player.
+   Everything about level completion, per-level best score, mastery
+   stars and the adventure profile lives here, under ONE localStorage
+   key. main.js and globe.js never keep their own copy — they read
+   through the exported helpers / injected getters.
 
-   Stored shape (localStorage key `bbl_progression_v1`):
+   Stored shape (localStorage key `bbl_progression_v1`, version 2):
      {
-       version: 1,
-       visitedLocations: [],   // ids of locations the player has completed
-       levelRecords: {},       // reserved for later steps (per-level records)
-       bestAdventureScore: 0,  // best score from a fully completed adventure
-       totalAdventures: 0      // adventures that reached their completion state
+       version: 2,
+       visitedLocations: [ locationId, … ],   // completed at least once
+       levelRecords: {
+         [locationId]: {
+           bestScore,      // best ISOLATED score for that level (campaign leg or replay)
+           completions,    // times cleared (campaign + replay)
+           stars: { completion, collection, performance }
+         }
+       },
+       bestAdventureScore,  // best score from a fully completed adventure
+       totalAdventures      // adventures that reached completion
      }
+
+   Player name / leaderboard data is deliberately NOT here — that stays
+   in sdk.js (`bbl_lb_names_v1`).
+
+   Version 1 profiles and the legacy `gh_progress_v2` object are folded
+   in once by migrateLegacy() on first load.
 ========================================================= */
 
 var STORAGE_KEY   = 'bbl_progression_v1';
-var SCHEMA_VERSION = 1;
+var LEGACY_KEY    = 'gh_progress_v2';
+var SCHEMA_VERSION = 2;
 
 function freshData(){
   return {
@@ -71,17 +84,78 @@ function sanitize(raw){
   return out;
 }
 
+/* One-time fold of a pre-v2 profile and/or the legacy gh_progress_v2
+   object into the canonical shape. Values are merged with max() so a
+   returning player never loses ground, then the legacy key is removed
+   and player names are handed to sdk.js. Returns true if anything was
+   migrated (so the caller knows to persist). */
+function migrateLegacy(d, loadedVersion){
+  var didMerge = false;
+  var legacy = null;
+  try{
+    var ls = (typeof localStorage !== 'undefined') ? localStorage.getItem(LEGACY_KEY) : null;
+    if(ls) legacy = JSON.parse(ls);
+  }catch(e){ legacy = null; }
+
+  if(legacy && typeof legacy === 'object' && !Array.isArray(legacy)){
+    var names = {};
+    Object.keys(legacy).forEach(function(id){
+      var e = legacy[id];
+      if(!e || typeof e !== 'object') return;
+      if(id === 'adventure'){
+        var ab = nonNegInt(e.best);
+        if(ab > d.bestAdventureScore) d.bestAdventureScore = ab;
+        if(typeof e.name === 'string' && e.name) names.adventure = e.name;
+        didMerge = true;
+        return;
+      }
+      if(typeof e.name === 'string' && e.name){ names[id] = e.name; didMerge = true; }
+      var lb = nonNegInt(e.best), lp = nonNegInt(e.playCount);
+      // Only materialise a record when the legacy entry actually has progress.
+      if(e.cleared !== true && lb === 0 && lp === 0) return;
+      var rec = d.levelRecords[id] || { bestScore: 0, completions: 0, stars: sanitizeStars() };
+      if(lb > rec.bestScore)   rec.bestScore   = lb;
+      if(lp > rec.completions) rec.completions = lp;
+      if(e.cleared === true){
+        rec.stars.completion = true;
+        if(d.visitedLocations.indexOf(id) === -1) d.visitedLocations.push(id);
+      }
+      d.levelRecords[id] = rec;
+      didMerge = true;
+    });
+    try{
+      if(Object.keys(names).length && typeof localStorage !== 'undefined'){
+        var existing = {};
+        try{ existing = JSON.parse(localStorage.getItem('bbl_lb_names_v1')) || {}; }catch(e2){}
+        Object.keys(names).forEach(function(k){ if(existing[k] == null) existing[k] = names[k]; });
+        localStorage.setItem('bbl_lb_names_v1', JSON.stringify(existing));
+      }
+    }catch(e3){}
+    try{ if(typeof localStorage !== 'undefined') localStorage.removeItem(LEGACY_KEY); }catch(e4){}
+  }
+
+  // A stored pre-v2 profile still needs re-stamping even with nothing to fold in.
+  if(loadedVersion != null && loadedVersion !== SCHEMA_VERSION) didMerge = true;
+  return didMerge;
+}
+
 var _data = null;
 
-/* Load once, then hand back the same live object. Never throws. */
+/* Load once, then hand back the same live object. Never throws.
+   Runs the one-time legacy migration on first load. */
 export function loadProgression(){
   if(_data) return _data;
-  var raw = null;
+  var raw = null, hadStored = false;
   try{
     var str = (typeof localStorage !== 'undefined') ? localStorage.getItem(STORAGE_KEY) : null;
-    if(str) raw = JSON.parse(str);
+    if(str){ raw = JSON.parse(str); hadStored = true; }
   }catch(e){ raw = null; }
   _data = sanitize(raw);
+  var loadedVersion = hadStored && raw && typeof raw === 'object' ? raw.version : null;
+  if(migrateLegacy(_data, loadedVersion)){
+    _data.version = SCHEMA_VERSION;
+    persist();
+  }
   return _data;
 }
 
@@ -114,9 +188,9 @@ export function recordAdventureComplete(finalScore){
   persist();
 }
 
-/* Record a standalone level result (a world-map replay). Bumps the
-   completion count and keeps the best score — the stored bestScore is
-   only replaced when the new score is strictly higher. */
+/* Record a level clear (campaign leg OR world-map replay). Bumps the
+   completion count and keeps the best ISOLATED score for that level —
+   bestScore is only replaced when the new score is strictly higher. */
 export function recordLevelResult(locationId, score){
   if(typeof locationId !== 'string' || !locationId) return;
   var s = (typeof score === 'number' && isFinite(score) && score > 0) ? Math.floor(score) : 0;
@@ -150,6 +224,24 @@ export function levelStarCount(locationId){
   if(!rec) return 0;
   var st = sanitizeStars(rec.stars);
   return (st.completion ? 1 : 0) + (st.collection ? 1 : 0) + (st.performance ? 1 : 0);
+}
+
+/* Best isolated score recorded for a level (0 if never cleared). */
+export function levelBestScore(locationId){
+  var rec = loadProgression().levelRecords[locationId];
+  return (rec && rec.bestScore) || 0;
+}
+
+/* Times a level has been cleared (campaign legs + replays). Replaces the
+   old gh_progress_v2 `playCount` — feeds escalating difficulty. */
+export function levelCompletions(locationId){
+  var rec = loadProgression().levelRecords[locationId];
+  return (rec && rec.completions) || 0;
+}
+
+/* Has this location been completed at least once? (the old `cleared` flag) */
+export function isLevelCleared(locationId){
+  return loadProgression().visitedLocations.indexOf(locationId) !== -1;
 }
 
 /* Wipe the profile back to defaults. Not wired to any UI yet;

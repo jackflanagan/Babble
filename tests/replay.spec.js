@@ -7,8 +7,7 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 
 const FILE_URL = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
-const PROG_KEY = 'bbl_progression_v1';
-const CAMP_KEY = 'gh_progress_v2';
+const PROG_KEY = 'bbl_progression_v1';   // the single canonical store
 
 test.beforeEach(() => {
   test.skip(test.info().project.name !== 'desktop', 'run once on desktop');
@@ -21,17 +20,19 @@ async function boot(page) {
   await page.waitForFunction(() => window.__game && window.__game.getState && window.__game.replayMode, null, { timeout: 5000 });
 }
 
-/** Seed locations as cleared (unlocks the pins) + visited (enables replay). */
+/** Seed canonical progression: locations visited (unlocks pins + enables replay). */
 async function seed(page, ids) {
-  await page.evaluate(({ ck, pk, ids }) => {
-    const camp = {};
-    ids.forEach(id => { camp[id] = { best: 1000, cleared: true }; });
-    localStorage.setItem(ck, JSON.stringify(camp));
+  await page.evaluate(({ pk, ids }) => {
+    const levelRecords = {};
+    ids.forEach(id => {
+      levelRecords[id] = { bestScore: 1000, completions: 1,
+        stars: { completion: true, collection: false, performance: false } };
+    });
     localStorage.setItem(pk, JSON.stringify({
-      version: 1, visitedLocations: ids.slice(), levelRecords: {},
+      version: 2, visitedLocations: ids.slice(), levelRecords,
       bestAdventureScore: 0, totalAdventures: 0,
     }));
-  }, { ck: CAMP_KEY, pk: PROG_KEY, ids });
+  }, { pk: PROG_KEY, ids });
 }
 
 async function startCampaignFromGlobe(page) {
@@ -209,7 +210,7 @@ test('replay records the level score in levelRecords when there is no better rec
   test.setTimeout(60000);
   await seededGlasgowReplay(page);
   const rec = await page.evaluate(() => window.__game.getProgression().levelRecords.glasgow);
-  expect(rec.completions).toBe(1);
+  expect(rec.completions).toBe(2);          // 1 seeded clear + this replay
   expect(rec.bestScore).toBeGreaterThan(0);
 });
 

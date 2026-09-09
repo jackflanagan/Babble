@@ -1,20 +1,22 @@
 
 import { TAU, clamp, lerp, rand, safeGet, safeSet, escHtml, haptic } from './utils.js';
 import { ctx, W, H, initCanvas } from './canvas.js';
-import { adGameplayStart, adGameplayStop, showAdBreak, lbEnabled, submitScore, fetchLeaderboard, openLeaderboard, setProgress } from './sdk.js';
+import { adGameplayStart, adGameplayStop, showAdBreak, lbEnabled, submitScore, fetchLeaderboard, openLeaderboard, setProgress, getLbName, setLbName } from './sdk.js';
 import { initStarfield } from './starfield.js';
 import { playSound, ac, getMasterGain, setMasterVolume, setMutedGetter, suspendAudio, resumeAudio } from './audio.js';
 import { bgmAudio, startMusic, stopMusic, setMusicMutedGetter } from './music.js';
 import { updateStreak, getDailyLocationId, refreshDailyUI, ACHIEVEMENTS, achievementQueue, achievementToast, achievementToastT, setAchievementToast, setAchievementToastT, unlockAchievement, renderAchievements, setLocationsGetter, setRunAchievements } from './features.js';
-import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation, setCanReplay, setLevelStars } from './globe.js';
+import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation, setCanReplay, setLevelStars, setLbName as setGlobeLbNameGetter } from './globe.js';
 import { drawGround, drawPlatform, drawFox, drawChicken, drawBubble, drawPowerup, drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawBuckfastRef, drawParmesanRef, drawLukeKellyRef, drawArtistRef, drawMotorbikeRef, drawPaintBlobs, setDrawState, getLOC_POWERUP_META } from './draw.js';
 import { netRole, netConnected, netStateAccum, setNetStateAccum, netUiRefresh, netHudRefresh, netTeardown, netBroadcastScene, netBroadcastState, netSendInputIfChanged, localJumpPress, localBubblePress, setNetState, setNetEnterLocation, setNetBackToMap, setNetPlaySound, setNetTryJump, setNetTryShoot, setNetKeys, setNetUpdateHud, setNetLivePlayers } from './net.js';
 import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
-import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete, recordLevelResult, recordLevelStars, levelStarCount } from './progression.js';
+import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete, recordLevelResult, recordLevelStars, levelStarCount, levelBestScore, levelCompletions, isLevelCleared } from './progression.js';
 
-  var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
-  setProgress(progress);
-  setGlobeProgress(progress);
+  // src/progression.js is the ONE canonical progression store. Its load also
+  // runs the one-time migration of any legacy gh_progress_v2 save.
+  var progression = loadProgression();
+  setProgress(progression);        // sdk.js: leaderboard "you" highlight
+  setGlobeProgress(progression);   // globe.js: reads visitedLocations / levelRecords
   // A globe location is replayable once it has been completed at least once
   // (campaign or replay both mark it visited). Mini-games are never in LOCATIONS.
   setCanReplay(function(id){
@@ -22,13 +24,14 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   });
   // Mastery star count for a location, for the world-map / info-card UI.
   setLevelStars(function(id){ return levelStarCount(id); });
+  // Player name for the globe "best runs" line (leaderboard data stays in sdk.js).
+  setGlobeLbNameGetter(function(id){ return getLbName(id); });
   // Re-derive unlocked locations from saved progress. globe.js runs
   // refreshClearedPin() at module load with empty progress, so without this
   // pass every location beyond the defaults re-locks on each page load.
   refreshClearedPin();
   setLocationsGetter(function(){ return LOCATIONS; });
   setDrawState(function(){ return { LEVELS: LEVELS, currentLocationId: state.currentLocationId }; });
-  loadProgression();   // hydrate the persistent player profile (see progression.js)
 
   /* ---------- Feature 5: Random Mid-Level Events ---------- */
   var EVENTS = [
@@ -490,7 +493,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     if(state.numPlayers===2) state.players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
 
     /* Feature 4: Escalating Difficulty */
-    var playCount = (progress[state.currentLocationId] && progress[state.currentLocationId].playCount) || 0;
+    var playCount = levelCompletions(state.currentLocationId);
     var diffMult = Math.min(1 + playCount * 0.12, 2.2);
     var adjustedChaseDelay = Math.max(5, CHASE_DELAY / diffMult);
 
@@ -540,8 +543,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     survivorUnlocked = false;
     usedPowerups = {};
 
-    var locPlayCount2 = (progress[state.currentLocationId] && progress[state.currentLocationId].playCount) || 0;
-    tutorialDone = locPlayCount2 > 0;
+    tutorialDone = levelCompletions(state.currentLocationId) > 0;
     tutorialT = 0;
     tutorialFirstPop = false;
 
@@ -588,8 +590,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     document.getElementById('overlayWin').hidden = true;
     document.getElementById('overlayLose').hidden = true;
     document.getElementById('overlayReplayResult').hidden = true;
-    var pr = progress[state.currentLocationId] || {best:0};
-    document.getElementById('hudBest').textContent = pr.best;
+    document.getElementById('hudBest').textContent = levelBestScore(state.currentLocationId);
   }
   resetGame._adjustedChaseDelay = CHASE_DELAY;
   resetGame._diffMult = 1;
@@ -662,18 +663,16 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       var val = nameInput.value.trim();
       if(!val) return;
       var boardId = adventureComplete ? 'adventure' : state.currentLocationId;
-      var pr = progress[boardId] || {best:0,cleared:false};
-      pr.name = val;
-      progress[boardId] = pr;
-      safeSet('gh_progress_v2', progress);
+      setLbName(boardId, val);   // leaderboard identity — separate from progression
       renderBestScores();
       // Submit to leaderboard on first confirm
       if(!submitted && lbEnabled()){
         submitted = true;
+        var scoreForBoard = adventureComplete ? getProgression().bestAdventureScore : levelBestScore(boardId);
         var winScoreSubmit = document.getElementById('winScoreSubmit');
         winScoreSubmit.hidden = false;
         winScoreSubmit.textContent = 'Submitting score…';
-        submitScore(boardId, val, pr.best, function(ok){
+        submitScore(boardId, val, scoreForBoard, function(ok){
           winScoreSubmit.textContent = ok ? '✓ On the leaderboard!' : '✗ Could not submit score';
         });
       }
@@ -686,8 +685,8 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
 
   // Skin selector
   function buildSkinDots(){
-    var p1Unlocks = [true, progress.glasgow && progress.glasgow.cleared, progress.modena && progress.modena.cleared, progress.kenya && progress.kenya.cleared];
-    var p2Unlocks = [true, progress.paris && progress.paris.cleared, progress.ireland && progress.ireland.cleared];
+    var p1Unlocks = [true, isLevelCleared('glasgow'), isLevelCleared('modena'), isLevelCleared('kenya')];
+    var p2Unlocks = [true, isLevelCleared('paris'), isLevelCleared('ireland')];
     var p1Colors = PALETTES_P1.map(function(p){ return p.body; });
     var p2Colors = PALETTES_P2.map(function(p){ return p.body; });
 
@@ -725,8 +724,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
 
   function updateHud(){
     document.getElementById('hudScore').textContent = state.score;
-    var pr = progress[state.currentLocationId] || {best:0};
-    document.getElementById('hudBest').textContent = pr.best;
+    document.getElementById('hudBest').textContent = levelBestScore(state.currentLocationId);
     var livesEl = document.getElementById('hudLives');
     livesEl.innerHTML = '';
     for(var i=0;i<state.lives;i++){
@@ -1798,14 +1796,10 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     var btnAgain = document.getElementById('btnWinAgain');
     if(btnAgain) btnAgain.textContent = 'New adventure';
 
-    var pr = progress.adventure || {best:0};
-    if(finalScore > (pr.best || 0)) pr.best = finalScore;
-    progress.adventure = pr;
-    safeSet('gh_progress_v2', progress);
-    document.getElementById('hudBest').textContent = pr.best;
-
-    // Persistent profile: only a genuine completion (every stop cleared) counts.
+    // Canonical profile: only a genuine completion (every stop cleared) raises
+    // the adventure best / run count.
     if(won) recordAdventureComplete(finalScore);
+    document.getElementById('hudBest').textContent = getProgression().bestAdventureScore;
 
     var nameEntryRow = document.getElementById('nameEntryRow');
     var nameInput = document.getElementById('nameInput');
@@ -1814,7 +1808,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     winScoreSubmit.hidden = true;
     if(lbEnabled()){
       nameEntryRow.hidden = false;
-      nameInput.value = pr.name || '';
+      nameInput.value = getLbName('adventure');
       setTimeout(function(){ nameInput.focus(); }, 100);
     } else {
       nameEntryRow.hidden = true;
@@ -2898,18 +2892,14 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     var starCollection  = state.collectibles.length > 0 && collected >= state.collectibles.length;
     var starPerformance = levelScore >= levelPerfTarget(state.currentLocationId);
     var stars = (starCompletion?1:0) + (starCollection?1:0) + (starPerformance?1:0);
+    var isNewBest = levelScore > prevLevelBest;
+    // Canonical progression — the ONE store. markLocationVisited replaces the
+    // old `cleared` flag; recordLevelResult bumps `completions` (the old
+    // `playCount`) and keeps the best ISOLATED level score (campaign leg or
+    // replay); recordLevelStars merges the mastery stars.
+    markLocationVisited(state.currentLocationId);
+    recordLevelResult(state.currentLocationId, levelScore);
     recordLevelStars(state.currentLocationId, { completion:starCompletion, collection:starCollection, performance:starPerformance });
-    var pr = progress[state.currentLocationId] || {best:0,cleared:false};
-    pr.cleared = true;
-    pr.playCount = (pr.playCount||0) + 1;
-    var isNewBest = state.score > pr.best;
-    if(isNewBest) pr.best = state.score;
-    progress[state.currentLocationId] = pr;
-    safeSet('gh_progress_v2', progress);
-    markLocationVisited(state.currentLocationId);   // persistent cross-adventure profile
-    // In a world-map replay, state.score is this level's score alone (resetGame
-    // zeroed it). Store it as the per-level record; only replaces when better.
-    if(replayMode) recordLevelResult(state.currentLocationId, state.score);
 
     /* Panda special unlock — beating the China boss */
     if(state.currentLocationId === 'boss' && !pandaSpecialUnlocked){
@@ -2922,7 +2912,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     /* Feature 3: Achievements in winLevel */
     if(totalElapsed < 40) unlockAchievement('speedrun');
     if(collected >= state.collectibles.length) unlockAchievement('treasure');
-    var allFiveCleared = ['glasgow','modena','kenya','paris','ireland'].every(function(id){ return progress[id] && progress[id].cleared; });
+    var allFiveCleared = ['glasgow','modena','kenya','paris','ireland'].every(isLevelCleared);
     if(allFiveCleared) unlockAchievement('globetrotter');
 
     /* Feature 2: Daily challenge check */
@@ -2963,16 +2953,17 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     // Per-level name entry / leaderboard only applies to standalone play. In the
     // adventure the leaderboard is handled once, at the very end.
     if(!campaignMode){
+      var savedName = getLbName(state.currentLocationId);
       if(isNewBest){
         nameEntryRow.hidden = false;
-        nameInput.value = pr.name || '';
+        nameInput.value = savedName;
         setTimeout(function(){ nameInput.focus(); }, 100);
       } else {
         nameEntryRow.hidden = true;
-        if(pr.name && lbEnabled()){
+        if(savedName && lbEnabled()){
           winScoreSubmit.hidden = false;
           winScoreSubmit.textContent = 'Submitting score…';
-          submitScore(state.currentLocationId, pr.name, state.score, function(ok){
+          submitScore(state.currentLocationId, savedName, levelBestScore(state.currentLocationId), function(ok){
             winScoreSubmit.textContent = ok ? '✓ Score submitted to leaderboard' : '✗ Could not submit score';
           });
         }

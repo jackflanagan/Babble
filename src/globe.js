@@ -6,8 +6,21 @@ import { TAU, clamp, rand, safeGet, safeSet } from './utils.js';
 import { netRole, netConnected } from './net.js';
 
 /* injectable deps */
-var _progress = {};
+var _progress = {};   // the canonical progression object (progression.js)
 export function setGlobeProgress(p){ _progress = p; }
+/* Read helpers over the canonical shape — globe.js never sees a per-location
+   `progress[id]` object any more. */
+function pCleared(id){
+  return !!(_progress.visitedLocations && _progress.visitedLocations.indexOf(id) !== -1);
+}
+function pBest(id){
+  var lr = _progress.levelRecords;
+  return (lr && lr[id] && lr[id].bestScore) || 0;
+}
+/* Player name for the "best runs" line — injected so leaderboard data
+   stays out of globe.js. */
+var _lbName = function(){ return ''; };
+export function setLbName(fn){ _lbName = fn; }
 var _enterLocation = function(){};
 export function setEnterLocation(fn){ _enterLocation = fn; }
 /* Predicate injected by main.js: has this location been completed (so it can
@@ -242,7 +255,7 @@ export function drawGlobe(){
     var fromLoc = LOCATIONS.filter(function(l){ return l.id===j.from; })[0];
     var toLoc   = LOCATIONS.filter(function(l){ return l.id===j.to;   })[0];
     if(!fromLoc || !toLoc) return;
-    var fromCleared = _progress[j.from] && _progress[j.from].cleared;
+    var fromCleared = pCleared(j.from);
     var toUnlocked  = toLoc.unlocked;
     if(!fromCleared && !toUnlocked) return;
     var pts = greatCircle(fromLoc.lat, fromLoc.lon, toLoc.lat, toLoc.lon, 30);
@@ -276,7 +289,7 @@ export function drawGlobe(){
     if(!loc.unlocked) return;
     var pg = project(loc.lat, loc.lon);
     if(pg.z < 0.1) return;
-    var cleared = _progress[loc.id] && _progress[loc.id].cleared;
+    var cleared = pCleared(loc.id);
     var r = (cleared ? 28 : 20) * pg.z;
     var gw = gctx.createRadialGradient(pg.x, pg.y, 0, pg.x, pg.y, r);
     var col = cleared ? '255,207,92' : '140,200,255';
@@ -337,7 +350,7 @@ var locInfoEl = null, locInfoSel = null;
 
 function locState(loc){
   if(!loc.unlocked) return 'locked';
-  if(_canReplay(loc.id) || (_progress[loc.id] && _progress[loc.id].cleared)) return 'visited';
+  if(_canReplay(loc.id) || pCleared(loc.id)) return 'visited';
   return 'available';
 }
 
@@ -368,7 +381,7 @@ function hideLocInfo(){ if(locInfoEl) locInfoEl.hidden = true; locInfoSel = null
 function showLocInfo(loc){
   var el = ensureLocInfo();
   var st = locState(loc);
-  var pr = _progress[loc.id] || {};
+  var best = pBest(loc.id);
   locInfoSel = loc;
   el.classList.remove('is-locked','is-visited','is-available');
   el.classList.add('is-' + st);
@@ -390,7 +403,7 @@ function showLocInfo(loc){
     goEl.hidden = true;
   } else if(st === 'visited'){
     stateEl.textContent = '✓ Cleared — you’ve travelled here';
-    scoreEl.textContent = (pr.best > 0) ? ('Best score · ' + pr.best) : 'No score recorded yet';
+    scoreEl.textContent = (best > 0) ? ('Best score · ' + best) : 'No score recorded yet';
     goEl.hidden = false;
     // launchLocation() routes by _canReplay, so the label matches the action.
     goEl.textContent = (_canReplay(loc.id) ? '▶ Replay ' : '▶ Play ') + loc.name;
@@ -476,31 +489,28 @@ export function unlockLocation(id){
 
 export function refreshClearedPin(){
   // Europe → Africa: unlock Kenya once all 4 European locations are cleared
-  var europeDone = ['glasgow','modena','paris','ireland'].every(function(id){
-    return _progress[id] && _progress[id].cleared;
-  });
+  var europeDone = ['glasgow','modena','paris','ireland'].every(pCleared);
   if(europeDone) unlockLocation('kenya');
 
   // Ireland → Athens (bonus European level)
-  if(_progress.ireland && _progress.ireland.cleared) unlockLocation('athens');
+  if(pCleared('ireland')) unlockLocation('athens');
   // Kenya → Tokyo
-  if(_progress.kenya && _progress.kenya.cleared) unlockLocation('tokyo');
+  if(pCleared('kenya')) unlockLocation('tokyo');
   // Tokyo → Brazil
-  if(_progress.tokyo && _progress.tokyo.cleared) unlockLocation('brazil');
+  if(pCleared('tokyo')) unlockLocation('brazil');
   // Brazil → New York
-  if(_progress.brazil && _progress.brazil.cleared) unlockLocation('newyork');
+  if(pCleared('brazil')) unlockLocation('newyork');
   // New York → Boss (China)
-  if(_progress.newyork && _progress.newyork.cleared) unlockLocation('boss');
+  if(pCleared('newyork')) unlockLocation('boss');
 
   // Also keep old Africa → Asia path if someone had legacy save
-  var africaDone = _progress.kenya && _progress.kenya.cleared;
-  if(africaDone && (!_progress.tokyo || !_progress.tokyo.cleared) && (!_progress.brazil || !_progress.brazil.cleared) && (!_progress.newyork || !_progress.newyork.cleared)) unlockLocation('boss');
+  var africaDone = pCleared('kenya');
+  if(africaDone && !pCleared('tokyo') && !pCleared('brazil') && !pCleared('newyork')) unlockLocation('boss');
 
   hideLocInfo();   // stale card if we're re-entering the map after a run
 
   LOCATIONS.forEach(function(loc){
-    var pr = _progress[loc.id];
-    var visited = !!_canReplay(loc.id) || !!(pr && pr.cleared);
+    var visited = _canReplay(loc.id) || pCleared(loc.id);
     // Three states on the globe: locked (grey, static) / available (coral,
     // pulsing) / visited (gold). Pins already carry .locked from build; add
     // .cleared for visited. Mirror the same read onto the roster chips.
@@ -519,10 +529,11 @@ export function renderBestScores(){
   var el = document.getElementById('bestScoreLine');
   var parts = [];
   LOCATIONS.forEach(function(loc){
-    var pr = _progress[loc.id];
-    if(pr && pr.best > 0){
-      var entry = loc.name + ': ' + pr.best;
-      if(pr.name) entry += ' (' + pr.name + ')';
+    var best = pBest(loc.id);
+    if(best > 0){
+      var entry = loc.name + ': ' + best;
+      var nm = _lbName(loc.id);
+      if(nm) entry += ' (' + nm + ')';
       parts.push(entry);
     }
   });

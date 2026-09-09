@@ -45,11 +45,12 @@ test('every location draws a non-blank level with no page errors', async ({ page
     if (m.type() === 'error' && !IGNORED_ERROR_RE.test(m.text())) errors.push('console.error: ' + m.text());
   });
 
-  // Unlock every location so all 10 can be entered from the roster.
+  // Unlock every location so all 10 can be entered from the roster (canonical store).
   await page.addInitScript((ids) => {
-    const all = {};
-    ids.forEach(id => { all[id] = { best: 0, cleared: true }; });
-    localStorage.setItem('gh_progress_v2', JSON.stringify(all));
+    localStorage.setItem('bbl_progression_v1', JSON.stringify({
+      version: 2, visitedLocations: ids.slice(), levelRecords: {},
+      bestAdventureScore: 0, totalAdventures: 0,
+    }));
   }, LOCATION_IDS);
 
   for (let i = 0; i < LABELS.length; i++) {

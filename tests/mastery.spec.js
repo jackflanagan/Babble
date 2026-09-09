@@ -9,8 +9,7 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 
 const FILE_URL = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
-const PROG_KEY = 'bbl_progression_v1';
-const CAMP_KEY = 'gh_progress_v2';
+const PROG_KEY = 'bbl_progression_v1';   // the single canonical store
 
 test.beforeEach(() => {
   test.skip(test.info().project.name !== 'desktop', 'run once on desktop');
@@ -19,13 +18,12 @@ test.beforeEach(() => {
 async function bootWithGlasgowVisited(page) {
   await page.goto(FILE_URL);
   await page.waitForSelector('#scene-globe', { state: 'visible', timeout: 10000 });
-  await page.evaluate(({ ck, pk }) => {
-    localStorage.setItem(ck, JSON.stringify({ glasgow: { best: 0, cleared: true } }));
+  await page.evaluate((pk) => {
     localStorage.setItem(pk, JSON.stringify({
-      version: 1, visitedLocations: ['glasgow'], levelRecords: {},
+      version: 2, visitedLocations: ['glasgow'], levelRecords: {},
       bestAdventureScore: 0, totalAdventures: 0,
     }));
-  }, { ck: CAMP_KEY, pk: PROG_KEY });
+  }, PROG_KEY);
   await page.reload();
   await page.waitForSelector('#scene-globe', { state: 'visible', timeout: 10000 });
   await page.evaluate(() => { const el = document.getElementById('portraitWarning'); if (el) el.style.display = 'none'; });

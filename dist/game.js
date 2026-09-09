@@ -172,6 +172,26 @@
   function setProgress(p) {
     _progress = p;
   }
+  function readLbNames() {
+    try {
+      return JSON.parse(localStorage.getItem(LB_NAMES_KEY)) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function getLbName(boardId) {
+    var n = readLbNames()[boardId];
+    return typeof n === "string" ? n : "";
+  }
+  function setLbName(boardId, name) {
+    if (!boardId || typeof name !== "string" || !name) return;
+    try {
+      var m = readLbNames();
+      m[boardId] = name;
+      localStorage.setItem(LB_NAMES_KEY, JSON.stringify(m));
+    } catch (e) {
+    }
+  }
   function loadLbTab(locationId) {
     var tableEl = document.getElementById("lbTable");
     var statusEl = document.getElementById("lbStatus");
@@ -184,8 +204,8 @@
         tableEl.innerHTML = '<p style="text-align:center;color:var(--dim-text);font-size:14px;">No scores yet \u2014 be the first!</p>';
         return;
       }
-      var progress = _progress || {};
-      var localBest = progress[locationId] && progress[locationId].best || 0;
+      var lr = _progress && _progress.levelRecords || {};
+      var localBest = lr[locationId] && lr[locationId].bestScore || 0;
       var html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">';
       html += '<tr style="color:var(--dim-text);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">';
       html += '<th style="padding:4px 8px;text-align:left;">#</th>';
@@ -205,7 +225,7 @@
       tableEl.innerHTML = html;
     });
   }
-  var CGSDK, LB_URL, LB_KEY, LB_TABLE, lbCurrentLocation, _progress;
+  var CGSDK, LB_URL, LB_KEY, LB_TABLE, lbCurrentLocation, _progress, LB_NAMES_KEY;
   var init_sdk = __esm({
     "src/sdk.js"() {
       init_utils();
@@ -224,6 +244,7 @@
       LB_TABLE = "scores";
       lbCurrentLocation = null;
       _progress = null;
+      LB_NAMES_KEY = "bbl_lb_names_v1";
     }
   });
 
@@ -1489,6 +1510,16 @@
   function setGlobeProgress(p) {
     _progress2 = p;
   }
+  function pCleared(id) {
+    return !!(_progress2.visitedLocations && _progress2.visitedLocations.indexOf(id) !== -1);
+  }
+  function pBest(id) {
+    var lr = _progress2.levelRecords;
+    return lr && lr[id] && lr[id].bestScore || 0;
+  }
+  function setLbName2(fn) {
+    _lbName = fn;
+  }
   function setEnterLocation(fn) {
     _enterLocation2 = fn;
   }
@@ -1681,7 +1712,7 @@
         return l.id === j.to;
       })[0];
       if (!fromLoc || !toLoc) return;
-      var fromCleared = _progress2[j.from] && _progress2[j.from].cleared;
+      var fromCleared = pCleared(j.from);
       var toUnlocked = toLoc.unlocked;
       if (!fromCleared && !toUnlocked) return;
       var pts = greatCircle(fromLoc.lat, fromLoc.lon, toLoc.lat, toLoc.lon, 30);
@@ -1718,7 +1749,7 @@
       if (!loc.unlocked) return;
       var pg = project(loc.lat, loc.lon);
       if (pg.z < 0.1) return;
-      var cleared = _progress2[loc.id] && _progress2[loc.id].cleared;
+      var cleared = pCleared(loc.id);
       var r = (cleared ? 28 : 20) * pg.z;
       var gw = gctx.createRadialGradient(pg.x, pg.y, 0, pg.x, pg.y, r);
       var col = cleared ? "255,207,92" : "140,200,255";
@@ -1769,7 +1800,7 @@
   }
   function locState(loc) {
     if (!loc.unlocked) return "locked";
-    if (_canReplay(loc.id) || _progress2[loc.id] && _progress2[loc.id].cleared) return "visited";
+    if (_canReplay(loc.id) || pCleared(loc.id)) return "visited";
     return "available";
   }
   function ensureLocInfo() {
@@ -1800,7 +1831,7 @@
   function showLocInfo(loc) {
     var el = ensureLocInfo();
     var st = locState(loc);
-    var pr = _progress2[loc.id] || {};
+    var best = pBest(loc.id);
     locInfoSel = loc;
     el.classList.remove("is-locked", "is-visited", "is-available");
     el.classList.add("is-" + st);
@@ -1822,7 +1853,7 @@
       goEl.hidden = true;
     } else if (st === "visited") {
       stateEl.textContent = "\u2713 Cleared \u2014 you\u2019ve travelled here";
-      scoreEl.textContent = pr.best > 0 ? "Best score \xB7 " + pr.best : "No score recorded yet";
+      scoreEl.textContent = best > 0 ? "Best score \xB7 " + best : "No score recorded yet";
       goEl.hidden = false;
       goEl.textContent = (_canReplay(loc.id) ? "\u25B6 Replay " : "\u25B6 Play ") + loc.name;
     } else {
@@ -1869,21 +1900,18 @@
     }, 2200);
   }
   function refreshClearedPin() {
-    var europeDone = ["glasgow", "modena", "paris", "ireland"].every(function(id) {
-      return _progress2[id] && _progress2[id].cleared;
-    });
+    var europeDone = ["glasgow", "modena", "paris", "ireland"].every(pCleared);
     if (europeDone) unlockLocation("kenya");
-    if (_progress2.ireland && _progress2.ireland.cleared) unlockLocation("athens");
-    if (_progress2.kenya && _progress2.kenya.cleared) unlockLocation("tokyo");
-    if (_progress2.tokyo && _progress2.tokyo.cleared) unlockLocation("brazil");
-    if (_progress2.brazil && _progress2.brazil.cleared) unlockLocation("newyork");
-    if (_progress2.newyork && _progress2.newyork.cleared) unlockLocation("boss");
-    var africaDone = _progress2.kenya && _progress2.kenya.cleared;
-    if (africaDone && (!_progress2.tokyo || !_progress2.tokyo.cleared) && (!_progress2.brazil || !_progress2.brazil.cleared) && (!_progress2.newyork || !_progress2.newyork.cleared)) unlockLocation("boss");
+    if (pCleared("ireland")) unlockLocation("athens");
+    if (pCleared("kenya")) unlockLocation("tokyo");
+    if (pCleared("tokyo")) unlockLocation("brazil");
+    if (pCleared("brazil")) unlockLocation("newyork");
+    if (pCleared("newyork")) unlockLocation("boss");
+    var africaDone = pCleared("kenya");
+    if (africaDone && !pCleared("tokyo") && !pCleared("brazil") && !pCleared("newyork")) unlockLocation("boss");
     hideLocInfo();
     LOCATIONS.forEach(function(loc) {
-      var pr = _progress2[loc.id];
-      var visited = !!_canReplay(loc.id) || !!(pr && pr.cleared);
+      var visited = _canReplay(loc.id) || pCleared(loc.id);
       if (pinEls[loc.id]) pinEls[loc.id].classList.toggle("cleared", visited);
       if (chipEls[loc.id]) {
         chipEls[loc.id].classList.toggle("cleared", visited);
@@ -1899,10 +1927,11 @@
     var el = document.getElementById("bestScoreLine");
     var parts = [];
     LOCATIONS.forEach(function(loc) {
-      var pr = _progress2[loc.id];
-      if (pr && pr.best > 0) {
-        var entry = loc.name + ": " + pr.best;
-        if (pr.name) entry += " (" + pr.name + ")";
+      var best = pBest(loc.id);
+      if (best > 0) {
+        var entry = loc.name + ": " + best;
+        var nm = _lbName(loc.id);
+        if (nm) entry += " (" + nm + ")";
         parts.push(entry);
       }
     });
@@ -1953,12 +1982,15 @@
     }
     requestAnimationFrame(globeLoop);
   }
-  var _progress2, _enterLocation2, _canReplay, _levelStars, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, locInfoEl, locInfoSel, pinEls, chipEls, rosterEl, globeRunning;
+  var _progress2, _lbName, _enterLocation2, _canReplay, _levelStars, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, locInfoEl, locInfoSel, pinEls, chipEls, rosterEl, globeRunning;
   var init_globe = __esm({
     "src/globe.js"() {
       init_utils();
       init_net();
       _progress2 = {};
+      _lbName = function() {
+        return "";
+      };
       _enterLocation2 = function() {
       };
       _canReplay = function() {
@@ -4969,16 +5001,83 @@
     out.totalAdventures = nonNegInt(raw.totalAdventures);
     return out;
   }
+  function migrateLegacy(d, loadedVersion) {
+    var didMerge = false;
+    var legacy = null;
+    try {
+      var ls = typeof localStorage !== "undefined" ? localStorage.getItem(LEGACY_KEY) : null;
+      if (ls) legacy = JSON.parse(ls);
+    } catch (e) {
+      legacy = null;
+    }
+    if (legacy && typeof legacy === "object" && !Array.isArray(legacy)) {
+      var names = {};
+      Object.keys(legacy).forEach(function(id) {
+        var e = legacy[id];
+        if (!e || typeof e !== "object") return;
+        if (id === "adventure") {
+          var ab = nonNegInt(e.best);
+          if (ab > d.bestAdventureScore) d.bestAdventureScore = ab;
+          if (typeof e.name === "string" && e.name) names.adventure = e.name;
+          didMerge = true;
+          return;
+        }
+        if (typeof e.name === "string" && e.name) {
+          names[id] = e.name;
+          didMerge = true;
+        }
+        var lb = nonNegInt(e.best), lp = nonNegInt(e.playCount);
+        if (e.cleared !== true && lb === 0 && lp === 0) return;
+        var rec = d.levelRecords[id] || { bestScore: 0, completions: 0, stars: sanitizeStars() };
+        if (lb > rec.bestScore) rec.bestScore = lb;
+        if (lp > rec.completions) rec.completions = lp;
+        if (e.cleared === true) {
+          rec.stars.completion = true;
+          if (d.visitedLocations.indexOf(id) === -1) d.visitedLocations.push(id);
+        }
+        d.levelRecords[id] = rec;
+        didMerge = true;
+      });
+      try {
+        if (Object.keys(names).length && typeof localStorage !== "undefined") {
+          var existing = {};
+          try {
+            existing = JSON.parse(localStorage.getItem("bbl_lb_names_v1")) || {};
+          } catch (e2) {
+          }
+          Object.keys(names).forEach(function(k) {
+            if (existing[k] == null) existing[k] = names[k];
+          });
+          localStorage.setItem("bbl_lb_names_v1", JSON.stringify(existing));
+        }
+      } catch (e3) {
+      }
+      try {
+        if (typeof localStorage !== "undefined") localStorage.removeItem(LEGACY_KEY);
+      } catch (e4) {
+      }
+    }
+    if (loadedVersion != null && loadedVersion !== SCHEMA_VERSION) didMerge = true;
+    return didMerge;
+  }
   function loadProgression() {
     if (_data) return _data;
-    var raw = null;
+    var raw = null, hadStored = false;
     try {
       var str = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-      if (str) raw = JSON.parse(str);
+      if (str) {
+        raw = JSON.parse(str);
+        hadStored = true;
+      }
     } catch (e) {
       raw = null;
     }
     _data = sanitize(raw);
+    var loadedVersion = hadStored && raw && typeof raw === "object" ? raw.version : null;
+    if (migrateLegacy(_data, loadedVersion)) {
+      _data.version = SCHEMA_VERSION;
+      persist();
+    }
     return _data;
   }
   function getProgression() {
@@ -5031,11 +5130,23 @@
     var st = sanitizeStars(rec.stars);
     return (st.completion ? 1 : 0) + (st.collection ? 1 : 0) + (st.performance ? 1 : 0);
   }
-  var STORAGE_KEY, SCHEMA_VERSION, _data;
+  function levelBestScore(locationId) {
+    var rec = loadProgression().levelRecords[locationId];
+    return rec && rec.bestScore || 0;
+  }
+  function levelCompletions(locationId) {
+    var rec = loadProgression().levelRecords[locationId];
+    return rec && rec.completions || 0;
+  }
+  function isLevelCleared(locationId) {
+    return loadProgression().visitedLocations.indexOf(locationId) !== -1;
+  }
+  var STORAGE_KEY, LEGACY_KEY, SCHEMA_VERSION, _data;
   var init_progression = __esm({
     "src/progression.js"() {
       STORAGE_KEY = "bbl_progression_v1";
-      SCHEMA_VERSION = 1;
+      LEGACY_KEY = "gh_progress_v2";
+      SCHEMA_VERSION = 2;
       _data = null;
     }
   });
@@ -5055,14 +5166,17 @@
       init_net();
       init_levels();
       init_progression();
-      var progress = safeGet("gh_progress_v2", { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
-      setProgress(progress);
-      setGlobeProgress(progress);
+      var progression = loadProgression();
+      setProgress(progression);
+      setGlobeProgress(progression);
       setCanReplay(function(id) {
         return getProgression().visitedLocations.indexOf(id) !== -1 && !!LEVELS[id] && !!LEVEL_LAYOUTS[id];
       });
       setLevelStars(function(id) {
         return levelStarCount(id);
+      });
+      setLbName2(function(id) {
+        return getLbName(id);
       });
       refreshClearedPin();
       setLocationsGetter(function() {
@@ -5071,7 +5185,6 @@
       setDrawState(function() {
         return { LEVELS, currentLocationId: state.currentLocationId };
       });
-      loadProgression();
       var EVENTS = [
         { id: "bubble_storm", label: "BUBBLE STORM!", color: "#7fe3ff", duration: 10 },
         { id: "speed_boost", label: "TAILWIND!", color: "#ffd700", duration: 8 },
@@ -5668,7 +5781,7 @@
       function resetGame(keepScore) {
         state.players = [makePlayer(0, state.numPlayers === 2 ? 320 : 360, PALETTES_P1[selectedSkins.p1])];
         if (state.numPlayers === 2) state.players.push(makePlayer(1, 420, PALETTES_P2[selectedSkins.p2]));
-        var playCount = progress[state.currentLocationId] && progress[state.currentLocationId].playCount || 0;
+        var playCount = levelCompletions(state.currentLocationId);
         var diffMult = Math.min(1 + playCount * 0.12, 2.2);
         var adjustedChaseDelay = Math.max(5, CHASE_DELAY / diffMult);
         var layout = LEVEL_LAYOUTS[state.currentLocationId];
@@ -5762,8 +5875,7 @@
         pandaProjectile = null;
         survivorUnlocked = false;
         usedPowerups = {};
-        var locPlayCount2 = progress[state.currentLocationId] && progress[state.currentLocationId].playCount || 0;
-        tutorialDone = locPlayCount2 > 0;
+        tutorialDone = levelCompletions(state.currentLocationId) > 0;
         tutorialT = 0;
         tutorialFirstPop = false;
         activeEvent = null;
@@ -5820,8 +5932,7 @@
         document.getElementById("overlayWin").hidden = true;
         document.getElementById("overlayLose").hidden = true;
         document.getElementById("overlayReplayResult").hidden = true;
-        var pr = progress[state.currentLocationId] || { best: 0 };
-        document.getElementById("hudBest").textContent = pr.best;
+        document.getElementById("hudBest").textContent = levelBestScore(state.currentLocationId);
       }
       resetGame._adjustedChaseDelay = CHASE_DELAY;
       resetGame._diffMult = 1;
@@ -5895,17 +6006,15 @@
           var val = nameInput.value.trim();
           if (!val) return;
           var boardId = adventureComplete ? "adventure" : state.currentLocationId;
-          var pr = progress[boardId] || { best: 0, cleared: false };
-          pr.name = val;
-          progress[boardId] = pr;
-          safeSet("gh_progress_v2", progress);
+          setLbName(boardId, val);
           renderBestScores();
           if (!submitted && lbEnabled()) {
             submitted = true;
+            var scoreForBoard = adventureComplete ? getProgression().bestAdventureScore : levelBestScore(boardId);
             var winScoreSubmit = document.getElementById("winScoreSubmit");
             winScoreSubmit.hidden = false;
             winScoreSubmit.textContent = "Submitting score\u2026";
-            submitScore(boardId, val, pr.best, function(ok) {
+            submitScore(boardId, val, scoreForBoard, function(ok) {
               winScoreSubmit.textContent = ok ? "\u2713 On the leaderboard!" : "\u2717 Could not submit score";
             });
           }
@@ -5919,8 +6028,8 @@
         });
       })();
       function buildSkinDots() {
-        var p1Unlocks = [true, progress.glasgow && progress.glasgow.cleared, progress.modena && progress.modena.cleared, progress.kenya && progress.kenya.cleared];
-        var p2Unlocks = [true, progress.paris && progress.paris.cleared, progress.ireland && progress.ireland.cleared];
+        var p1Unlocks = [true, isLevelCleared("glasgow"), isLevelCleared("modena"), isLevelCleared("kenya")];
+        var p2Unlocks = [true, isLevelCleared("paris"), isLevelCleared("ireland")];
         var p1Colors = PALETTES_P1.map(function(p) {
           return p.body;
         });
@@ -5959,8 +6068,7 @@
       buildSkinDots();
       function updateHud() {
         document.getElementById("hudScore").textContent = state.score;
-        var pr = progress[state.currentLocationId] || { best: 0 };
-        document.getElementById("hudBest").textContent = pr.best;
+        document.getElementById("hudBest").textContent = levelBestScore(state.currentLocationId);
         var livesEl = document.getElementById("hudLives");
         livesEl.innerHTML = "";
         for (var i = 0; i < state.lives; i++) {
@@ -7248,12 +7356,8 @@
         document.getElementById("winNextHint").hidden = true;
         var btnAgain = document.getElementById("btnWinAgain");
         if (btnAgain) btnAgain.textContent = "New adventure";
-        var pr = progress.adventure || { best: 0 };
-        if (finalScore > (pr.best || 0)) pr.best = finalScore;
-        progress.adventure = pr;
-        safeSet("gh_progress_v2", progress);
-        document.getElementById("hudBest").textContent = pr.best;
         if (won) recordAdventureComplete(finalScore);
+        document.getElementById("hudBest").textContent = getProgression().bestAdventureScore;
         var nameEntryRow = document.getElementById("nameEntryRow");
         var nameInput = document.getElementById("nameInput");
         var winScoreSubmit = document.getElementById("winScoreSubmit");
@@ -7261,7 +7365,7 @@
         winScoreSubmit.hidden = true;
         if (lbEnabled()) {
           nameEntryRow.hidden = false;
-          nameInput.value = pr.name || "";
+          nameInput.value = getLbName("adventure");
           setTimeout(function() {
             nameInput.focus();
           }, 100);
@@ -8831,16 +8935,10 @@
         var starCollection = state.collectibles.length > 0 && collected >= state.collectibles.length;
         var starPerformance = levelScore >= levelPerfTarget(state.currentLocationId);
         var stars = (starCompletion ? 1 : 0) + (starCollection ? 1 : 0) + (starPerformance ? 1 : 0);
-        recordLevelStars(state.currentLocationId, { completion: starCompletion, collection: starCollection, performance: starPerformance });
-        var pr = progress[state.currentLocationId] || { best: 0, cleared: false };
-        pr.cleared = true;
-        pr.playCount = (pr.playCount || 0) + 1;
-        var isNewBest = state.score > pr.best;
-        if (isNewBest) pr.best = state.score;
-        progress[state.currentLocationId] = pr;
-        safeSet("gh_progress_v2", progress);
+        var isNewBest = levelScore > prevLevelBest;
         markLocationVisited(state.currentLocationId);
-        if (replayMode) recordLevelResult(state.currentLocationId, state.score);
+        recordLevelResult(state.currentLocationId, levelScore);
+        recordLevelStars(state.currentLocationId, { completion: starCompletion, collection: starCollection, performance: starPerformance });
         if (state.currentLocationId === "boss" && !pandaSpecialUnlocked) {
           pandaSpecialUnlocked = true;
           try {
@@ -8852,9 +8950,7 @@
         }
         if (totalElapsed < 40) unlockAchievement("speedrun");
         if (collected >= state.collectibles.length) unlockAchievement("treasure");
-        var allFiveCleared = ["glasgow", "modena", "kenya", "paris", "ireland"].every(function(id) {
-          return progress[id] && progress[id].cleared;
-        });
+        var allFiveCleared = ["glasgow", "modena", "kenya", "paris", "ireland"].every(isLevelCleared);
         if (allFiveCleared) unlockAchievement("globetrotter");
         var daily = safeGet("gh_daily_v1", { date: "", score: 0, done: false });
         var today2 = (/* @__PURE__ */ new Date()).toDateString();
@@ -8896,18 +8992,19 @@
         winScoreSubmit.hidden = true;
         if (window._resetLbSubmit) window._resetLbSubmit();
         if (!campaignMode) {
+          var savedName = getLbName(state.currentLocationId);
           if (isNewBest) {
             nameEntryRow.hidden = false;
-            nameInput.value = pr.name || "";
+            nameInput.value = savedName;
             setTimeout(function() {
               nameInput.focus();
             }, 100);
           } else {
             nameEntryRow.hidden = true;
-            if (pr.name && lbEnabled()) {
+            if (savedName && lbEnabled()) {
               winScoreSubmit.hidden = false;
               winScoreSubmit.textContent = "Submitting score\u2026";
-              submitScore(state.currentLocationId, pr.name, state.score, function(ok) {
+              submitScore(state.currentLocationId, savedName, levelBestScore(state.currentLocationId), function(ok) {
                 winScoreSubmit.textContent = ok ? "\u2713 Score submitted to leaderboard" : "\u2717 Could not submit score";
               });
             }
