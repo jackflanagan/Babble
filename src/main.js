@@ -10,6 +10,7 @@ import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeR
 import { drawGround, drawPlatform, drawFox, drawChicken, drawBubble, drawPowerup, drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawBuckfastRef, drawParmesanRef, drawLukeKellyRef, drawArtistRef, drawMotorbikeRef, drawPaintBlobs, setDrawState, getLOC_POWERUP_META } from './draw.js';
 import { netRole, netConnected, netStateAccum, setNetStateAccum, netUiRefresh, netHudRefresh, netTeardown, netBroadcastScene, netBroadcastState, netSendInputIfChanged, localJumpPress, localBubblePress, setNetState, setNetEnterLocation, setNetBackToMap, setNetPlaySound, setNetTryJump, setNetTryShoot, setNetKeys, setNetUpdateHud, setNetLivePlayers } from './net.js';
 import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
+import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete } from './progression.js';
 
   var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
   setProgress(progress);
@@ -20,6 +21,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
   refreshClearedPin();
   setLocationsGetter(function(){ return LOCATIONS; });
   setDrawState(function(){ return { LEVELS: LEVELS, currentLocationId: state.currentLocationId }; });
+  loadProgression();   // hydrate the persistent player profile (see progression.js)
 
   /* ---------- Feature 5: Random Mid-Level Events ---------- */
   var EVENTS = [
@@ -1721,6 +1723,9 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     safeSet('gh_progress_v2', progress);
     document.getElementById('hudBest').textContent = pr.best;
 
+    // Persistent profile: only a genuine completion (every stop cleared) counts.
+    if(won) recordAdventureComplete(finalScore);
+
     var nameEntryRow = document.getElementById('nameEntryRow');
     var nameInput = document.getElementById('nameInput');
     var winScoreSubmit = document.getElementById('winScoreSubmit');
@@ -2762,6 +2767,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     if(isNewBest) pr.best = state.score;
     progress[state.currentLocationId] = pr;
     safeSet('gh_progress_v2', progress);
+    markLocationVisited(state.currentLocationId);   // persistent cross-adventure profile
 
     /* Panda special unlock — beating the China boss */
     if(state.currentLocationId === 'boss' && !pandaSpecialUnlocked){
@@ -3537,6 +3543,7 @@ import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
     miniGameId: function(){ return miniGameId; },
     campaignStep: function(){ return campaignStep; },
     adventureComplete: function(){ return adventureComplete; },
+    getProgression: function(){ return getProgression(); },
     powerCharges: function(){ return powerCharges; },
     freeEnemyCount: function(){ return state.enemies.filter(function(e){ return e.state === 'free'; }).length; },
     usePower: function(){ usePower(); },

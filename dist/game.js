@@ -4814,6 +4814,88 @@
     }
   });
 
+  // src/progression.js
+  function freshData() {
+    return {
+      version: SCHEMA_VERSION,
+      visitedLocations: [],
+      levelRecords: {},
+      bestAdventureScore: 0,
+      totalAdventures: 0
+    };
+  }
+  function nonNegInt(v) {
+    return typeof v === "number" && isFinite(v) && v > 0 ? Math.floor(v) : 0;
+  }
+  function sanitize(raw) {
+    var out = freshData();
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+    if (Array.isArray(raw.visitedLocations)) {
+      var seen = {};
+      raw.visitedLocations.forEach(function(id) {
+        if (typeof id === "string" && id && !seen[id]) {
+          seen[id] = 1;
+          out.visitedLocations.push(id);
+        }
+      });
+    }
+    if (raw.levelRecords && typeof raw.levelRecords === "object" && !Array.isArray(raw.levelRecords)) {
+      Object.keys(raw.levelRecords).forEach(function(id) {
+        var r = raw.levelRecords[id];
+        if (!r || typeof r !== "object" || Array.isArray(r)) return;
+        out.levelRecords[id] = {
+          bestScore: nonNegInt(r.bestScore),
+          completions: nonNegInt(r.completions)
+        };
+      });
+    }
+    out.bestAdventureScore = nonNegInt(raw.bestAdventureScore);
+    out.totalAdventures = nonNegInt(raw.totalAdventures);
+    return out;
+  }
+  function loadProgression() {
+    if (_data) return _data;
+    var raw = null;
+    try {
+      var str = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+      if (str) raw = JSON.parse(str);
+    } catch (e) {
+      raw = null;
+    }
+    _data = sanitize(raw);
+    return _data;
+  }
+  function getProgression() {
+    return loadProgression();
+  }
+  function persist() {
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, JSON.stringify(_data));
+    } catch (e) {
+    }
+  }
+  function markLocationVisited(locationId) {
+    if (typeof locationId !== "string" || !locationId) return;
+    var d = loadProgression();
+    if (d.visitedLocations.indexOf(locationId) === -1) d.visitedLocations.push(locationId);
+    persist();
+  }
+  function recordAdventureComplete(finalScore) {
+    var d = loadProgression();
+    d.totalAdventures += 1;
+    var s = typeof finalScore === "number" && isFinite(finalScore) ? finalScore : 0;
+    if (s > d.bestAdventureScore) d.bestAdventureScore = s;
+    persist();
+  }
+  var STORAGE_KEY, SCHEMA_VERSION, _data;
+  var init_progression = __esm({
+    "src/progression.js"() {
+      STORAGE_KEY = "bbl_progression_v1";
+      SCHEMA_VERSION = 1;
+      _data = null;
+    }
+  });
+
   // src/main.js
   var require_main = __commonJS({
     "src/main.js"() {
@@ -4828,6 +4910,7 @@
       init_draw();
       init_net();
       init_levels();
+      init_progression();
       var progress = safeGet("gh_progress_v2", { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
       setProgress(progress);
       setGlobeProgress(progress);
@@ -4838,6 +4921,7 @@
       setDrawState(function() {
         return { LEVELS, currentLocationId: state.currentLocationId };
       });
+      loadProgression();
       var EVENTS = [
         { id: "bubble_storm", label: "BUBBLE STORM!", color: "#7fe3ff", duration: 10 },
         { id: "speed_boost", label: "TAILWIND!", color: "#ffd700", duration: 8 },
@@ -6954,6 +7038,7 @@
         progress.adventure = pr;
         safeSet("gh_progress_v2", progress);
         document.getElementById("hudBest").textContent = pr.best;
+        if (won) recordAdventureComplete(finalScore);
         var nameEntryRow = document.getElementById("nameEntryRow");
         var nameInput = document.getElementById("nameInput");
         var winScoreSubmit = document.getElementById("winScoreSubmit");
@@ -8501,6 +8586,7 @@
         if (isNewBest) pr.best = state.score;
         progress[state.currentLocationId] = pr;
         safeSet("gh_progress_v2", progress);
+        markLocationVisited(state.currentLocationId);
         if (state.currentLocationId === "boss" && !pandaSpecialUnlocked) {
           pandaSpecialUnlocked = true;
           try {
@@ -9401,6 +9487,9 @@
         },
         adventureComplete: function() {
           return adventureComplete;
+        },
+        getProgression: function() {
+          return getProgression();
         },
         powerCharges: function() {
           return powerCharges;
