@@ -187,6 +187,8 @@ a{color:inherit;}
   color: var(--dim-text);
 }
 .chip.active{ color: var(--ink-text); border-color: rgba(255,107,74,0.5); background: linear-gradient(180deg, rgba(255,107,74,0.22), rgba(255,107,74,0.06)); }
+/* visited / replayable — gold, matching the cleared pins on the globe */
+.chip.cleared{ color: var(--gold); border-color: rgba(255,207,92,0.45); background: linear-gradient(180deg, rgba(255,207,92,0.18), rgba(255,207,92,0.04)); }
 .chip .dot-mini{ width:7px;height:7px;border-radius:50%; background:currentColor; }
 
 .best-score{
@@ -195,6 +197,49 @@ a{color:inherit;}
   text-align:center;
 }
 .best-score b{ color: var(--gold); font-family:'Space Mono'; }
+
+/* ---------- globe location info card ---------- */
+.globe-locinfo{
+  position:absolute;
+  left:50%; bottom:4%;
+  transform:translateX(-50%);
+  width:min(80%, 300px);
+  box-sizing:border-box;
+  background: rgba(10,17,40,0.94);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px 16px 16px;
+  text-align:center;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 14px 44px rgba(0,0,0,0.55);
+  z-index:1200;
+}
+.globe-locinfo.is-visited{ border-color: rgba(255,207,92,0.45); }
+.globe-locinfo.is-locked{ border-color: rgba(74,84,132,0.65); }
+.globe-locinfo-name{
+  font-family:'Fredoka', sans-serif;
+  font-size:18px; font-weight:700;
+  color: var(--ink-text);
+  line-height:1.2;
+}
+.globe-locinfo-state{
+  font-size:12px; color: var(--dim-text);
+  letter-spacing:0.02em; margin-top:3px;
+}
+.globe-locinfo.is-visited .globe-locinfo-state{ color: var(--gold); }
+.globe-locinfo-score{
+  font-size:12px; color: var(--dim-text);
+  font-family:'Space Mono', monospace;
+  margin-top:5px; min-height:14px;
+}
+.globe-locinfo-go{ margin-top:12px; font-size:13px; padding:8px 18px; }
+.globe-locinfo-x{
+  position:absolute; top:5px; right:8px;
+  background:none; border:none;
+  color: var(--dim-text); font-size:13px;
+  line-height:1; padding:3px; cursor:pointer;
+}
+.globe-locinfo-x:hover{ color: var(--ink-text); }
 
 /* ---------- game screen ---------- */
 .cabinet{

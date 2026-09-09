@@ -1764,6 +1764,64 @@
     gctx.strokeStyle = "rgba(190,225,255," + (0.45 + pulse * 0.18) + ")";
     gctx.stroke();
   }
+  function locState(loc) {
+    if (!loc.unlocked) return "locked";
+    if (_canReplay(loc.id) || _progress2[loc.id] && _progress2[loc.id].cleared) return "visited";
+    return "available";
+  }
+  function ensureLocInfo() {
+    if (locInfoEl) return locInfoEl;
+    locInfoEl = document.createElement("div");
+    locInfoEl.className = "globe-locinfo";
+    locInfoEl.hidden = true;
+    locInfoEl.innerHTML = '<button type="button" class="globe-locinfo-x" aria-label="Close">\u2715</button><div class="globe-locinfo-name"></div><div class="globe-locinfo-state"></div><div class="globe-locinfo-score"></div><button type="button" class="globe-locinfo-go btn btn-primary"></button>';
+    locInfoEl.querySelector(".globe-locinfo-x").addEventListener("click", function(e) {
+      e.stopPropagation();
+      hideLocInfo();
+    });
+    locInfoEl.querySelector(".globe-locinfo-go").addEventListener("click", function(e) {
+      e.stopPropagation();
+      var l = locInfoSel;
+      if (l && l.unlocked) {
+        hideLocInfo();
+        launchLocation(l);
+      }
+    });
+    globeWrap.appendChild(locInfoEl);
+    return locInfoEl;
+  }
+  function hideLocInfo() {
+    if (locInfoEl) locInfoEl.hidden = true;
+    locInfoSel = null;
+  }
+  function showLocInfo(loc) {
+    var el = ensureLocInfo();
+    var st = locState(loc);
+    var pr = _progress2[loc.id] || {};
+    locInfoSel = loc;
+    el.classList.remove("is-locked", "is-visited", "is-available");
+    el.classList.add("is-" + st);
+    el.querySelector(".globe-locinfo-name").textContent = loc.name;
+    var stateEl = el.querySelector(".globe-locinfo-state");
+    var scoreEl = el.querySelector(".globe-locinfo-score");
+    var goEl = el.querySelector(".globe-locinfo-go");
+    if (st === "locked") {
+      stateEl.textContent = "\u{1F512} Locked \u2014 not reached yet";
+      scoreEl.textContent = "Clear the earlier stops to travel here.";
+      goEl.hidden = true;
+    } else if (st === "visited") {
+      stateEl.textContent = "\u2713 Cleared \u2014 you\u2019ve travelled here";
+      scoreEl.textContent = pr.best > 0 ? "Best score \xB7 " + pr.best : "No score recorded yet";
+      goEl.hidden = false;
+      goEl.textContent = (_canReplay(loc.id) ? "\u25B6 Replay " : "\u25B6 Play ") + loc.name;
+    } else {
+      stateEl.textContent = "Available \u2014 not travelled yet";
+      scoreEl.textContent = "";
+      goEl.hidden = false;
+      goEl.textContent = "\u25B6 Play " + loc.name;
+    }
+    el.hidden = false;
+  }
   function unlockLocation(id) {
     var loc = LOCATIONS.filter(function(l) {
       return l.id === id;
@@ -1811,10 +1869,15 @@
     if (_progress2.newyork && _progress2.newyork.cleared) unlockLocation("boss");
     var africaDone = _progress2.kenya && _progress2.kenya.cleared;
     if (africaDone && (!_progress2.tokyo || !_progress2.tokyo.cleared) && (!_progress2.brazil || !_progress2.brazil.cleared) && (!_progress2.newyork || !_progress2.newyork.cleared)) unlockLocation("boss");
+    hideLocInfo();
     LOCATIONS.forEach(function(loc) {
       var pr = _progress2[loc.id];
-      if (pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add("cleared");
-      if (_canReplay(loc.id) && chipEls[loc.id]) chipEls[loc.id].title = "Replay " + loc.name;
+      var visited = !!_canReplay(loc.id) || !!(pr && pr.cleared);
+      if (pinEls[loc.id]) pinEls[loc.id].classList.toggle("cleared", visited);
+      if (chipEls[loc.id]) {
+        chipEls[loc.id].classList.toggle("cleared", visited);
+        if (visited) chipEls[loc.id].title = "Replay " + loc.name;
+      }
     });
     renderBestScores();
   }
@@ -1876,7 +1939,7 @@
     }
     requestAnimationFrame(globeLoop);
   }
-  var _progress2, _enterLocation2, _canReplay, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, pinEls, chipEls, rosterEl, globeRunning;
+  var _progress2, _enterLocation2, _canReplay, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, locInfoEl, locInfoSel, pinEls, chipEls, rosterEl, globeRunning;
   var init_globe = __esm({
     "src/globe.js"() {
       init_utils();
@@ -1930,6 +1993,14 @@
         { from: "ireland", to: "kenya" },
         { from: "kenya", to: "boss" }
       ];
+      locInfoEl = null;
+      locInfoSel = null;
+      document.addEventListener("pointerdown", function(e) {
+        if (!locInfoEl || locInfoEl.hidden) return;
+        if (locInfoEl.contains(e.target)) return;
+        if (e.target && e.target.closest && e.target.closest(".pin")) return;
+        hideLocInfo();
+      });
       pinEls = {};
       chipEls = {};
       rosterEl = document.getElementById("roster");
@@ -1942,7 +2013,8 @@
         btn.appendChild(dot);
         if (loc.unlocked) {
           btn.addEventListener("click", function() {
-            launchLocation(loc);
+            if (netRole === "guest" && netConnected) return;
+            showLocInfo(loc);
           });
         } else {
           btn.disabled = true;
@@ -1953,11 +2025,17 @@
         chip.className = "chip" + (loc.unlocked ? " active" : "");
         chip.innerHTML = '<span class="dot-mini"></span>' + loc.name;
         chip.title = loc.unlocked ? "Play " + loc.name : "Locked";
+        chip.style.cursor = "pointer";
         if (loc.unlocked) {
-          chip.style.cursor = "pointer";
           (function(l) {
             chip.addEventListener("click", function() {
               launchLocation(l);
+            });
+          })(loc);
+        } else {
+          (function(l) {
+            chip.addEventListener("click", function() {
+              showLocInfo(l);
             });
           })(loc);
         }

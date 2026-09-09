@@ -325,6 +325,80 @@ export function drawGlobe(){
   gctx.stroke();
 }
 
+/* ---------------------------------------------------------
+   Location info card — a single reusable panel shown when a
+   pin (or a locked chip) is selected. Content is derived from
+   LOCATIONS + progression data; there is no per-destination UI.
+--------------------------------------------------------- */
+var locInfoEl = null, locInfoSel = null;
+
+function locState(loc){
+  if(!loc.unlocked) return 'locked';
+  if(_canReplay(loc.id) || (_progress[loc.id] && _progress[loc.id].cleared)) return 'visited';
+  return 'available';
+}
+
+function ensureLocInfo(){
+  if(locInfoEl) return locInfoEl;
+  locInfoEl = document.createElement('div');
+  locInfoEl.className = 'globe-locinfo';
+  locInfoEl.hidden = true;
+  locInfoEl.innerHTML =
+    '<button type="button" class="globe-locinfo-x" aria-label="Close">✕</button>' +
+    '<div class="globe-locinfo-name"></div>' +
+    '<div class="globe-locinfo-state"></div>' +
+    '<div class="globe-locinfo-score"></div>' +
+    '<button type="button" class="globe-locinfo-go btn btn-primary"></button>';
+  locInfoEl.querySelector('.globe-locinfo-x').addEventListener('click', function(e){ e.stopPropagation(); hideLocInfo(); });
+  locInfoEl.querySelector('.globe-locinfo-go').addEventListener('click', function(e){
+    e.stopPropagation();
+    var l = locInfoSel;
+    if(l && l.unlocked){ hideLocInfo(); launchLocation(l); }
+  });
+  globeWrap.appendChild(locInfoEl);
+  return locInfoEl;
+}
+
+function hideLocInfo(){ if(locInfoEl) locInfoEl.hidden = true; locInfoSel = null; }
+
+function showLocInfo(loc){
+  var el = ensureLocInfo();
+  var st = locState(loc);
+  var pr = _progress[loc.id] || {};
+  locInfoSel = loc;
+  el.classList.remove('is-locked','is-visited','is-available');
+  el.classList.add('is-' + st);
+  el.querySelector('.globe-locinfo-name').textContent = loc.name;
+  var stateEl = el.querySelector('.globe-locinfo-state');
+  var scoreEl = el.querySelector('.globe-locinfo-score');
+  var goEl    = el.querySelector('.globe-locinfo-go');
+  if(st === 'locked'){
+    stateEl.textContent = '🔒 Locked — not reached yet';
+    scoreEl.textContent = 'Clear the earlier stops to travel here.';
+    goEl.hidden = true;
+  } else if(st === 'visited'){
+    stateEl.textContent = '✓ Cleared — you’ve travelled here';
+    scoreEl.textContent = (pr.best > 0) ? ('Best score · ' + pr.best) : 'No score recorded yet';
+    goEl.hidden = false;
+    // launchLocation() routes by _canReplay, so the label matches the action.
+    goEl.textContent = (_canReplay(loc.id) ? '▶ Replay ' : '▶ Play ') + loc.name;
+  } else {
+    stateEl.textContent = 'Available — not travelled yet';
+    scoreEl.textContent = '';
+    goEl.hidden = false;
+    goEl.textContent = '▶ Play ' + loc.name;
+  }
+  el.hidden = false;
+}
+
+// Tap anywhere off the card (and off a pin) closes it.
+document.addEventListener('pointerdown', function(e){
+  if(!locInfoEl || locInfoEl.hidden) return;
+  if(locInfoEl.contains(e.target)) return;
+  if(e.target && e.target.closest && e.target.closest('.pin')) return; // pin handler swaps it
+  hideLocInfo();
+});
+
 var pinEls = {}, chipEls = {};
 var rosterEl = document.getElementById('roster');
 LOCATIONS.forEach(function(loc){
@@ -334,7 +408,12 @@ LOCATIONS.forEach(function(loc){
   var dot = document.createElement('div'); dot.className = 'dot';
   btn.appendChild(dot);
   if(loc.unlocked){
-    btn.addEventListener('click', function(){ launchLocation(loc); });
+    // A pin tap *selects* the location and shows its info card; the card's
+    // button launches. (Chips remain a one-tap launcher — see below.)
+    btn.addEventListener('click', function(){
+      if(netRole==='guest' && netConnected) return;
+      showLocInfo(loc);
+    });
   } else {
     btn.disabled = true;
   }
@@ -345,9 +424,12 @@ LOCATIONS.forEach(function(loc){
   chip.className = 'chip' + (loc.unlocked ? ' active' : '');
   chip.innerHTML = '<span class="dot-mini"></span>' + loc.name;
   chip.title = loc.unlocked ? 'Play ' + loc.name : 'Locked';
+  chip.style.cursor = 'pointer';
   if(loc.unlocked){
-    chip.style.cursor = 'pointer';
     (function(l){ chip.addEventListener('click', function(){ launchLocation(l); }); })(loc);
+  } else {
+    // Locked chip: no launch, but explain why it's locked.
+    (function(l){ chip.addEventListener('click', function(){ showLocInfo(l); }); })(loc);
   }
   rosterEl.appendChild(chip);
   chipEls[loc.id] = chip;
@@ -402,11 +484,19 @@ export function refreshClearedPin(){
   var africaDone = _progress.kenya && _progress.kenya.cleared;
   if(africaDone && (!_progress.tokyo || !_progress.tokyo.cleared) && (!_progress.brazil || !_progress.brazil.cleared) && (!_progress.newyork || !_progress.newyork.cleared)) unlockLocation('boss');
 
+  hideLocInfo();   // stale card if we're re-entering the map after a run
+
   LOCATIONS.forEach(function(loc){
     var pr = _progress[loc.id];
-    if(pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add('cleared');
-    // Minimal replay affordance: completed locations relabel their tooltip.
-    if(_canReplay(loc.id) && chipEls[loc.id]) chipEls[loc.id].title = 'Replay ' + loc.name;
+    var visited = !!_canReplay(loc.id) || !!(pr && pr.cleared);
+    // Three states on the globe: locked (grey, static) / available (coral,
+    // pulsing) / visited (gold). Pins already carry .locked from build; add
+    // .cleared for visited. Mirror the same read onto the roster chips.
+    if(pinEls[loc.id]) pinEls[loc.id].classList.toggle('cleared', visited);
+    if(chipEls[loc.id]){
+      chipEls[loc.id].classList.toggle('cleared', visited);
+      if(visited) chipEls[loc.id].title = 'Replay ' + loc.name;
+    }
   });
   renderBestScores();
 }
