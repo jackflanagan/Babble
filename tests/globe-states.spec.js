@@ -22,18 +22,22 @@ async function boot(page) {
   await page.waitForFunction(() => window.__game && window.__game.getState && window.__game.replayMode, null, { timeout: 5000 });
 }
 
-/** Seed locations as cleared (unlocks pins) + visited (enables replay). */
+/** Seed locations as cleared (unlocks pins) + visited (enables replay).
+ *  records: { id: bestScore } or { id: { best, stars } } */
 async function seed(page, records) {
   await page.evaluate(({ ck, pk, records }) => {
     const camp = {};
     const visited = [];
+    const levelRecords = {};
     Object.keys(records).forEach(id => {
-      camp[id] = { best: records[id], cleared: true };
+      const r = typeof records[id] === 'object' ? records[id] : { best: records[id] };
+      camp[id] = { best: r.best || 0, cleared: true };
       visited.push(id);
+      if (r.stars) levelRecords[id] = { bestScore: r.best || 0, completions: 1, stars: r.stars };
     });
     localStorage.setItem(ck, JSON.stringify(camp));
     localStorage.setItem(pk, JSON.stringify({
-      version: 1, visitedLocations: visited, levelRecords: {},
+      version: 1, visitedLocations: visited, levelRecords,
       bestAdventureScore: 0, totalAdventures: 0,
     }));
   }, { ck: CAMP_KEY, pk: PROG_KEY, records });
@@ -86,9 +90,9 @@ test('AVAILABLE: pin shows a "Play" card and launches the campaign', async ({ pa
   expect(await page.evaluate(() => window.__game.replayMode())).toBe(false);
 });
 
-test('VISITED: pin + chip go gold and the card shows score, status and Replay', async ({ page }) => {
+test('VISITED: pin + chip go gold and the card shows score, status, stars and Replay', async ({ page }) => {
   await boot(page);
-  await seed(page, { glasgow: 4200 });
+  await seed(page, { glasgow: { best: 4200, stars: { completion: true, collection: false, performance: true } } });
   await page.reload();
   await page.waitForSelector('#scene-globe', { state: 'visible', timeout: 10000 });
   await page.waitForFunction(() => window.__game && window.__game.getState && window.__game.replayMode, null, { timeout: 5000 });
@@ -96,6 +100,7 @@ test('VISITED: pin + chip go gold and the card shows score, status and Replay', 
   // Visual state: gold on both the globe pin and the roster chip.
   await expect(page.locator(pin('Glasgow'))).toHaveClass(/\bcleared\b/);
   await expect(chip(page, 'Glasgow')).toHaveClass(/\bcleared\b/);
+  expect(await chip(page, 'Glasgow').getAttribute('title')).toContain('2/3');
 
   await page.locator(pin('Glasgow')).dispatchEvent('click');
   await expect(page.locator(card)).toBeVisible();
@@ -103,6 +108,11 @@ test('VISITED: pin + chip go gold and the card shows score, status and Replay', 
   await expect(page.locator('.globe-locinfo-name')).toHaveText('Glasgow');
   await expect(page.locator('.globe-locinfo-state')).toContainText('Cleared');
   await expect(page.locator('.globe-locinfo-score')).toContainText('4200');
+  // Mastery stars are rendered on the card: 2 of 3 earned.
+  const starsLine = page.locator('.globe-locinfo-stars');
+  await expect(starsLine).toBeVisible();
+  await expect(starsLine).toContainText('2/3');
+  await expect(starsLine).toContainText('★★☆');
   const go = page.locator('.globe-locinfo-go');
   await expect(go).toContainText('Replay');
 

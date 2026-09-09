@@ -43,10 +43,11 @@ async function startCampaignFromGlobe(page) {
   await page.waitForTimeout(3300); // start countdown
 }
 
-/** Force the current live level to completion; resolves once overlayWin shows. */
+/** Force the current live replay level to completion; resolves once the
+ *  compact replay result card shows. */
 async function forceClearLevel(page) {
   for (let i = 0; i < 60; i++) {
-    if (await page.evaluate(() => !document.getElementById('overlayWin').hidden)) return true;
+    if (await page.evaluate(() => !document.getElementById('overlayReplayResult').hidden)) return true;
     await page.evaluate(() => {
       const g = window.__game;
       if (g.getState().gameState === 'playing') { g.forceAllCollectiblesTaken(); g.forceWave2(); }
@@ -171,16 +172,18 @@ test('replay completion returns to the results/map state, not the next campaign 
 
   expect(await forceClearLevel(page)).toBe(true);
 
-  // Results overlay is shown; no "next level" affordance; replay is labelled.
-  expect(await page.evaluate(() => document.getElementById('overlayWin').hidden)).toBe(false);
-  expect(await page.evaluate(() => document.getElementById('btnWinNext').hidden)).toBe(true);
-  expect((await page.locator('#winSummary').textContent() || '')).toContain('REPLAY');
+  // The compact replay result card is shown (not the campaign #overlayWin),
+  // it offers Replay / World map, and there is no auto-advance.
+  expect(await page.evaluate(() => document.getElementById('overlayReplayResult').hidden)).toBe(false);
+  expect(await page.evaluate(() => document.getElementById('overlayWin').hidden)).toBe(true);
+  await expect(page.locator('#rrReplay')).toBeVisible();
+  await expect(page.locator('#rrMap')).toBeVisible();
   expect(await page.evaluate(() => window.__game.getState().gameState)).toBe('won');
   expect(await page.evaluate(() => window.__game.replayMode())).toBe(true);
   expect(await page.evaluate(() => window.__game.campaignStep())).toBe(0);
 
   // "World map" returns to the globe and clears replay mode.
-  await page.locator('#btnWinMap').click();
+  await page.locator('#rrMap').click();
   await page.waitForSelector('#scene-globe', { state: 'visible', timeout: 5000 });
   expect(await page.evaluate(() => window.__game.replayMode())).toBe(false);
 });

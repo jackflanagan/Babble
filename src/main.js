@@ -179,6 +179,20 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   document.getElementById('btnWinMap').addEventListener('click', backToMap);
   document.getElementById('btnLoseMap').addEventListener('click', backToMap);
 
+  // Compact replay result card buttons.
+  document.getElementById('rrReplay').addEventListener('click', function(){
+    if(netRole==='guest') return;
+    document.getElementById('overlayReplayResult').hidden = true;
+    resetGame();                       // replayMode stays true -> re-run this level
+    state.gameState = 'playing';
+    state.startTime = performance.now();
+    startMusic();
+  });
+  document.getElementById('rrMap').addEventListener('click', function(){
+    document.getElementById('overlayReplayResult').hidden = true;
+    backToMap();
+  });
+
   document.getElementById('btnLeaderboard').addEventListener('click', function(){
     openLeaderboard(null, LOCATIONS);
   });
@@ -569,6 +583,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     updateHud();
     document.getElementById('overlayWin').hidden = true;
     document.getElementById('overlayLose').hidden = true;
+    document.getElementById('overlayReplayResult').hidden = true;
     var pr = progress[state.currentLocationId] || {best:0};
     document.getElementById('hudBest').textContent = pr.best;
   }
@@ -2807,6 +2822,32 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     return Math.round(baseClear * 1.7 / 100) * 100;
   }
 
+  function commaNum(n){ return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+  /* Fill the compact replay result card. No animation, no forced steps — just
+     the run's score, the player's previous best, whether it beat it, and stars.
+     Only shown for world-map replays; the adventure screen stays on #overlayWin. */
+  function populateReplayResult(id, runScore, prevBest, prevStars, starsNow){
+    var isBest = runScore > prevBest;
+    var hadPrev = prevBest > 0;
+    var banner = document.getElementById('rrBanner');
+    var label  = document.getElementById('rrLabel');
+    banner.hidden = !(isBest && hadPrev);
+    label.hidden  = !banner.hidden;
+    label.textContent = (LEVELS[id] ? LEVELS[id].name : id) + ' · replay';
+    document.getElementById('rrScore').textContent = commaNum(runScore);
+    document.getElementById('rrStars').textContent = '★'.repeat(starsNow) + '☆'.repeat(3 - starsNow);
+    var prev = document.getElementById('rrPrev');
+    if(hadPrev){
+      var txt = 'Previous best: ' + commaNum(prevBest);
+      if(starsNow > prevStars) txt += '  ·  ' + prevStars + '★ → ' + starsNow + '★';
+      prev.textContent = txt;
+      prev.hidden = false;
+    } else {
+      prev.hidden = true;
+    }
+  }
+
   function winLevel(){
     if(survivalMode) return;
     if(state.gameState !== 'playing') return;
@@ -2816,6 +2857,11 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     var totalElapsed = (performance.now()-state.startTime)/1000;
     var elapsed = totalElapsed; // kept for star rating compat
     var collected = state.collectibles.filter(function(c){return c.taken;}).length;
+    // Snapshot this level's stored record BEFORE we update it — the replay
+    // result screen compares the run against the player's previous best.
+    var _prevLevelRec  = getProgression().levelRecords[state.currentLocationId];
+    var prevLevelBest  = (_prevLevelRec && _prevLevelRec.bestScore) || 0;
+    var prevLevelStars = levelStarCount(state.currentLocationId);
     // time bonus (based on total elapsed across both waves)
     var timeBonus = Math.max(0, Math.floor(500 - totalElapsed * 6));
     if(timeBonus > 0){ state.score += timeBonus; spawnPopup(W/2,H/2-40,'TIME BONUS +'+timeBonus,'#ffd700'); }
@@ -2875,6 +2921,9 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     document.getElementById('winTitle').textContent = LEVELS[state.currentLocationId].name + ' cleared!';
     document.getElementById('winStars').textContent = '★'.repeat(stars) + '☆'.repeat(3-stars);
     document.getElementById('winSummary').textContent = 'Score ' + state.score + ' · ' + collected + '/' + state.collectibles.length + ' treasures · Tier ' + Math.min(playCount+1, 10);
+    if(replayMode){
+      populateReplayResult(state.currentLocationId, levelScore, prevLevelBest, prevLevelStars, stars);
+    }
     var acWinEl = document.getElementById('winAchievements');
     if(acWinEl){
       if(runAchievements && runAchievements.length > 0){
@@ -2918,7 +2967,10 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       });
     }
     showAdBreak(function(){
-      if(!campaignMode) document.getElementById('overlayWin').hidden = false;
+      if(campaignMode) return;
+      // Replays get the compact result card; standalone/campaign-final use #overlayWin.
+      if(replayMode) document.getElementById('overlayReplayResult').hidden = false;
+      else document.getElementById('overlayWin').hidden = false;
     });
 
     if(campaignMode){
@@ -2929,15 +2981,11 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         startCampaignTransition();
       }, 2200);
     } else if(replayMode){
-      /* Replay: no campaign chaining. The player stays on the results screen
-         and returns to the world map (or replays) — campaignStep is untouched. */
+      /* Replay: no campaign chaining, no auto-advance. The compact result card
+         (#overlayReplayResult, populated above) offers Replay / World map, and
+         campaignStep is left untouched. */
       if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
-      document.getElementById('btnWinNext').hidden = true;
-      document.getElementById('winNextHint').hidden = true;
-      var winAgainBtn = document.getElementById('btnWinAgain');
-      if(winAgainBtn) winAgainBtn.textContent = 'Replay again';
-      var winSum = document.getElementById('winSummary');
-      winSum.textContent = 'LEVEL REPLAY · ' + winSum.textContent;
+      document.getElementById('overlayWin').hidden = true;
       refreshClearedPin();
     } else {
       /* Level flow: show Next Level button and auto-advance after 5s */

@@ -47,7 +47,8 @@ async function startGlasgowReplay(page) {
 async function finishLevel(page, opts = {}) {
   if (opts.score) await page.evaluate((n) => window.__game.addScore(n), opts.score);
   for (let i = 0; i < 60; i++) {
-    if (await page.evaluate(() => !document.getElementById('overlayWin').hidden)) return true;
+    // A world-map replay finishes on the compact result card, not #overlayWin.
+    if (await page.evaluate(() => !document.getElementById('overlayReplayResult').hidden)) return true;
     await page.evaluate((collect) => {
       if (collect) window.__game.forceAllCollectiblesTaken();
       if (window.__game.getState().gameState === 'playing') window.__game.forceWave2();
@@ -129,7 +130,7 @@ test('stars never decrease: a worse replay keeps every earned star', async ({ pa
   expect(await starCount(page)).toBe(3);
 
   // Run 2: deliberately worse — no collectibles, no score.
-  await page.locator('#btnWinAgain').click(); // "Replay again"
+  await page.locator('#rrReplay').click(); // replay card's "Replay"
   await page.waitForFunction(() => window.__game.getState().gameState === 'playing', null, { timeout: 5000 });
   await page.waitForTimeout(3300);
   expect(await finishLevel(page)).toBe(true);
@@ -151,7 +152,7 @@ test('replay improving a record: a later, better run adds the missing stars', as
   const bestAfter1 = await page.evaluate(() => window.__game.getProgression().levelRecords.glasgow.bestScore);
 
   // Run 2: full clear + strong score.
-  await page.locator('#btnWinAgain').click();
+  await page.locator('#rrReplay').click();
   await page.waitForFunction(() => window.__game.getState().gameState === 'playing', null, { timeout: 5000 });
   await page.waitForTimeout(3300);
   const target = await page.evaluate(() => window.__game.perfTarget('glasgow'));

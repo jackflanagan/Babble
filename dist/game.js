@@ -5223,6 +5223,18 @@
       });
       document.getElementById("btnWinMap").addEventListener("click", backToMap);
       document.getElementById("btnLoseMap").addEventListener("click", backToMap);
+      document.getElementById("rrReplay").addEventListener("click", function() {
+        if (netRole === "guest") return;
+        document.getElementById("overlayReplayResult").hidden = true;
+        resetGame();
+        state.gameState = "playing";
+        state.startTime = performance.now();
+        startMusic();
+      });
+      document.getElementById("rrMap").addEventListener("click", function() {
+        document.getElementById("overlayReplayResult").hidden = true;
+        backToMap();
+      });
       document.getElementById("btnLeaderboard").addEventListener("click", function() {
         openLeaderboard(null, LOCATIONS);
       });
@@ -5804,6 +5816,7 @@
         updateHud();
         document.getElementById("overlayWin").hidden = true;
         document.getElementById("overlayLose").hidden = true;
+        document.getElementById("overlayReplayResult").hidden = true;
         var pr = progress[state.currentLocationId] || { best: 0 };
         document.getElementById("hudBest").textContent = pr.best;
       }
@@ -8756,6 +8769,29 @@
         var baseClear = 10 * (v.pop || 150) + collectAll + 150;
         return Math.round(baseClear * 1.7 / 100) * 100;
       }
+      function commaNum(n) {
+        return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      }
+      function populateReplayResult(id, runScore, prevBest, prevStars, starsNow) {
+        var isBest = runScore > prevBest;
+        var hadPrev = prevBest > 0;
+        var banner = document.getElementById("rrBanner");
+        var label = document.getElementById("rrLabel");
+        banner.hidden = !(isBest && hadPrev);
+        label.hidden = !banner.hidden;
+        label.textContent = (LEVELS[id] ? LEVELS[id].name : id) + " \xB7 replay";
+        document.getElementById("rrScore").textContent = commaNum(runScore);
+        document.getElementById("rrStars").textContent = "\u2605".repeat(starsNow) + "\u2606".repeat(3 - starsNow);
+        var prev = document.getElementById("rrPrev");
+        if (hadPrev) {
+          var txt = "Previous best: " + commaNum(prevBest);
+          if (starsNow > prevStars) txt += "  \xB7  " + prevStars + "\u2605 \u2192 " + starsNow + "\u2605";
+          prev.textContent = txt;
+          prev.hidden = false;
+        } else {
+          prev.hidden = true;
+        }
+      }
       function winLevel() {
         if (survivalMode) return;
         if (state.gameState !== "playing") return;
@@ -8767,6 +8803,9 @@
         var collected = state.collectibles.filter(function(c) {
           return c.taken;
         }).length;
+        var _prevLevelRec = getProgression().levelRecords[state.currentLocationId];
+        var prevLevelBest = _prevLevelRec && _prevLevelRec.bestScore || 0;
+        var prevLevelStars = levelStarCount(state.currentLocationId);
         var timeBonus = Math.max(0, Math.floor(500 - totalElapsed * 6));
         if (timeBonus > 0) {
           state.score += timeBonus;
@@ -8822,6 +8861,9 @@
         document.getElementById("winTitle").textContent = LEVELS[state.currentLocationId].name + " cleared!";
         document.getElementById("winStars").textContent = "\u2605".repeat(stars) + "\u2606".repeat(3 - stars);
         document.getElementById("winSummary").textContent = "Score " + state.score + " \xB7 " + collected + "/" + state.collectibles.length + " treasures \xB7 Tier " + Math.min(playCount + 1, 10);
+        if (replayMode) {
+          populateReplayResult(state.currentLocationId, levelScore, prevLevelBest, prevLevelStars, stars);
+        }
         var acWinEl = document.getElementById("winAchievements");
         if (acWinEl) {
           if (runAchievements && runAchievements.length > 0) {
@@ -8873,7 +8915,9 @@
           });
         }
         showAdBreak(function() {
-          if (!campaignMode) document.getElementById("overlayWin").hidden = false;
+          if (campaignMode) return;
+          if (replayMode) document.getElementById("overlayReplayResult").hidden = false;
+          else document.getElementById("overlayWin").hidden = false;
         });
         if (campaignMode) {
           document.getElementById("btnWinNext").hidden = true;
@@ -8886,12 +8930,7 @@
             clearTimeout(winNextTimer);
             winNextTimer = null;
           }
-          document.getElementById("btnWinNext").hidden = true;
-          document.getElementById("winNextHint").hidden = true;
-          var winAgainBtn = document.getElementById("btnWinAgain");
-          if (winAgainBtn) winAgainBtn.textContent = "Replay again";
-          var winSum = document.getElementById("winSummary");
-          winSum.textContent = "LEVEL REPLAY \xB7 " + winSum.textContent;
+          document.getElementById("overlayWin").hidden = true;
           refreshClearedPin();
         } else {
           refreshClearedPin();
