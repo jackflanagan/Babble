@@ -119,10 +119,15 @@ a{color:inherit;}
   gap:4px;
   background:none;
   border:none;
-  padding:10px;
-  margin:-10px;
+  padding:12px;
+  margin:-12px;
   cursor:pointer;
   will-change: transform, opacity;
+}
+/* Bigger finger-friendly hit area on touch screens (positionPins() spaces the
+   pins apart to match, so the larger targets don't overlap). */
+@media (pointer: coarse){
+  .pin{ padding:18px; margin:-18px; }
 }
 .pin .dot{
   width:16px; height:16px;

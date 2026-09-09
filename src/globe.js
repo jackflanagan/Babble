@@ -542,19 +542,49 @@ export function renderBestScores(){
 }
 refreshClearedPin();
 
+var COARSE_POINTER = (typeof matchMedia === 'function') && matchMedia('(pointer: coarse)').matches;
+
 export function positionPins(){
   var rect = globeCanvas.getBoundingClientRect();
   var scale = rect.width / globeCanvas.width;
-  LOCATIONS.forEach(function(loc){
+  // Minimum spacing between pin centres so each stays independently tappable —
+  // the European stops (Glasgow / Galway / Paris / Modena) project into a tight
+  // cluster, especially on a phone-sized globe.
+  var minGap = COARSE_POINTER ? 48 : 34;
+
+  var placed = LOCATIONS.map(function(loc){
     var p = project(loc.lat, loc.lon);
     var el = pinEls[loc.id];
     var visible = p.z > -0.15;
     el.style.opacity = visible ? clamp(0.35 + p.z*0.9, 0.25, 1) : 0;
     el.style.pointerEvents = (visible && loc.unlocked) ? 'auto' : 'none';
-    var sx = p.x*scale, sy = p.y*scale;
-    var sc = clamp(0.7+p.z*0.5,0.6,1.15);
-    el.style.transform = 'translate(' + (sx-8*sc) + 'px,' + (sy-8*sc) + 'px) scale(' + sc + ')';
-    el.style.zIndex = String(Math.round(1000 + p.z*100));
+    return { el: el, x: p.x*scale, y: p.y*scale, z: p.z,
+      sc: clamp(0.7 + p.z*0.5, 0.6, 1.15),
+      active: visible && loc.unlocked };
+  });
+
+  // De-cluster: gently push apart any interactive pins whose hit targets would
+  // overlap. The canvas glow spots stay at the true location; only the button
+  // nudges, so a tap reliably lands on the pin you aimed at.
+  for(var pass=0; pass<3; pass++){
+    for(var i=0;i<placed.length;i++){
+      var a = placed[i]; if(!a.active) continue;
+      for(var j=i+1;j<placed.length;j++){
+        var b = placed[j]; if(!b.active) continue;
+        var dx = b.x-a.x, dy = b.y-a.y;
+        var d = Math.sqrt(dx*dx + dy*dy) || 0.001;
+        if(d < minGap){
+          var push = (minGap - d) / 2, ux = dx/d, uy = dy/d;
+          a.x -= ux*push; a.y -= uy*push;
+          b.x += ux*push; b.y += uy*push;
+        }
+      }
+    }
+  }
+
+  placed.forEach(function(q){
+    q.el.style.transform = 'translate(' + (q.x - 8*q.sc) + 'px,' + (q.y - 8*q.sc) + 'px) scale(' + q.sc + ')';
+    q.el.style.zIndex = String(Math.round(1000 + q.z*100));
   });
 }
 

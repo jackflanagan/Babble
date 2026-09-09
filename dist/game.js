@@ -1945,16 +1945,44 @@
   function positionPins() {
     var rect = globeCanvas.getBoundingClientRect();
     var scale = rect.width / globeCanvas.width;
-    LOCATIONS.forEach(function(loc) {
+    var minGap = COARSE_POINTER ? 48 : 34;
+    var placed = LOCATIONS.map(function(loc) {
       var p = project(loc.lat, loc.lon);
       var el = pinEls[loc.id];
       var visible = p.z > -0.15;
       el.style.opacity = visible ? clamp(0.35 + p.z * 0.9, 0.25, 1) : 0;
       el.style.pointerEvents = visible && loc.unlocked ? "auto" : "none";
-      var sx = p.x * scale, sy = p.y * scale;
-      var sc = clamp(0.7 + p.z * 0.5, 0.6, 1.15);
-      el.style.transform = "translate(" + (sx - 8 * sc) + "px," + (sy - 8 * sc) + "px) scale(" + sc + ")";
-      el.style.zIndex = String(Math.round(1e3 + p.z * 100));
+      return {
+        el,
+        x: p.x * scale,
+        y: p.y * scale,
+        z: p.z,
+        sc: clamp(0.7 + p.z * 0.5, 0.6, 1.15),
+        active: visible && loc.unlocked
+      };
+    });
+    for (var pass = 0; pass < 3; pass++) {
+      for (var i = 0; i < placed.length; i++) {
+        var a = placed[i];
+        if (!a.active) continue;
+        for (var j = i + 1; j < placed.length; j++) {
+          var b = placed[j];
+          if (!b.active) continue;
+          var dx = b.x - a.x, dy = b.y - a.y;
+          var d = Math.sqrt(dx * dx + dy * dy) || 1e-3;
+          if (d < minGap) {
+            var push = (minGap - d) / 2, ux = dx / d, uy = dy / d;
+            a.x -= ux * push;
+            a.y -= uy * push;
+            b.x += ux * push;
+            b.y += uy * push;
+          }
+        }
+      }
+    }
+    placed.forEach(function(q) {
+      q.el.style.transform = "translate(" + (q.x - 8 * q.sc) + "px," + (q.y - 8 * q.sc) + "px) scale(" + q.sc + ")";
+      q.el.style.zIndex = String(Math.round(1e3 + q.z * 100));
     });
   }
   function setGlobeRunning(v) {
@@ -1982,7 +2010,7 @@
     }
     requestAnimationFrame(globeLoop);
   }
-  var _progress2, _lbName, _enterLocation2, _canReplay, _levelStars, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, locInfoEl, locInfoSel, pinEls, chipEls, rosterEl, globeRunning;
+  var _progress2, _lbName, _enterLocation2, _canReplay, _levelStars, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, locInfoEl, locInfoSel, pinEls, chipEls, rosterEl, COARSE_POINTER, globeRunning;
   var init_globe = __esm({
     "src/globe.js"() {
       init_utils();
@@ -2092,6 +2120,7 @@
         chipEls[loc.id] = chip;
       });
       refreshClearedPin();
+      COARSE_POINTER = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
       globeRunning = true;
       requestAnimationFrame(globeLoop);
       globeCanvas.addEventListener("pointerdown", function(e) {
