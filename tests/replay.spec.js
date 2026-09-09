@@ -113,16 +113,16 @@ test('replay does not modify campaignStep or campaign progression', async ({ pag
   await boot(page);
   await startCampaignFromGlobe(page);
 
-  // Drive the campaign forward to the Modena level (glasgow -> mediterranean -> modena)
-  // so campaignStep is genuinely non-zero.
-  let atModena = false;
-  for (let i = 0; i < 90 && !atModena; i++) {
+  // Drive the campaign forward to the Paris level (glasgow -> modena -> paris,
+  // all real levels in the new order) so campaignStep is genuinely non-zero.
+  let atParis = false;
+  for (let i = 0; i < 90 && !atParis; i++) {
     const s = await page.evaluate(() => ({
       mg: window.__game.miniGameId(),
       loc: window.__game.getState().currentLocationId,
       playing: window.__game.getState().gameState === 'playing',
     }));
-    if (s.loc === 'modena' && !s.mg && s.playing) { atModena = true; break; }
+    if (s.loc === 'paris' && !s.mg && s.playing) { atParis = true; break; }
     await page.evaluate(() => {
       const g = window.__game;
       if (g.miniGameId()) g.forceMiniGameWin();
@@ -130,7 +130,7 @@ test('replay does not modify campaignStep or campaign progression', async ({ pag
     });
     await page.waitForTimeout(400);
   }
-  expect(atModena, 'campaign never reached the Modena level').toBe(true);
+  expect(atParis, 'campaign never reached the Paris level').toBe(true);
   const stepBefore = await page.evaluate(() => window.__game.campaignStep());
   expect(stepBefore).toBeGreaterThanOrEqual(2);
 

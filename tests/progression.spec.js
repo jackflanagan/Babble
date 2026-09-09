@@ -106,14 +106,16 @@ test('completing a location records it as visited and persists (save + load roun
   await startAdventure(page);
   expect(await page.evaluate(() => window.__game.getState().currentLocationId)).toBe('glasgow');
 
-  // Force-clear Glasgow: both waves, all collectibles. When the run advances to
-  // the Mediterranean mini-game, winLevel() has run for Glasgow.
-  for (let i = 0; i < 40; i++) {
-    if (await page.evaluate(() => window.__game.miniGameId())) break;
+  // Force-clear Glasgow: both waves, all collectibles. Once the run advances
+  // past it (Modena is next), winLevel() has run for Glasgow.
+  for (let i = 0; i < 60; i++) {
+    const advanced = await page.evaluate(() =>
+      window.__game.campaignStep() > 0 || window.__game.getState().currentLocationId !== 'glasgow');
+    if (advanced) break;
     await page.evaluate(() => { window.__game.forceAllCollectiblesTaken(); window.__game.forceWave2(); });
     await page.waitForTimeout(300);
   }
-  expect(await page.evaluate(() => window.__game.miniGameId())).toBe('mediterranean');
+  expect(await page.evaluate(() => window.__game.getState().currentLocationId)).not.toBe('glasgow');
 
   // In memory + on disk.
   const prog = await page.evaluate(() => window.__game.getProgression());

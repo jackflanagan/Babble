@@ -7,8 +7,8 @@ const path = require('path');
 const FILE_URL = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
 
 const EXPECTED_ORDER = [
-  'glasgow', 'mediterranean', 'modena', 'krakow', 'paris', 'berlin', 'ireland',
-  'london', 'athens', 'pamplona', 'kenya', 'tokyo', 'brazil', 'newyork', 'boss',
+  'glasgow', 'modena', 'paris', 'mediterranean', 'ireland', 'athens', 'krakow',
+  'kenya', 'tokyo', 'berlin', 'brazil', 'london', 'newyork', 'pamplona', 'boss',
 ];
 
 test.beforeEach(() => {

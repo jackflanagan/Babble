@@ -64,14 +64,15 @@ test('P1 jump / bubble keys do not throw', async ({ page }) => {
 });
 
 test('Trap Blast power: banked on a mini-game clear, bubbles every free enemy', async ({ page }) => {
-  test.setTimeout(30000);
+  test.setTimeout(70000);
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await enterLocation(page); // Glasgow, step 0
 
-  // Force-clear Glasgow so the run advances to the Mediterranean mini-game.
+  // Force-clear the first three levels (glasgow -> modena -> paris) so the run
+  // reaches the first mini-game (Mediterranean, step 3 in the new order).
   await page.waitForTimeout(3300);
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 160; i++) {
     if (await page.evaluate(() => window.__game.miniGameId())) break;
     await page.evaluate(() => { window.__game.forceAllCollectiblesTaken(); window.__game.forceWave2(); });
     await page.waitForTimeout(300);

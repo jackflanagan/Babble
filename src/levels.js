@@ -35,7 +35,7 @@ glasgow: {
   movingPlatformDefs: [
     {ox:260, oy:310, w:120, h:18, axis:'x', amplitude:90, speed:0.7}
   ],
-  enemyVariety: {specialType:'buckfast', waveRatio:0.4}
+  enemyVariety: {specialType:'buckfast', waveRatio:0.25}   // teaching level — kept gentle in both waves
 },
 modena: {
   platforms: [
@@ -61,7 +61,7 @@ modena: {
   movingPlatformDefs: [
     {ox:360, oy:210, w:100, h:18, axis:'y', amplitude:45, speed:0.9}
   ],
-  enemyVariety: {specialType:'parmesan', waveRatio:0.5}
+  enemyVariety: {specialType:'parmesan', waveRatio:0.3}   // was 0.5 — 3-hit ricochet enemy was too dense for stop 2
 },
 paris: {
   platforms: [
@@ -140,7 +140,7 @@ kenya: {
   movingPlatformDefs: [
     {ox:360, oy:255, w:130, h:18, axis:'x', amplitude:110, speed:1.0}
   ],
-  enemyVariety: {specialType:'motorbike', waveRatio:0.5}
+  enemyVariety: {specialType:'motorbike', waveRatio:0.4}   // was 0.5 — eased alongside softer smoke
 },
 tokyo: {
   platforms: [
@@ -467,7 +467,7 @@ export var LEVELS = {
   },
   ireland:{
     name:'Galway',
-    blurb:'Trap every banshee in a bubble, then bump it to pop it. Grab a shamrock, golden harp and a pot of gold for bonus points. Walk off either edge to wrap around the map.',
+    blurb:'A gentler stop — the banshees here won’t chase you. Take your time and grab all six treasures (shamrock, golden harp, pot of gold) for the collection star. Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#4a7a9a', skyMid:'#7ab0c0', skyBottom:'#c8e0cc',

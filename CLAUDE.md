@@ -13,19 +13,25 @@ collectibles for bonus points, clear every enemy across two waves to finish a le
 Tapping **any** landing pin on the globe starts a single fixed run:
 
 ```
-Glasgow → (Mediterranean) → Modena → (Krakow) → Paris → (Berlin) → Galway →
-(London) → Athens → (Pamplona) → Amboseli → Tokyo → Brazil → New York → Beijing
+Glasgow → Modena → Paris → (Mediterranean) → Galway → Athens → (Krakow) →
+Amboseli → Tokyo → (Berlin) → Brazil → (London) → New York → (Pamplona) → Beijing
 ```
 
 15 stops = 10 levels + 5 mini-games, in a fixed order (`CAMPAIGN` in `main.js`),
-ending on the Beijing boss.
+ending on the Beijing boss. Order is tuned for a new-player difficulty curve:
+three real levels before the first mini-game, mini-games never in the first 3
+stops / never adjacent, Tokyo and Brazil not back-to-back.
 
-- **No level select / no replays.** `enterLocation()` ignores which pin was tapped
-  and always starts at `CAMPAIGN[0]`. `campaignStep` walks the list; `getNextCampaignItem()`
-  returns `null` at the end.
+- **First-time run always starts at `CAMPAIGN[0]`.** `enterLocation()` ignores which
+  pin was tapped; `campaignStep` walks the list; `getNextCampaignItem()` returns
+  `null` at the end. (A *completed* location can later be replayed from the globe —
+  see the replay/mastery systems — but that is a separate path and never touches
+  `campaignStep`.)
 - **Score carries the whole way.** `resetGame(keepScore)` — campaign transitions pass
   `true`. Lives reset to 3 per level.
-- **Out of lives ends the run** → `finishAdventure(false)`. Clearing Beijing →
+- **Early safety net:** a wipe on the first three stops (`campaignStep <= 2`)
+  auto-restarts that stop (score carries, lives refill) instead of ending the run.
+- **Out of lives from the fourth stop on ends the run** → `finishAdventure(false)`. Clearing Beijing →
   `finishAdventure(true)`. Both show the `#overlayWin` overlay repurposed as the
   results screen, with a single `'adventure'` leaderboard record and "New adventure" /
   "World map" buttons.

@@ -3924,7 +3924,8 @@
           movingPlatformDefs: [
             { ox: 260, oy: 310, w: 120, h: 18, axis: "x", amplitude: 90, speed: 0.7 }
           ],
-          enemyVariety: { specialType: "buckfast", waveRatio: 0.4 }
+          enemyVariety: { specialType: "buckfast", waveRatio: 0.25 }
+          // teaching level — kept gentle in both waves
         },
         modena: {
           platforms: [
@@ -3954,7 +3955,8 @@
           movingPlatformDefs: [
             { ox: 360, oy: 210, w: 100, h: 18, axis: "y", amplitude: 45, speed: 0.9 }
           ],
-          enemyVariety: { specialType: "parmesan", waveRatio: 0.5 }
+          enemyVariety: { specialType: "parmesan", waveRatio: 0.3 }
+          // was 0.5 — 3-hit ricochet enemy was too dense for stop 2
         },
         paris: {
           platforms: [
@@ -4045,7 +4047,8 @@
           movingPlatformDefs: [
             { ox: 360, oy: 255, w: 130, h: 18, axis: "x", amplitude: 110, speed: 1 }
           ],
-          enemyVariety: { specialType: "motorbike", waveRatio: 0.5 }
+          enemyVariety: { specialType: "motorbike", waveRatio: 0.4 }
+          // was 0.5 — eased alongside softer smoke
         },
         tokyo: {
           platforms: [
@@ -4498,7 +4501,7 @@
         },
         ireland: {
           name: "Galway",
-          blurb: "Trap every banshee in a bubble, then bump it to pop it. Grab a shamrock, golden harp and a pot of gold for bonus points. Walk off either edge to wrap around the map.",
+          blurb: "A gentler stop \u2014 the banshees here won\u2019t chase you. Take your time and grab all six treasures (shamrock, golden harp, pot of gold) for the collection star. Walk off either edge to wrap around the map.",
           values: { a: 100, b: 60, c: 250, pop: 150 },
           theme: {
             skyTop: "#4a7a9a",
@@ -5150,7 +5153,7 @@
           selectMode("1");
         }
         var level = LEVELS[first.id];
-        document.getElementById("hudLocation").textContent = first.name + "  \xB7  1/" + CAMPAIGN.length;
+        document.getElementById("hudLocation").textContent = first.name;
         document.getElementById("howtoTitle").textContent = "Start the adventure \u2014 " + first.name;
         document.getElementById("howtoBlurb").textContent = level.blurb;
         resetGame();
@@ -5607,19 +5610,19 @@
       var CHASE_DELAY = 12;
       var CAMPAIGN = [
         { type: "level", id: "glasgow" },
-        { type: "minigame", id: "mediterranean" },
         { type: "level", id: "modena" },
-        { type: "minigame", id: "krakow" },
         { type: "level", id: "paris" },
-        { type: "minigame", id: "berlin" },
+        { type: "minigame", id: "mediterranean" },
         { type: "level", id: "ireland" },
-        { type: "minigame", id: "london" },
         { type: "level", id: "athens" },
-        { type: "minigame", id: "pamplona" },
+        { type: "minigame", id: "krakow" },
         { type: "level", id: "kenya" },
         { type: "level", id: "tokyo" },
+        { type: "minigame", id: "berlin" },
         { type: "level", id: "brazil" },
+        { type: "minigame", id: "london" },
         { type: "level", id: "newyork" },
+        { type: "minigame", id: "pamplona" },
         { type: "level", id: "boss" }
       ];
       var MINI_GAME_DEFS = {
@@ -6250,7 +6253,7 @@
         });
         if (!tutorialDone && state.gameState === "playing") {
           tutorialT += dt;
-          if (tutorialT > 12) tutorialDone = true;
+          if (tutorialT > 18) tutorialDone = true;
         }
         var accel = 900, fric = 1300;
         state.players.forEach(function(p) {
@@ -6732,8 +6735,8 @@
           if (en3.type === "motorbike") {
             en3.smokeRevT = (en3.smokeRevT !== void 0 ? en3.smokeRevT : rand(3, 6)) - dt;
             if (en3.smokeRevT <= 0) {
-              en3.smokeRevT = rand(3, 7);
-              smokeLevel = Math.min(1, smokeLevel + 0.55);
+              en3.smokeRevT = rand(4, 8);
+              smokeLevel = Math.min(1, smokeLevel + 0.38);
               playSound("motorbike_rev");
               for (var msi = 0; msi < 12; msi++) {
                 state.particles.push({
@@ -7064,7 +7067,7 @@
           }
         }
         if (allClearDelay > 0) allClearDelay -= dt;
-        if (smokeLevel > 0) smokeLevel = Math.max(0, smokeLevel - dt * 0.12);
+        if (smokeLevel > 0) smokeLevel = Math.max(0, smokeLevel - dt * 0.2);
         for (var pbi = paintBlobs.length - 1; pbi >= 0; pbi--) {
           var pb2 = paintBlobs[pbi];
           pb2.t += dt;
@@ -7165,6 +7168,18 @@
           state.gameState = "lost";
           stopMusic();
           if (campaignMode) {
+            if (campaignStep <= 2) {
+              spawnPopup(W / 2, H / 2 - 40, "TRY AGAIN", "#ffd166", 26);
+              pushKillFeed("EARLY STOP \u2014 THE RUN CONTINUES", "#ffd166");
+              setTimeout(function() {
+                if (!campaignMode || state.gameState !== "lost") return;
+                resetGame(true);
+                state.gameState = "playing";
+                state.startTime = performance.now();
+                startMusic();
+              }, 1200);
+              return;
+            }
             finishAdventure(false);
             return;
           }
@@ -7282,14 +7297,14 @@
           }
           var stepNo = campaignStep + 1;
           var locName = item.type === "level" ? LEVELS[item.id] ? LEVELS[item.id].name : item.id : MINI_GAME_DEFS[item.id].title;
-          var sub = item.type === "minigame" ? MINI_GAME_DEFS[item.id].subtitle : "Stop " + stepNo + " of " + CAMPAIGN.length;
+          var sub = item.type === "minigame" ? MINI_GAME_DEFS[item.id].subtitle : stepNo <= 3 ? "" : "Stop " + stepNo;
           el.innerHTML = '<div style="color:#fff;font-family:Fredoka,sans-serif;font-size:42px;font-weight:bold;text-align:center;text-shadow:0 0 30px rgba(255,255,255,0.4);">' + locName + '</div><div style="color:#aabbc8;font-family:Nunito,sans-serif;font-size:20px;margin-top:10px;text-align:center;">' + sub + "</div>";
           if (item.type === "level") {
             campaignLastType = "level";
             stopMusic();
             state.currentLocationId = item.id;
             resetGame(true);
-            document.getElementById("hudLocation").textContent = LEVELS[item.id].name + "  \xB7  " + stepNo + "/" + CAMPAIGN.length;
+            document.getElementById("hudLocation").textContent = LEVELS[item.id].name + (stepNo > 3 ? "  \xB7  Stop " + stepNo : "");
             document.getElementById("howto").hidden = true;
             state.gameState = "playing";
             state.startTime = performance.now();
@@ -7697,10 +7712,10 @@
               return { x: sp.x, y: sp.y, r: 36, color: bCols[i], lit: false, litT: 0, hitAnim: 0 };
             }),
             activeSpot: -1,
-            litDuration: 0.72,
+            litDuration: 0.9,
             litTimer: 0,
             hits: 0,
-            needed: 28,
+            needed: 24,
             beatT: 0,
             beamPhase: 0
           };
@@ -9063,7 +9078,7 @@
         drawPaintBlobs(paintBlobs);
         if (smokeLevel > 0.05) {
           ctx.save();
-          ctx.globalAlpha = smokeLevel * 0.72;
+          ctx.globalAlpha = smokeLevel * 0.5;
           ctx.fillStyle = "#707070";
           ctx.fillRect(0, 0, W, H);
           ctx.globalAlpha = 1;
@@ -9255,12 +9270,16 @@
           ctx.restore();
         }
         if (!tutorialDone && state.gameState === "playing") {
-          var tMsg = tutorialFirstPop ? "Jump onto the trapped bubble to pop it!" : "Shoot enemies with bubbles! [Shift / bubble button]";
-          var tAlpha;
+          var tMsg, tAlpha;
           if (!tutorialFirstPop) {
+            tMsg = "Shoot enemies with bubbles!  [Shift / bubble button]";
             tAlpha = Math.min(1, tutorialT * 3) * Math.min(1, (6 - tutorialT) * 2);
-          } else {
+          } else if (tutorialT < 12) {
+            tMsg = "Jump on the trapped bubble to pop it \u2014 and grab the treasures!";
             tAlpha = Math.min(1, (tutorialT - 6) * 2) * Math.min(1, (12 - tutorialT) * 2);
+          } else {
+            tMsg = "Pop several in a row for a combo \u2014 that\u2019s where the points are!";
+            tAlpha = Math.min(1, (tutorialT - 12) * 2) * Math.min(1, (18 - tutorialT) * 2);
           }
           tAlpha = Math.max(0, tAlpha);
           if (tAlpha > 0) {
@@ -9753,6 +9772,14 @@
         },
         addScore: function(n) {
           state.score += n | 0;
+        },
+        loseLife: function() {
+          if (state.players && state.players[0]) loseLife(state.players[0], 0);
+        },
+        campaign: function() {
+          return CAMPAIGN.map(function(c) {
+            return c.type + ":" + c.id;
+          });
         },
         powerCharges: function() {
           return powerCharges;

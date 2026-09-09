@@ -114,7 +114,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       selectMode('1');
     }
     var level = LEVELS[first.id];
-    document.getElementById('hudLocation').textContent = first.name + '  ·  1/' + CAMPAIGN.length;
+    document.getElementById('hudLocation').textContent = first.name;   // no "1/15" — don't front-load the commitment
     document.getElementById('howtoTitle').textContent = 'Start the adventure — ' + first.name;
     document.getElementById('howtoBlurb').textContent = level.blurb;
     resetGame();
@@ -443,21 +443,25 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   /* The whole game is one fixed run: every level and mini-game once, in order,
      ending with the China boss. Score carries across the whole thing and the
      leaderboard is offered only on the final screen. */
+  /* Order tuned for the new-player difficulty curve: three real levels first
+     so the core loop lands before any mouse mini-game; mini-games then spaced
+     out (never in the first 3 stops, never two in a row); Tokyo and Brazil
+     are no longer adjacent. */
   var CAMPAIGN = [
     {type:'level', id:'glasgow'},
-    {type:'minigame', id:'mediterranean'},
     {type:'level', id:'modena'},
-    {type:'minigame', id:'krakow'},
     {type:'level', id:'paris'},
-    {type:'minigame', id:'berlin'},
+    {type:'minigame', id:'mediterranean'},
     {type:'level', id:'ireland'},
-    {type:'minigame', id:'london'},
     {type:'level', id:'athens'},
-    {type:'minigame', id:'pamplona'},
+    {type:'minigame', id:'krakow'},
     {type:'level', id:'kenya'},
     {type:'level', id:'tokyo'},
+    {type:'minigame', id:'berlin'},
     {type:'level', id:'brazil'},
+    {type:'minigame', id:'london'},
     {type:'level', id:'newyork'},
+    {type:'minigame', id:'pamplona'},
     {type:'level', id:'boss'},
   ];
   var MINI_GAME_DEFS = {
@@ -950,7 +954,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     /* tutorial timer */
     if(!tutorialDone && state.gameState==='playing'){
       tutorialT += dt;
-      if(tutorialT > 12) tutorialDone = true;
+      if(tutorialT > 18) tutorialDone = true;
     }
 
     var accel = 900, fric = 1300;
@@ -1345,8 +1349,8 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       if(en.type === 'motorbike'){
         en.smokeRevT = ((en.smokeRevT !== undefined) ? en.smokeRevT : rand(3,6)) - dt;
         if(en.smokeRevT <= 0){
-          en.smokeRevT = rand(3, 7);
-          smokeLevel = Math.min(1, smokeLevel + 0.55);
+          en.smokeRevT = rand(4, 8);
+          smokeLevel = Math.min(1, smokeLevel + 0.38);   // eased: less blinding, clears faster
           playSound('motorbike_rev');
           for(var msi=0;msi<12;msi++){
             state.particles.push({x:en.x+en.w/2, y:en.y+en.h/2, vx:rand(-80,80), vy:rand(-60,20),
@@ -1598,7 +1602,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     }
 
     if(allClearDelay > 0) allClearDelay -= dt;
-    if(smokeLevel > 0) smokeLevel = Math.max(0, smokeLevel - dt * 0.12);
+    if(smokeLevel > 0) smokeLevel = Math.max(0, smokeLevel - dt * 0.2);
 
     /* Paint blob update */
     for(var pbi=paintBlobs.length-1;pbi>=0;pbi--){
@@ -1674,7 +1678,22 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       state.gameState = 'lost';
       stopMusic();
       if(campaignMode){
-        // The adventure is a single run — no per-level retries. End it here.
+        if(campaignStep <= 2){
+          // Safety net for the first three stops: a wipe restarts the stop
+          // instead of ending the whole run. Cumulative score carries; lives
+          // refill. No menu — it just picks you back up.
+          spawnPopup(W/2, H/2-40, 'TRY AGAIN', '#ffd166', 26);
+          pushKillFeed('EARLY STOP — THE RUN CONTINUES', '#ffd166');
+          setTimeout(function(){
+            if(!campaignMode || state.gameState !== 'lost') return;
+            resetGame(true);            // keep cumulative score; lives back to 3
+            state.gameState = 'playing';
+            state.startTime = performance.now();
+            startMusic();
+          }, 1200);
+          return;
+        }
+        // From the fourth stop on, the adventure is a single run — end it here.
         finishAdventure(false);
         return;
       }
@@ -1825,7 +1844,10 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       }
       var stepNo = campaignStep + 1;
       var locName = item.type==='level' ? (LEVELS[item.id] ? LEVELS[item.id].name : item.id) : MINI_GAME_DEFS[item.id].title;
-      var sub = item.type==='minigame' ? MINI_GAME_DEFS[item.id].subtitle : ('Stop ' + stepNo + ' of ' + CAMPAIGN.length);
+      // Keep the early game low-pressure: no stop counter for the first three,
+      // and never the daunting "… of 15" total.
+      var sub = item.type==='minigame' ? MINI_GAME_DEFS[item.id].subtitle
+              : (stepNo <= 3 ? '' : ('Stop ' + stepNo));
       el.innerHTML = '<div style="color:#fff;font-family:Fredoka,sans-serif;font-size:42px;font-weight:bold;text-align:center;text-shadow:0 0 30px rgba(255,255,255,0.4);">'+locName+'</div>'
         +'<div style="color:#aabbc8;font-family:Nunito,sans-serif;font-size:20px;margin-top:10px;text-align:center;">'+sub+'</div>';
       if(item.type==='level'){
@@ -1834,7 +1856,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         state.currentLocationId = item.id;
         resetGame(true);   // carry the cumulative score
         document.getElementById('hudLocation').textContent =
-          LEVELS[item.id].name + '  ·  ' + stepNo + '/' + CAMPAIGN.length;
+          LEVELS[item.id].name + (stepNo > 3 ? ('  ·  Stop ' + stepNo) : '');
         document.getElementById('howto').hidden = true;
         state.gameState = 'playing';
         state.startTime = performance.now();
@@ -2109,7 +2131,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         spots:[{x:130,y:355},{x:240,y:375},{x:360,y:360},{x:480,y:375},{x:590,y:355}].map(function(sp,i){
           return {x:sp.x,y:sp.y,r:36,color:bCols[i],lit:false,litT:0,hitAnim:0};
         }),
-        activeSpot:-1, litDuration:0.72, litTimer:0, hits:0, needed:28, beatT:0, beamPhase:0
+        activeSpot:-1, litDuration:0.9, litTimer:0, hits:0, needed:24, beatT:0, beamPhase:0
       };
       mgActivateSpot();
     } else if(id === 'london'){
@@ -3106,7 +3128,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     /* Smoke screen overlay from motorbike */
     if(smokeLevel > 0.05){
       ctx.save();
-      ctx.globalAlpha = smokeLevel * 0.72;
+      ctx.globalAlpha = smokeLevel * 0.5;   // eased: obscures without blinding
       ctx.fillStyle = '#707070';
       ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = 1;
@@ -3255,10 +3277,17 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       ctx.restore();
     }
     if(!tutorialDone && state.gameState==='playing'){
-      var tMsg=tutorialFirstPop?'Jump onto the trapped bubble to pop it!':'Shoot enemies with bubbles! [Shift / bubble button]';
-      var tAlpha;
-      if(!tutorialFirstPop){ tAlpha=Math.min(1,tutorialT*3)*Math.min(1,(6-tutorialT)*2); }
-      else { tAlpha=Math.min(1,(tutorialT-6)*2)*Math.min(1,(12-tutorialT)*2); }
+      var tMsg, tAlpha;
+      if(!tutorialFirstPop){
+        tMsg = 'Shoot enemies with bubbles!  [Shift / bubble button]';
+        tAlpha = Math.min(1,tutorialT*3)*Math.min(1,(6-tutorialT)*2);
+      } else if(tutorialT < 12){
+        tMsg = 'Jump on the trapped bubble to pop it — and grab the treasures!';
+        tAlpha = Math.min(1,(tutorialT-6)*2)*Math.min(1,(12-tutorialT)*2);
+      } else {
+        tMsg = 'Pop several in a row for a combo — that’s where the points are!';
+        tAlpha = Math.min(1,(tutorialT-12)*2)*Math.min(1,(18-tutorialT)*2);
+      }
       tAlpha=Math.max(0,tAlpha);
       if(tAlpha>0){
         ctx.save();
@@ -3681,6 +3710,8 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     levelStars: function(id){ return levelStarCount(id || state.currentLocationId); },
     perfTarget: function(id){ return levelPerfTarget(id || state.currentLocationId); },
     addScore: function(n){ state.score += (n|0); },
+    loseLife: function(){ if(state.players && state.players[0]) loseLife(state.players[0], 0); },
+    campaign: function(){ return CAMPAIGN.map(function(c){ return c.type + ':' + c.id; }); },
     powerCharges: function(){ return powerCharges; },
     freeEnemyCount: function(){ return state.enemies.filter(function(e){ return e.state === 'free'; }).length; },
     usePower: function(){ usePower(); },
