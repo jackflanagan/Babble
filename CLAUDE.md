@@ -33,17 +33,87 @@ stops / never adjacent, Tokyo and Brazil not back-to-back.
   auto-restarts that stop (score carries, lives refill) instead of ending the run.
 - **Out of lives from the fourth stop on ends the run** → `finishAdventure(false)`. Clearing Beijing →
   `finishAdventure(true)`. Both show the `#overlayWin` overlay repurposed as the
-  results screen, with a single `'adventure'` leaderboard record and "New adventure" /
-  "World map" buttons.
+  results screen (title "Adventure over" / "Adventure complete!"), with "New
+  adventure" / "World map" buttons. `finishAdventure(true)` calls
+  `recordAdventureComplete(finalScore)` → `bestAdventureScore` + `totalAdventures++`.
 - **Mini-game clears bank a Trap Blast charge** (`powerCharges`). In a level, press
   **E** / **Q** or the `#btnPower` / `#mcPower` button to spend one: every free enemy
-  is instantly bubbled. Charges reset per run.
+  is instantly bubbled. Charges reset per run. A *failed* mini-game has no penalty —
+  the run just continues without the charge.
+- **Difficulty tuning (new-player curve, `src/levels.js` + a few `main.js` consts):**
+  Glasgow `buckfast` waveRatio `0.25`, Modena `parmesan` `0.3`, Amboseli `motorbike`
+  `0.4`; motorbike smoke eased (burst `+0.38`, decay `×0.2`, overlay alpha `×0.5`);
+  Berlin mini-game window `litDuration 0.9` / `needed 24`; Glasgow tutorial runs 18 s
+  with a 3rd line about combos; HUD / transitions drop the "N / 15" total (first 3
+  stops show only the location name).
 - **Leaderboard is not wired up.** `sdk.js` has empty `LB_URL` / `LB_KEY`, so
-  `submitScore()` no-ops and the name-entry row stays hidden. The finish screen is
-  ready for when a backend is configured.
+  `submitScore()` no-ops and the name-entry row stays hidden. Names still persist
+  (to `bbl_lb_names_v1`) so the flow is ready for a backend.
 
 Location **ids** never change (`ireland`, `kenya`, `boss`); only their display
 **names** were updated to Galway / Amboseli / Beijing.
+
+## Replay, three-star mastery & the results card
+
+A location the player has **completed at least once** (`visitedLocations`) becomes
+replayable straight from the globe — a *separate* path from the campaign.
+
+- **Entry.** `globe.js` `launchLocation(loc)` routes every pin/chip tap:
+  `_canReplay(loc.id)` (injected: `visitedLocations.includes(id) && LEVELS[id] &&
+  LEVEL_LAYOUTS[id]`) → `enterLocation(loc, {replay:true})` → `enterReplay(loc)`;
+  otherwise the normal campaign `enterLocation(loc)`. A locked chip opens the info
+  card instead of launching. Guests never initiate (`netRole==='guest' && netConnected`).
+- **`enterReplay(loc)`** sets `replayMode = true`, `campaignMode = false`, plays that
+  one level via the ordinary `LEVELS` / `LEVEL_LAYOUTS` / `resetGame()` pipeline.
+  **It never touches `campaignStep`** and does not bank/spend `powerCharges`.
+- **`replayMode`** is a module-scope flag in `main.js` (mutually exclusive with
+  `campaignMode`), cleared in `backToMap()` and the campaign path of `enterLocation`.
+- **Three mastery stars** per action level, stored in `levelRecords[id].stars`
+  (`{completion, collection, performance}`, each only ever flips `false → true`):
+  - `completion` — reaching `winLevel()`
+  - `collection` — every collectible in the level picked up
+  - `performance` — `levelScore >= levelPerfTarget(id)`. `levelScore =
+    state.score - levelStartScore` isolates *this* level's earnings, so it works the
+    same in a replay (score starts 0) and inside the cumulative-score campaign.
+    `levelStartScore` is snapshotted in `resetGame()`.
+  - **`levelPerfTarget(id)`** = `LEVELS[id].starScore` if set (boss = `2600`), else
+    derived from the level's own point values:
+    `round((10·pop + 2a+2b+2c + 150) · 1.7 / 100) · 100` ≈ 4200 standard, 5400 Athens.
+  `winLevel()` records stars for **both** campaign and replay clears; the win screen's
+  `★` row and the globe use the same count (`levelStarCount(id)`).
+- **`#overlayReplayResult`** — the compact replay results card (separate from the
+  campaign `#overlayWin`, which is untouched). `populateReplayResult(id, runScore,
+  prevBest, prevStars, starsNow)` fills `#rrScore` (comma-formatted), `#rrStars`,
+  `#rrPrev` ("Previous best: …", shown only when a prior record exists), and
+  `#rrBanner` "NEW BEST!" (shown only when `runScore > prevBest` **and** a prior best
+  existed). Buttons `#rrReplay` (re-run, `replayMode` stays on) / `#rrMap`
+  (`backToMap`). No animation; `resetGame()` also hides it.
+- `prevBest` / `prevStars` are snapshotted at the top of `winLevel()` **before** the
+  record is updated.
+
+## Globe / world map (`src/globe.js`)
+
+- **Three location states**, all driven by progression data:
+  - **LOCKED** — pin `disabled` + `.locked` (grey, no pulse); chip not `.active`.
+  - **AVAILABLE** — pin `.pin` (coral, pulsing).
+  - **VISITED** — pin **and** roster chip get `.cleared` (gold), from
+    `pCleared(id) === visitedLocations.includes(id)`.
+- **`refreshClearedPin()`** re-derives pin unlocks from `visitedLocations` (the
+  campaign unlock chain: Europe-4 → Amboseli; Galway → Athens; Amboseli → Tokyo →
+  Brazil → New York → Beijing) and toggles the `.cleared` classes + chip tooltips.
+  Called at globe module load (empty data), then from `main.js` init and `backToMap()`.
+- **`#globe-locinfo`** — one reusable info card (`ensureLocInfo` builds it once,
+  bottom-centre of `.globe-wrap`). Pin tap → `showLocInfo(loc)` fills name /
+  `★`-line (`_levelStars`) / state text / best score (`pBest`) / a PLAY-or-REPLAY
+  button; a locked chip opens it with an explain-only message. Tap-off / `#…-x` closes.
+- **`positionPins()`** projects each pin to screen space, then runs a small
+  **de-cluster pass** (3 iterations) pushing apart any interactive pins whose hit
+  areas would overlap — the European stops (Glasgow / Galway / Paris / Modena)
+  cluster tightly on a phone globe. `minGap` = 48 px on `(pointer: coarse)`, 34 px
+  otherwise; `.pin` padding is 12 px, 18 px under `@media (pointer: coarse)`. The
+  canvas glow spots stay at the true location — only the button nudges.
+- **DI from `main.js`:** `setGlobeProgress(getProgression())`, `setEnterLocation`,
+  `setCanReplay`, `setLevelStars`, `setLbName`.
 
 ## Player progression — one canonical system
 
@@ -123,9 +193,9 @@ progress. There is no second copy anywhere. One localStorage key,
 ### Still living in `main.js`
 Scene switching, input/keybindings/mobile controls, the update loop, the mini-games,
 `draw()`, and cosmetic UI all stay in `main.js` — they cross-reference the `state`
-object and ~20 module-scope variables (`GRAVITY`, `PLATFORMS`, `freezeT`, `slowT`,
-`powerCharges`, `campaignStep`, …). Further extraction needs those threaded through
-explicitly rather than closed over.
+object and ~25 module-scope variables (`GRAVITY`, `PLATFORMS`, `freezeT`, `slowT`,
+`powerCharges`, `campaignMode`, `campaignStep`, `replayMode`, `levelStartScore`, …).
+Further extraction needs those threaded through explicitly rather than closed over.
 
 `net.js` is fully extracted but depends on main.js wiring it up: `setNetState`,
 `setNetKeys`, `setNetUpdateHud`, `setNetLivePlayers`, `setNetTryJump`, etc. When a
@@ -159,6 +229,32 @@ the host).
 
 **Not runtime-tested:** real WebRTC multiplayer (needs two hosted browsers — Trystero
 won't pair over `file://`); leaderboard submission (no backend configured).
+
+## State & open threads (for a fresh session)
+
+Everything below is **done, tested and on `main`** — this section is orientation, not a TODO.
+
+Recent work, newest first:
+1. **Progression consolidation** — one canonical store (`progression.js`), `main.js`
+   holds no progression state, `gh_progress_v2` migrated once then removed, names
+   split to `bbl_lb_names_v1`. Globe pins de-clustered + bigger touch targets.
+2. **Balance pass** — campaign reorder, early-stop safety net, enemy/mini-game/
+   tutorial/HUD tweaks (see the campaign section).
+3. **Replay + three-star mastery + `#overlayReplayResult`** card.
+4. **Globe three-state UI + `#globe-locinfo`** info card.
+
+Known quirks / not-yet-done (no one has asked for these):
+- **Level timing is wave-2-only.** `state.startTime` is reset when wave 2 spawns, so
+  `totalElapsed` in `winLevel()` measures wave 2, not the whole level. The mastery
+  *performance* star sidesteps this (score-based via `levelStartScore`), but the
+  cosmetic `★` star-rating and time bonus still use the partial value.
+- **Only action levels are replayable**, not mini-games (no `LEVELS` entry for them).
+- **`render.spec.js` effectively only renders Glasgow** — `enterLocation()` always
+  starts `CAMPAIGN[0]`, so its per-location loop enters Glasgow 10×. Still a useful
+  pageerror guard; a real per-location render check would need the `__game` hook.
+- **Modena gravity is 1200** (floaty) — left as-is in the balance pass because its
+  platforms were placed for it; changing it risks unreachable collectibles.
+- **Leaderboard backend** — `LB_URL`/`LB_KEY` still empty in `sdk.js`.
 
 ## Rules for working in this codebase
 1. **Always `node build.js` after editing `src/`** before testing or committing.
