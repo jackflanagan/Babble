@@ -10,6 +10,18 @@ var _progress = {};
 export function setGlobeProgress(p){ _progress = p; }
 var _enterLocation = function(){};
 export function setEnterLocation(fn){ _enterLocation = fn; }
+/* Predicate injected by main.js: has this location been completed (so it can
+   be replayed from the map)? Default false keeps first-time behaviour intact. */
+var _canReplay = function(){ return false; };
+export function setCanReplay(fn){ _canReplay = fn; }
+
+/* Single launch point for a pin/chip tap. A completed location starts a
+   standalone replay; anything else starts the fixed campaign, exactly as before. */
+function launchLocation(loc){
+  if(netRole==='guest' && netConnected) return;  // guest follows the host once paired up
+  if(_canReplay(loc.id)) _enterLocation(loc, {replay:true});
+  else _enterLocation(loc);
+}
 
 var globeCanvas = document.getElementById('globeCanvas');
 var gctx = globeCanvas.getContext('2d');
@@ -322,10 +334,7 @@ LOCATIONS.forEach(function(loc){
   var dot = document.createElement('div'); dot.className = 'dot';
   btn.appendChild(dot);
   if(loc.unlocked){
-    btn.addEventListener('click', function(){
-      if(netRole==='guest' && netConnected) return; // guest follows the host once paired up
-      _enterLocation(loc);
-    });
+    btn.addEventListener('click', function(){ launchLocation(loc); });
   } else {
     btn.disabled = true;
   }
@@ -338,9 +347,7 @@ LOCATIONS.forEach(function(loc){
   chip.title = loc.unlocked ? 'Play ' + loc.name : 'Locked';
   if(loc.unlocked){
     chip.style.cursor = 'pointer';
-    (function(l){ chip.addEventListener('click', function(){
-      _enterLocation(l);
-    }); })(loc);
+    (function(l){ chip.addEventListener('click', function(){ launchLocation(l); }); })(loc);
   }
   rosterEl.appendChild(chip);
   chipEls[loc.id] = chip;
@@ -355,17 +362,14 @@ export function unlockLocation(id){
     btn.classList.remove('locked');
     btn.setAttribute('aria-label', loc.name);
     btn.disabled = false;
-    btn.addEventListener('click', function(){
-      if(netRole==='guest' && netConnected) return;
-      _enterLocation(loc);
-    });
+    btn.addEventListener('click', function(){ launchLocation(loc); });
   }
   var chip = chipEls[id];
   if(chip){
     chip.classList.add('active');
     chip.title = 'Play ' + loc.name;
     chip.style.cursor = 'pointer';
-    (function(l){ chip.addEventListener('click', function(){ _enterLocation(l); }); })(loc);
+    (function(l){ chip.addEventListener('click', function(){ launchLocation(l); }); })(loc);
   }
   // cinematic: zoom out to see world, rotate to new region, zoom back in
   globeTargetZoom = 0.78;
@@ -401,6 +405,8 @@ export function refreshClearedPin(){
   LOCATIONS.forEach(function(loc){
     var pr = _progress[loc.id];
     if(pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add('cleared');
+    // Minimal replay affordance: completed locations relabel their tooltip.
+    if(_canReplay(loc.id) && chipEls[loc.id]) chipEls[loc.id].title = 'Replay ' + loc.name;
   });
   renderBestScores();
 }

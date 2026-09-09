@@ -290,7 +290,7 @@ export function applyRemoteScene(data){
   if(netRole!=='guest' || !data) return;
   if(data.type==='_enterLocation'){
     var loc = _getState().LOCATIONS.filter(function(l){ return l.id===data.locationId; })[0];
-    if(loc) _enterLocation(loc);
+    if(loc) _enterLocation(loc, data.replay ? {replay:true} : undefined);
   } else if(data.type==='start'){
     _getState().gameState = 'playing';
     document.getElementById('howto').hidden = true;

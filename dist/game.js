@@ -1392,7 +1392,7 @@
       var loc = _getState().LOCATIONS.filter(function(l) {
         return l.id === data.locationId;
       })[0];
-      if (loc) _enterLocation(loc);
+      if (loc) _enterLocation(loc, data.replay ? { replay: true } : void 0);
     } else if (data.type === "start") {
       _getState().gameState = "playing";
       document.getElementById("howto").hidden = true;
@@ -1491,6 +1491,14 @@
   }
   function setEnterLocation(fn) {
     _enterLocation2 = fn;
+  }
+  function setCanReplay(fn) {
+    _canReplay = fn;
+  }
+  function launchLocation(loc) {
+    if (netRole === "guest" && netConnected) return;
+    if (_canReplay(loc.id)) _enterLocation2(loc, { replay: true });
+    else _enterLocation2(loc);
   }
   function project(lat, lon, rot) {
     var latR = lat * Math.PI / 180;
@@ -1768,8 +1776,7 @@
       btn.setAttribute("aria-label", loc.name);
       btn.disabled = false;
       btn.addEventListener("click", function() {
-        if (netRole === "guest" && netConnected) return;
-        _enterLocation2(loc);
+        launchLocation(loc);
       });
     }
     var chip = chipEls[id];
@@ -1779,7 +1786,7 @@
       chip.style.cursor = "pointer";
       (function(l) {
         chip.addEventListener("click", function() {
-          _enterLocation2(l);
+          launchLocation(l);
         });
       })(loc);
     }
@@ -1807,6 +1814,7 @@
     LOCATIONS.forEach(function(loc) {
       var pr = _progress2[loc.id];
       if (pr && pr.cleared && pinEls[loc.id]) pinEls[loc.id].classList.add("cleared");
+      if (_canReplay(loc.id) && chipEls[loc.id]) chipEls[loc.id].title = "Replay " + loc.name;
     });
     renderBestScores();
   }
@@ -1868,13 +1876,16 @@
     }
     requestAnimationFrame(globeLoop);
   }
-  var _progress2, _enterLocation2, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, pinEls, chipEls, rosterEl, globeRunning;
+  var _progress2, _enterLocation2, _canReplay, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, pinEls, chipEls, rosterEl, globeRunning;
   var init_globe = __esm({
     "src/globe.js"() {
       init_utils();
       init_net();
       _progress2 = {};
       _enterLocation2 = function() {
+      };
+      _canReplay = function() {
+        return false;
       };
       globeCanvas = document.getElementById("globeCanvas");
       gctx = globeCanvas.getContext("2d");
@@ -1931,8 +1942,7 @@
         btn.appendChild(dot);
         if (loc.unlocked) {
           btn.addEventListener("click", function() {
-            if (netRole === "guest" && netConnected) return;
-            _enterLocation2(loc);
+            launchLocation(loc);
           });
         } else {
           btn.disabled = true;
@@ -1947,7 +1957,7 @@
           chip.style.cursor = "pointer";
           (function(l) {
             chip.addEventListener("click", function() {
-              _enterLocation2(l);
+              launchLocation(l);
             });
           })(loc);
         }
@@ -4887,6 +4897,16 @@
     if (s > d.bestAdventureScore) d.bestAdventureScore = s;
     persist();
   }
+  function recordLevelResult(locationId, score) {
+    if (typeof locationId !== "string" || !locationId) return;
+    var s = typeof score === "number" && isFinite(score) && score > 0 ? Math.floor(score) : 0;
+    var d = loadProgression();
+    var rec = d.levelRecords[locationId] || { bestScore: 0, completions: 0 };
+    rec.completions = (rec.completions || 0) + 1;
+    if (s > (rec.bestScore || 0)) rec.bestScore = s;
+    d.levelRecords[locationId] = rec;
+    persist();
+  }
   var STORAGE_KEY, SCHEMA_VERSION, _data;
   var init_progression = __esm({
     "src/progression.js"() {
@@ -4914,6 +4934,9 @@
       var progress = safeGet("gh_progress_v2", { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
       setProgress(progress);
       setGlobeProgress(progress);
+      setCanReplay(function(id) {
+        return getProgression().visitedLocations.indexOf(id) !== -1 && !!LEVELS[id] && !!LEVEL_LAYOUTS[id];
+      });
       refreshClearedPin();
       setLocationsGetter(function() {
         return LOCATIONS;
@@ -4978,10 +5001,15 @@
           selectMode(btn.dataset.players);
         });
       });
-      function enterLocation(loc) {
+      function enterLocation(loc, opts) {
+        if (opts && opts.replay) {
+          enterReplay(loc);
+          return;
+        }
         setGlobeRunning(false);
         sceneGlobe.hidden = true;
         sceneGame.hidden = false;
+        replayMode = false;
         campaignMode = true;
         campaignStep = 0;
         campaignLastType = "level";
@@ -5009,6 +5037,37 @@
           netBroadcastScene("enterLocation", { locationId: first.id });
         }
       }
+      function enterReplay(loc) {
+        var rloc = LOCATIONS.filter(function(l) {
+          return l.id === loc.id;
+        })[0] || loc;
+        if (!rloc || !LEVELS[rloc.id] || !LEVEL_LAYOUTS[rloc.id]) return;
+        setGlobeRunning(false);
+        sceneGlobe.hidden = true;
+        sceneGame.hidden = false;
+        replayMode = true;
+        campaignMode = false;
+        adventureComplete = false;
+        powerCharges = 0;
+        state.currentLocationId = rloc.id;
+        if (netRole) {
+          state.numPlayers = 2;
+          document.getElementById("p2Controls").hidden = true;
+        } else {
+          selectMode("1");
+        }
+        var level = LEVELS[rloc.id];
+        document.getElementById("hudLocation").textContent = rloc.name + "  \xB7  REPLAY";
+        document.getElementById("howtoTitle").textContent = "Level Replay \u2014 " + rloc.name;
+        document.getElementById("howtoBlurb").textContent = level.blurb;
+        resetGame();
+        document.getElementById("howto").hidden = false;
+        netUiRefresh();
+        netHudRefresh();
+        if (netRole === "host") {
+          netBroadcastScene("enterLocation", { locationId: rloc.id, replay: true });
+        }
+      }
       setEnterLocation(enterLocation);
       setNetEnterLocation(enterLocation);
       setNetPlaySound(playSound);
@@ -5020,6 +5079,7 @@
         var wasHost = netRole === "host";
         adGameplayStop();
         stopGame();
+        replayMode = false;
         sceneGame.hidden = true;
         sceneGlobe.hidden = false;
         setGlobeRunning(true);
@@ -5391,6 +5451,7 @@
       var pandaProjectile = null;
       var campaignMode = false;
       var campaignLastType = "minigame";
+      var replayMode = false;
       var campaignStep = 0;
       var adventureComplete = false;
       var powerCharges = 0;
@@ -8587,6 +8648,7 @@
         progress[state.currentLocationId] = pr;
         safeSet("gh_progress_v2", progress);
         markLocationVisited(state.currentLocationId);
+        if (replayMode) recordLevelResult(state.currentLocationId, state.score);
         if (state.currentLocationId === "boss" && !pandaSpecialUnlocked) {
           pandaSpecialUnlocked = true;
           try {
@@ -8681,6 +8743,18 @@
           winNextTimer = setTimeout(function() {
             startCampaignTransition();
           }, 2200);
+        } else if (replayMode) {
+          if (winNextTimer) {
+            clearTimeout(winNextTimer);
+            winNextTimer = null;
+          }
+          document.getElementById("btnWinNext").hidden = true;
+          document.getElementById("winNextHint").hidden = true;
+          var winAgainBtn = document.getElementById("btnWinAgain");
+          if (winAgainBtn) winAgainBtn.textContent = "Replay again";
+          var winSum = document.getElementById("winSummary");
+          winSum.textContent = "LEVEL REPLAY \xB7 " + winSum.textContent;
+          refreshClearedPin();
         } else {
           refreshClearedPin();
           buildSkinDots();
@@ -9487,6 +9561,9 @@
         },
         adventureComplete: function() {
           return adventureComplete;
+        },
+        replayMode: function() {
+          return replayMode;
         },
         getProgression: function() {
           return getProgression();

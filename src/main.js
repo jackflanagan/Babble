@@ -6,15 +6,20 @@ import { initStarfield } from './starfield.js';
 import { playSound, ac, getMasterGain, setMasterVolume, setMutedGetter, suspendAudio, resumeAudio } from './audio.js';
 import { bgmAudio, startMusic, stopMusic, setMusicMutedGetter } from './music.js';
 import { updateStreak, getDailyLocationId, refreshDailyUI, ACHIEVEMENTS, achievementQueue, achievementToast, achievementToastT, setAchievementToast, setAchievementToastT, unlockAchievement, renderAchievements, setLocationsGetter, setRunAchievements } from './features.js';
-import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation } from './globe.js';
+import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation, setCanReplay } from './globe.js';
 import { drawGround, drawPlatform, drawFox, drawChicken, drawBubble, drawPowerup, drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawBuckfastRef, drawParmesanRef, drawLukeKellyRef, drawArtistRef, drawMotorbikeRef, drawPaintBlobs, setDrawState, getLOC_POWERUP_META } from './draw.js';
 import { netRole, netConnected, netStateAccum, setNetStateAccum, netUiRefresh, netHudRefresh, netTeardown, netBroadcastScene, netBroadcastState, netSendInputIfChanged, localJumpPress, localBubblePress, setNetState, setNetEnterLocation, setNetBackToMap, setNetPlaySound, setNetTryJump, setNetTryShoot, setNetKeys, setNetUpdateHud, setNetLivePlayers } from './net.js';
 import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
-import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete } from './progression.js';
+import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete, recordLevelResult } from './progression.js';
 
   var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
   setProgress(progress);
   setGlobeProgress(progress);
+  // A globe location is replayable once it has been completed at least once
+  // (campaign or replay both mark it visited). Mini-games are never in LOCATIONS.
+  setCanReplay(function(id){
+    return getProgression().visitedLocations.indexOf(id) !== -1 && !!LEVELS[id] && !!LEVEL_LAYOUTS[id];
+  });
   // Re-derive unlocked locations from saved progress. globe.js runs
   // refreshClearedPin() at module load with empty progress, so without this
   // pass every location beyond the defaults re-locks on each page load.
@@ -82,12 +87,17 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     btn.addEventListener('click', function(){ selectMode(btn.dataset.players); });
   });
 
-  function enterLocation(loc){
+  function enterLocation(loc, opts){
+    // Additional world-map path: replay an already-completed location on its
+    // own. The fixed campaign is untouched — campaignStep / campaign progression
+    // are never changed here.
+    if(opts && opts.replay){ enterReplay(loc); return; }
     setGlobeRunning(false);
     sceneGlobe.hidden = true;
     sceneGame.hidden = false;
     // One fixed adventure — whichever pin was tapped, the run always starts at
     // the top of CAMPAIGN and plays straight through to the boss.
+    replayMode = false;
     campaignMode = true;
     campaignStep = 0;
     campaignLastType = 'level';
@@ -111,6 +121,37 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     netHudRefresh();
     if(netRole==='host'){ netBroadcastScene('enterLocation', {locationId: first.id}); }
   }
+
+  // Replay a single completed location. Reuses the normal level pipeline
+  // (LEVELS / LEVEL_LAYOUTS / resetGame) — no per-location code, no campaign
+  // branching. Explicitly NOT campaign mode and does not touch campaignStep.
+  function enterReplay(loc){
+    var rloc = LOCATIONS.filter(function(l){ return l.id === loc.id; })[0] || loc;
+    if(!rloc || !LEVELS[rloc.id] || !LEVEL_LAYOUTS[rloc.id]) return;  // action locations only
+    setGlobeRunning(false);
+    sceneGlobe.hidden = true;
+    sceneGame.hidden = false;
+    replayMode = true;
+    campaignMode = false;
+    adventureComplete = false;
+    powerCharges = 0;            // replay does not use banked Trap Blast charges
+    state.currentLocationId = rloc.id;
+    if(netRole){
+      state.numPlayers = 2;
+      document.getElementById('p2Controls').hidden = true;
+    } else {
+      selectMode('1');
+    }
+    var level = LEVELS[rloc.id];
+    document.getElementById('hudLocation').textContent = rloc.name + '  ·  REPLAY';
+    document.getElementById('howtoTitle').textContent = 'Level Replay — ' + rloc.name;
+    document.getElementById('howtoBlurb').textContent = level.blurb;
+    resetGame();
+    document.getElementById('howto').hidden = false;
+    netUiRefresh();
+    netHudRefresh();
+    if(netRole==='host'){ netBroadcastScene('enterLocation', {locationId: rloc.id, replay: true}); }
+  }
   setEnterLocation(enterLocation);
   setNetEnterLocation(enterLocation);
   setNetPlaySound(playSound);
@@ -119,6 +160,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     var wasHost = (netRole==='host');
     adGameplayStop();
     stopGame();
+    replayMode = false;
     sceneGame.hidden = true;
     sceneGlobe.hidden = false;
     setGlobeRunning(true);
@@ -373,6 +415,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   var pandaChargeCount = 0, pandaChargeTimer = 0, pandaCooldown = 0;
   var pandaProjectile = null; // {x,y,vx,vy,t,phase:'flying'|'sneezing',sneezeT}
   var campaignMode = false, campaignLastType = 'minigame';
+  var replayMode = false;      // true only during a world-map level replay (never with campaignMode)
   var campaignStep = 0;        // index into CAMPAIGN for the current run
   var adventureComplete = false;
   var powerCharges = 0;        // banked "Trap Blast" charges from cleared mini-games
@@ -2768,6 +2811,9 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     progress[state.currentLocationId] = pr;
     safeSet('gh_progress_v2', progress);
     markLocationVisited(state.currentLocationId);   // persistent cross-adventure profile
+    // In a world-map replay, state.score is this level's score alone (resetGame
+    // zeroed it). Store it as the per-level record; only replaces when better.
+    if(replayMode) recordLevelResult(state.currentLocationId, state.score);
 
     /* Panda special unlock — beating the China boss */
     if(state.currentLocationId === 'boss' && !pandaSpecialUnlocked){
@@ -2854,6 +2900,17 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       winNextTimer = setTimeout(function(){
         startCampaignTransition();
       }, 2200);
+    } else if(replayMode){
+      /* Replay: no campaign chaining. The player stays on the results screen
+         and returns to the world map (or replays) — campaignStep is untouched. */
+      if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
+      document.getElementById('btnWinNext').hidden = true;
+      document.getElementById('winNextHint').hidden = true;
+      var winAgainBtn = document.getElementById('btnWinAgain');
+      if(winAgainBtn) winAgainBtn.textContent = 'Replay again';
+      var winSum = document.getElementById('winSummary');
+      winSum.textContent = 'LEVEL REPLAY · ' + winSum.textContent;
+      refreshClearedPin();
     } else {
       /* Level flow: show Next Level button and auto-advance after 5s */
       refreshClearedPin(); buildSkinDots(); // unlock any newly reachable locations first
@@ -3543,6 +3600,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     miniGameId: function(){ return miniGameId; },
     campaignStep: function(){ return campaignStep; },
     adventureComplete: function(){ return adventureComplete; },
+    replayMode: function(){ return replayMode; },
     getProgression: function(){ return getProgression(); },
     powerCharges: function(){ return powerCharges; },
     freeEnemyCount: function(){ return state.enemies.filter(function(e){ return e.state === 'free'; }).length; },

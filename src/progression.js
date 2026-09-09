@@ -106,6 +106,20 @@ export function recordAdventureComplete(finalScore){
   persist();
 }
 
+/* Record a standalone level result (a world-map replay). Bumps the
+   completion count and keeps the best score — the stored bestScore is
+   only replaced when the new score is strictly higher. */
+export function recordLevelResult(locationId, score){
+  if(typeof locationId !== 'string' || !locationId) return;
+  var s = (typeof score === 'number' && isFinite(score) && score > 0) ? Math.floor(score) : 0;
+  var d = loadProgression();
+  var rec = d.levelRecords[locationId] || { bestScore: 0, completions: 0 };
+  rec.completions = (rec.completions || 0) + 1;
+  if(s > (rec.bestScore || 0)) rec.bestScore = s;
+  d.levelRecords[locationId] = rec;
+  persist();
+}
+
 /* Wipe the profile back to defaults. Not wired to any UI yet;
    the existing "Reset all progress" button clears localStorage
    wholesale. Exposed for tests and future settings use. */
