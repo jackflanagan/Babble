@@ -1495,6 +1495,9 @@
   function setCanReplay(fn) {
     _canReplay = fn;
   }
+  function setLevelStars(fn) {
+    _levelStars = fn;
+  }
   function launchLocation(loc) {
     if (netRole === "guest" && netConnected) return;
     if (_canReplay(loc.id)) _enterLocation2(loc, { replay: true });
@@ -1774,7 +1777,7 @@
     locInfoEl = document.createElement("div");
     locInfoEl.className = "globe-locinfo";
     locInfoEl.hidden = true;
-    locInfoEl.innerHTML = '<button type="button" class="globe-locinfo-x" aria-label="Close">\u2715</button><div class="globe-locinfo-name"></div><div class="globe-locinfo-state"></div><div class="globe-locinfo-score"></div><button type="button" class="globe-locinfo-go btn btn-primary"></button>';
+    locInfoEl.innerHTML = '<button type="button" class="globe-locinfo-x" aria-label="Close">\u2715</button><div class="globe-locinfo-name"></div><div class="globe-locinfo-stars" hidden></div><div class="globe-locinfo-state"></div><div class="globe-locinfo-score"></div><button type="button" class="globe-locinfo-go btn btn-primary"></button>';
     locInfoEl.querySelector(".globe-locinfo-x").addEventListener("click", function(e) {
       e.stopPropagation();
       hideLocInfo();
@@ -1804,7 +1807,15 @@
     el.querySelector(".globe-locinfo-name").textContent = loc.name;
     var stateEl = el.querySelector(".globe-locinfo-state");
     var scoreEl = el.querySelector(".globe-locinfo-score");
+    var starsEl = el.querySelector(".globe-locinfo-stars");
     var goEl = el.querySelector(".globe-locinfo-go");
+    var nStars = _levelStars(loc.id) || 0;
+    if (st !== "locked" && nStars > 0) {
+      starsEl.textContent = "\u2605\u2605\u2605\u2606\u2606\u2606".slice(3 - nStars, 6 - nStars) + "  " + nStars + "/3";
+      starsEl.hidden = false;
+    } else {
+      starsEl.hidden = true;
+    }
     if (st === "locked") {
       stateEl.textContent = "\u{1F512} Locked \u2014 not reached yet";
       scoreEl.textContent = "Clear the earlier stops to travel here.";
@@ -1876,7 +1887,10 @@
       if (pinEls[loc.id]) pinEls[loc.id].classList.toggle("cleared", visited);
       if (chipEls[loc.id]) {
         chipEls[loc.id].classList.toggle("cleared", visited);
-        if (visited) chipEls[loc.id].title = "Replay " + loc.name;
+        if (visited) {
+          var s = _levelStars(loc.id) || 0;
+          chipEls[loc.id].title = "Replay " + loc.name + (s > 0 ? " \u2014 " + s + "/3 \u2605" : "");
+        }
       }
     });
     renderBestScores();
@@ -1939,7 +1953,7 @@
     }
     requestAnimationFrame(globeLoop);
   }
-  var _progress2, _enterLocation2, _canReplay, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, locInfoEl, locInfoSel, pinEls, chipEls, rosterEl, globeRunning;
+  var _progress2, _enterLocation2, _canReplay, _levelStars, globeCanvas, gctx, globeWrap, LOCATIONS, WORLD_LAND, globeRot, globeZoom, globeTargetZoom, globeTargetRot, cloudRot, GLOBE_BASE_R, globeR, globeCX, globeCY, draggingGlobe, dragLastX, dragVel, CLOUD_SPOTS, JOURNEYS, locInfoEl, locInfoSel, pinEls, chipEls, rosterEl, globeRunning;
   var init_globe = __esm({
     "src/globe.js"() {
       init_utils();
@@ -1949,6 +1963,9 @@
       };
       _canReplay = function() {
         return false;
+      };
+      _levelStars = function() {
+        return 0;
       };
       globeCanvas = document.getElementById("globeCanvas");
       gctx = globeCanvas.getContext("2d");
@@ -4832,6 +4849,9 @@
           name: "Beijing",
           blurb: "A mighty dragon guards the mountains. Three hits to defeat it \u2014 each hit makes it faster and angrier. This is the final test.",
           values: { a: 100, b: 60, c: 250, pop: 500 },
+          // Boss uses a single 3-hit enemy (not 10 spawns), so its performance target
+          // is set explicitly rather than derived: dragon pops + all collectibles.
+          starScore: 2600,
           theme: {
             skyTop: "#c0392b",
             skyMid: "#e74c3c",
@@ -4915,6 +4935,10 @@
   function nonNegInt(v) {
     return typeof v === "number" && isFinite(v) && v > 0 ? Math.floor(v) : 0;
   }
+  function sanitizeStars(s) {
+    s = s && typeof s === "object" ? s : {};
+    return { completion: s.completion === true, collection: s.collection === true, performance: s.performance === true };
+  }
   function sanitize(raw) {
     var out = freshData();
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
@@ -4933,7 +4957,8 @@
         if (!r || typeof r !== "object" || Array.isArray(r)) return;
         out.levelRecords[id] = {
           bestScore: nonNegInt(r.bestScore),
-          completions: nonNegInt(r.completions)
+          completions: nonNegInt(r.completions),
+          stars: sanitizeStars(r.stars)
         };
       });
     }
@@ -4979,11 +5004,29 @@
     if (typeof locationId !== "string" || !locationId) return;
     var s = typeof score === "number" && isFinite(score) && score > 0 ? Math.floor(score) : 0;
     var d = loadProgression();
-    var rec = d.levelRecords[locationId] || { bestScore: 0, completions: 0 };
+    var rec = d.levelRecords[locationId] || { bestScore: 0, completions: 0, stars: sanitizeStars() };
     rec.completions = (rec.completions || 0) + 1;
     if (s > (rec.bestScore || 0)) rec.bestScore = s;
     d.levelRecords[locationId] = rec;
     persist();
+  }
+  function recordLevelStars(locationId, earned) {
+    if (typeof locationId !== "string" || !locationId || !earned) return;
+    var d = loadProgression();
+    var rec = d.levelRecords[locationId] || { bestScore: 0, completions: 0, stars: sanitizeStars() };
+    var st = sanitizeStars(rec.stars);
+    st.completion = st.completion || earned.completion === true;
+    st.collection = st.collection || earned.collection === true;
+    st.performance = st.performance || earned.performance === true;
+    rec.stars = st;
+    d.levelRecords[locationId] = rec;
+    persist();
+  }
+  function levelStarCount(locationId) {
+    var rec = loadProgression().levelRecords[locationId];
+    if (!rec) return 0;
+    var st = sanitizeStars(rec.stars);
+    return (st.completion ? 1 : 0) + (st.collection ? 1 : 0) + (st.performance ? 1 : 0);
   }
   var STORAGE_KEY, SCHEMA_VERSION, _data;
   var init_progression = __esm({
@@ -5014,6 +5057,9 @@
       setGlobeProgress(progress);
       setCanReplay(function(id) {
         return getProgression().visitedLocations.indexOf(id) !== -1 && !!LEVELS[id] && !!LEVEL_LAYOUTS[id];
+      });
+      setLevelStars(function(id) {
+        return levelStarCount(id);
       });
       refreshClearedPin();
       setLocationsGetter(function() {
@@ -5530,6 +5576,7 @@
       var campaignMode = false;
       var campaignLastType = "minigame";
       var replayMode = false;
+      var levelStartScore = 0;
       var campaignStep = 0;
       var adventureComplete = false;
       var powerCharges = 0;
@@ -5750,6 +5797,7 @@
         runAchievements = [];
         confettiParticles = [];
         state.score = keepScore ? state.score : 0;
+        levelStartScore = state.score;
         state.lives = 3;
         state.gameState = "ready";
         state.startTime = performance.now();
@@ -8699,6 +8747,15 @@
         ctx.fill();
         ctx.restore();
       }
+      function levelPerfTarget(id) {
+        var lv = LEVELS[id];
+        if (!lv) return Infinity;
+        if (typeof lv.starScore === "number") return lv.starScore;
+        var v = lv.values || { a: 100, b: 60, c: 250, pop: 150 };
+        var collectAll = 2 * (v.a || 0) + 2 * (v.b || 0) + 2 * (v.c || 0);
+        var baseClear = 10 * (v.pop || 150) + collectAll + 150;
+        return Math.round(baseClear * 1.7 / 100) * 100;
+      }
       function winLevel() {
         if (survivalMode) return;
         if (state.gameState !== "playing") return;
@@ -8715,9 +8772,12 @@
           state.score += timeBonus;
           spawnPopup(W / 2, H / 2 - 40, "TIME BONUS +" + timeBonus, "#ffd700");
         }
-        var stars = 1;
-        if (collected >= 4) stars++;
-        if (totalElapsed < 60) stars++;
+        var levelScore = state.score - levelStartScore;
+        var starCompletion = true;
+        var starCollection = state.collectibles.length > 0 && collected >= state.collectibles.length;
+        var starPerformance = levelScore >= levelPerfTarget(state.currentLocationId);
+        var stars = (starCompletion ? 1 : 0) + (starCollection ? 1 : 0) + (starPerformance ? 1 : 0);
+        recordLevelStars(state.currentLocationId, { completion: starCompletion, collection: starCollection, performance: starPerformance });
         var pr = progress[state.currentLocationId] || { best: 0, cleared: false };
         pr.cleared = true;
         pr.playCount = (pr.playCount || 0) + 1;
@@ -9645,6 +9705,15 @@
         },
         getProgression: function() {
           return getProgression();
+        },
+        levelStars: function(id) {
+          return levelStarCount(id || state.currentLocationId);
+        },
+        perfTarget: function(id) {
+          return levelPerfTarget(id || state.currentLocationId);
+        },
+        addScore: function(n) {
+          state.score += n | 0;
         },
         powerCharges: function() {
           return powerCharges;

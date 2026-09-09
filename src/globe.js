@@ -14,6 +14,9 @@ export function setEnterLocation(fn){ _enterLocation = fn; }
    be replayed from the map)? Default false keeps first-time behaviour intact. */
 var _canReplay = function(){ return false; };
 export function setCanReplay(fn){ _canReplay = fn; }
+/* Getter injected by main.js: how many mastery stars (0–3) a location holds. */
+var _levelStars = function(){ return 0; };
+export function setLevelStars(fn){ _levelStars = fn; }
 
 /* Single launch point for a pin/chip tap. A completed location starts a
    standalone replay; anything else starts the fixed campaign, exactly as before. */
@@ -346,6 +349,7 @@ function ensureLocInfo(){
   locInfoEl.innerHTML =
     '<button type="button" class="globe-locinfo-x" aria-label="Close">✕</button>' +
     '<div class="globe-locinfo-name"></div>' +
+    '<div class="globe-locinfo-stars" hidden></div>' +
     '<div class="globe-locinfo-state"></div>' +
     '<div class="globe-locinfo-score"></div>' +
     '<button type="button" class="globe-locinfo-go btn btn-primary"></button>';
@@ -371,7 +375,15 @@ function showLocInfo(loc){
   el.querySelector('.globe-locinfo-name').textContent = loc.name;
   var stateEl = el.querySelector('.globe-locinfo-state');
   var scoreEl = el.querySelector('.globe-locinfo-score');
+  var starsEl = el.querySelector('.globe-locinfo-stars');
   var goEl    = el.querySelector('.globe-locinfo-go');
+  var nStars = _levelStars(loc.id) || 0;
+  if(st !== 'locked' && nStars > 0){
+    starsEl.textContent = '★★★☆☆☆'.slice(3 - nStars, 6 - nStars) + '  ' + nStars + '/3';
+    starsEl.hidden = false;
+  } else {
+    starsEl.hidden = true;
+  }
   if(st === 'locked'){
     stateEl.textContent = '🔒 Locked — not reached yet';
     scoreEl.textContent = 'Clear the earlier stops to travel here.';
@@ -495,7 +507,10 @@ export function refreshClearedPin(){
     if(pinEls[loc.id]) pinEls[loc.id].classList.toggle('cleared', visited);
     if(chipEls[loc.id]){
       chipEls[loc.id].classList.toggle('cleared', visited);
-      if(visited) chipEls[loc.id].title = 'Replay ' + loc.name;
+      if(visited){
+        var s = _levelStars(loc.id) || 0;
+        chipEls[loc.id].title = 'Replay ' + loc.name + (s > 0 ? ' — ' + s + '/3 ★' : '');
+      }
     }
   });
   renderBestScores();

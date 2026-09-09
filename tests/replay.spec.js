@@ -78,7 +78,7 @@ test('completing a campaign level marks it visited and replayable from the map',
   await page.waitForSelector('#scene-globe', { state: 'visible', timeout: 10000 });
   await page.waitForFunction(() => window.__game && window.__game.getState, null, { timeout: 5000 });
   const title = await page.locator('#roster .chip', { hasText: 'Glasgow' }).getAttribute('title');
-  expect(title).toBe('Replay Glasgow');
+  expect(title).toContain('Replay Glasgow'); // may carry a mastery-star suffix
 });
 
 test('selecting a visited location starts that level directly in replay mode', async ({ page }) => {

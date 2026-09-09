@@ -6,11 +6,11 @@ import { initStarfield } from './starfield.js';
 import { playSound, ac, getMasterGain, setMasterVolume, setMutedGetter, suspendAudio, resumeAudio } from './audio.js';
 import { bgmAudio, startMusic, stopMusic, setMusicMutedGetter } from './music.js';
 import { updateStreak, getDailyLocationId, refreshDailyUI, ACHIEVEMENTS, achievementQueue, achievementToast, achievementToastT, setAchievementToast, setAchievementToastT, unlockAchievement, renderAchievements, setLocationsGetter, setRunAchievements } from './features.js';
-import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation, setCanReplay } from './globe.js';
+import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation, setCanReplay, setLevelStars } from './globe.js';
 import { drawGround, drawPlatform, drawFox, drawChicken, drawBubble, drawPowerup, drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawBuckfastRef, drawParmesanRef, drawLukeKellyRef, drawArtistRef, drawMotorbikeRef, drawPaintBlobs, setDrawState, getLOC_POWERUP_META } from './draw.js';
 import { netRole, netConnected, netStateAccum, setNetStateAccum, netUiRefresh, netHudRefresh, netTeardown, netBroadcastScene, netBroadcastState, netSendInputIfChanged, localJumpPress, localBubblePress, setNetState, setNetEnterLocation, setNetBackToMap, setNetPlaySound, setNetTryJump, setNetTryShoot, setNetKeys, setNetUpdateHud, setNetLivePlayers } from './net.js';
 import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
-import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete, recordLevelResult } from './progression.js';
+import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete, recordLevelResult, recordLevelStars, levelStarCount } from './progression.js';
 
   var progress = safeGet('gh_progress_v2', { glasgow: { best: 0, cleared: false }, modena: { best: 0, cleared: false }, kenya: { best: 0, cleared: false }, paris: { best: 0, cleared: false }, ireland: { best: 0, cleared: false }, athens: { best: 0, cleared: false }, tokyo: { best: 0, cleared: false }, brazil: { best: 0, cleared: false }, newyork: { best: 0, cleared: false }, boss: { best: 0, cleared: false } });
   setProgress(progress);
@@ -20,6 +20,8 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   setCanReplay(function(id){
     return getProgression().visitedLocations.indexOf(id) !== -1 && !!LEVELS[id] && !!LEVEL_LAYOUTS[id];
   });
+  // Mastery star count for a location, for the world-map / info-card UI.
+  setLevelStars(function(id){ return levelStarCount(id); });
   // Re-derive unlocked locations from saved progress. globe.js runs
   // refreshClearedPin() at module load with empty progress, so without this
   // pass every location beyond the defaults re-locks on each page load.
@@ -416,6 +418,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   var pandaProjectile = null; // {x,y,vx,vy,t,phase:'flying'|'sneezing',sneezeT}
   var campaignMode = false, campaignLastType = 'minigame';
   var replayMode = false;      // true only during a world-map level replay (never with campaignMode)
+  var levelStartScore = 0;     // state.score when the current level began — for the per-level performance star
   var campaignStep = 0;        // index into CAMPAIGN for the current run
   var adventureComplete = false;
   var powerCharges = 0;        // banked "Trap Blast" charges from cleared mini-games
@@ -559,6 +562,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     confettiParticles = [];
 
     state.score = keepScore ? state.score : 0;
+    levelStartScore = state.score;   // baseline for this level's performance star
     state.lives = 3;
     state.gameState = 'ready';
     state.startTime = performance.now();
@@ -2788,6 +2792,21 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
 
   // ── End campaign & mini-game system ──────────────────────────────────────
 
+  /* Per-level target for the "performance" mastery star. Derived from the
+     level's own point values (2×a + 2×b + 2×c collectibles + 10 enemies at
+     base pop value + a small time bonus), scaled ~1.7× so reaching it takes
+     some combo play rather than plain solo pops. Tracks per-level balance;
+     LEVELS[id].starScore overrides it (used for the boss). */
+  function levelPerfTarget(id){
+    var lv = LEVELS[id];
+    if(!lv) return Infinity;
+    if(typeof lv.starScore === 'number') return lv.starScore;
+    var v = lv.values || { a:100, b:60, c:250, pop:150 };
+    var collectAll = 2*(v.a||0) + 2*(v.b||0) + 2*(v.c||0);
+    var baseClear  = 10*(v.pop||150) + collectAll + 150;
+    return Math.round(baseClear * 1.7 / 100) * 100;
+  }
+
   function winLevel(){
     if(survivalMode) return;
     if(state.gameState !== 'playing') return;
@@ -2800,9 +2819,18 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     // time bonus (based on total elapsed across both waves)
     var timeBonus = Math.max(0, Math.floor(500 - totalElapsed * 6));
     if(timeBonus > 0){ state.score += timeBonus; spawnPopup(W/2,H/2-40,'TIME BONUS +'+timeBonus,'#ffd700'); }
-    var stars = 1;
-    if(collected >= 4) stars++;
-    if(totalElapsed < 60) stars++;
+    /* Three-star mastery (persisted per action level; stars only ever accrue).
+       - completion: reaching winLevel() means the level is cleared
+       - collection: every collectible in the level was picked up
+       - performance: this level's own score met its target (see levelPerfTarget).
+         levelScore isolates *this* level's earnings, so it works the same in a
+         standalone replay and inside the cumulative-score campaign. */
+    var levelScore = state.score - levelStartScore;
+    var starCompletion  = true;
+    var starCollection  = state.collectibles.length > 0 && collected >= state.collectibles.length;
+    var starPerformance = levelScore >= levelPerfTarget(state.currentLocationId);
+    var stars = (starCompletion?1:0) + (starCollection?1:0) + (starPerformance?1:0);
+    recordLevelStars(state.currentLocationId, { completion:starCompletion, collection:starCollection, performance:starPerformance });
     var pr = progress[state.currentLocationId] || {best:0,cleared:false};
     pr.cleared = true;
     pr.playCount = (pr.playCount||0) + 1;
@@ -3602,6 +3630,9 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     adventureComplete: function(){ return adventureComplete; },
     replayMode: function(){ return replayMode; },
     getProgression: function(){ return getProgression(); },
+    levelStars: function(id){ return levelStarCount(id || state.currentLocationId); },
+    perfTarget: function(id){ return levelPerfTarget(id || state.currentLocationId); },
+    addScore: function(n){ state.score += (n|0); },
     powerCharges: function(){ return powerCharges; },
     freeEnemyCount: function(){ return state.enemies.filter(function(e){ return e.state === 'free'; }).length; },
     usePower: function(){ usePower(); },

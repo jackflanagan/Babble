@@ -44,7 +44,7 @@ test('loading progression: a stored profile is read back and sanitised', async (
   await page.evaluate((k) => localStorage.setItem(k, JSON.stringify({
     version: 1,
     visitedLocations: ['glasgow', 'modena', 'glasgow'], // dupe should collapse
-    levelRecords: { glasgow: { bestScore: 1200, completions: 2 } },
+    levelRecords: { glasgow: { bestScore: 1200, completions: 2, stars: { completion: true, collection: false, performance: true } } },
     bestAdventureScore: 5000,
     totalAdventures: 3,
     strayField: 'ignored',
@@ -55,7 +55,10 @@ test('loading progression: a stored profile is read back and sanitised', async (
 
   const prog = await page.evaluate(() => window.__game.getProgression());
   expect(prog.visitedLocations).toEqual(['glasgow', 'modena']);
-  expect(prog.levelRecords.glasgow).toEqual({ bestScore: 1200, completions: 2 });
+  expect(prog.levelRecords.glasgow).toEqual({
+    bestScore: 1200, completions: 2,
+    stars: { completion: true, collection: false, performance: true },
+  });
   expect(prog.bestAdventureScore).toBe(5000);
   expect(prog.totalAdventures).toBe(3);
   expect(prog).not.toHaveProperty('strayField');

@@ -706,6 +706,9 @@ export var LEVELS = {
     name:'Beijing',
     blurb:'A mighty dragon guards the mountains. Three hits to defeat it — each hit makes it faster and angrier. This is the final test.',
     values:{ a:100, b:60, c:250, pop:500 },
+    // Boss uses a single 3-hit enemy (not 10 spawns), so its performance target
+    // is set explicitly rather than derived: dragon pops + all collectibles.
+    starScore:2600,
     theme:{
       skyTop:'#c0392b', skyMid:'#e74c3c', skyBottom:'#f39c12',
       sunColor:'rgba(255,220,50,0.95)',

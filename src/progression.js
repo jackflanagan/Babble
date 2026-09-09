@@ -33,6 +33,13 @@ function nonNegInt(v){
   return (typeof v === 'number' && isFinite(v) && v > 0) ? Math.floor(v) : 0;
 }
 
+/* Three independent mastery stars per action level. Each only ever flips
+   false -> true (see recordLevelStars), so a record can only improve. */
+function sanitizeStars(s){
+  s = (s && typeof s === 'object') ? s : {};
+  return { completion: s.completion === true, collection: s.collection === true, performance: s.performance === true };
+}
+
 /* Coerce whatever comes back from disk into a known-good shape.
    Corrupt JSON, wrong types, an unknown schema version, or extra
    keys all collapse to defaults instead of throwing. */
@@ -53,7 +60,8 @@ function sanitize(raw){
       if(!r || typeof r !== 'object' || Array.isArray(r)) return;
       out.levelRecords[id] = {
         bestScore:   nonNegInt(r.bestScore),
-        completions: nonNegInt(r.completions)
+        completions: nonNegInt(r.completions),
+        stars:       sanitizeStars(r.stars)
       };
     });
   }
@@ -113,11 +121,35 @@ export function recordLevelResult(locationId, score){
   if(typeof locationId !== 'string' || !locationId) return;
   var s = (typeof score === 'number' && isFinite(score) && score > 0) ? Math.floor(score) : 0;
   var d = loadProgression();
-  var rec = d.levelRecords[locationId] || { bestScore: 0, completions: 0 };
+  var rec = d.levelRecords[locationId] || { bestScore: 0, completions: 0, stars: sanitizeStars() };
   rec.completions = (rec.completions || 0) + 1;
   if(s > (rec.bestScore || 0)) rec.bestScore = s;
   d.levelRecords[locationId] = rec;
   persist();
+}
+
+/* Merge freshly earned mastery stars into a level's record. Stars only ever
+   go false -> true, so a worse replay can never take a star away, and a
+   better replay can add the ones that were still missing. */
+export function recordLevelStars(locationId, earned){
+  if(typeof locationId !== 'string' || !locationId || !earned) return;
+  var d = loadProgression();
+  var rec = d.levelRecords[locationId] || { bestScore: 0, completions: 0, stars: sanitizeStars() };
+  var st = sanitizeStars(rec.stars);
+  st.completion  = st.completion  || earned.completion  === true;
+  st.collection  = st.collection  || earned.collection  === true;
+  st.performance = st.performance || earned.performance === true;
+  rec.stars = st;
+  d.levelRecords[locationId] = rec;
+  persist();
+}
+
+/* 0–3: how many mastery stars a level currently holds. */
+export function levelStarCount(locationId){
+  var rec = loadProgression().levelRecords[locationId];
+  if(!rec) return 0;
+  var st = sanitizeStars(rec.stars);
+  return (st.completion ? 1 : 0) + (st.collection ? 1 : 0) + (st.performance ? 1 : 0);
 }
 
 /* Wipe the profile back to defaults. Not wired to any UI yet;
