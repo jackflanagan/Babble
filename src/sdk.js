@@ -1,18 +1,22 @@
 /* ---------- CrazyGames SDK wrapper ----------
-   All calls are no-ops when running outside CrazyGames (dev, self-host, Poki, etc.)
-   Replace the SDK script tag + CGSDK init to target a different platform.      */
+   All calls are no-ops until initCG() has run and found a live CrazyGames.SDK
+   global. The SDK script tag is now injected at runtime by ads.js (only on
+   crazygames.com), so init can no longer happen synchronously at module load
+   — src/ads.js calls initCG() once the dynamically-loaded script fires. */
 
 import { escHtml } from './utils.js';
 
 var CGSDK = null;
-(function(){
+export function initCG(){
   try{
     if(typeof CrazyGames !== 'undefined' && CrazyGames.SDK){
       CGSDK = CrazyGames.SDK;
       CGSDK.init();
+      return true;
     }
   }catch(e){}
-})();
+  return false;
+}
 
 export function adGameplayStart(){ try{ if(CGSDK) CGSDK.game.gameplayStart(); }catch(e){} }
 export function adGameplayStop(){  try{ if(CGSDK) CGSDK.game.gameplayStop();  }catch(e){} }
@@ -27,6 +31,21 @@ export function showAdBreak(cb){
     });
   }catch(e){ if(cb) cb(); }
 }
+/* Rewarded video — adFinished means the player watched to completion and
+   should get the reward; adError (unfilled, cooldown, etc.) means no reward. */
+export function showRewardedAd(cb){
+  if(!CGSDK){ if(cb) cb(false); return; }
+  try{
+    CGSDK.ad.requestAd('rewarded', {
+      adStarted:  function(){},
+      adFinished: function(){ if(cb) cb(true); },
+      adError:    function(){ if(cb) cb(false); }
+    });
+  }catch(e){ if(cb) cb(false); }
+}
+/* Use sparingly — CrazyGames' own docs say this is for genuinely special
+   moments (beating a boss, a high score), not routine level clears. */
+export function happyMoment(){ try{ if(CGSDK) CGSDK.game.happytime(); }catch(e){} }
 
 /* ---------- Leaderboard config (fill in after Supabase setup) ---------- */
 var LB_URL  = '';   // e.g. 'https://xyzxyz.supabase.co'

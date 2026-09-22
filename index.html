@@ -1,7 +1,7 @@
 <title>Babble</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<!-- CrazyGames SDK — remove this script tag when self-hosting outside CrazyGames -->
-<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+<!-- Portal SDK (CrazyGames or Poki) is loaded at runtime by src/ads.js, based on
+     hostname — nothing to add/remove here for self-hosting or a new portal. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -835,6 +835,8 @@ footer{
             <button class="btn btn-ghost" id="btnWinMap">World map</button>
             <button class="btn btn-ghost" id="btnEndless" hidden>🔁 Endless Mode</button>
             <button class="btn btn-ghost" id="btnShareScore">📤 Share Score</button>
+            <button class="btn btn-ghost" id="btnWatchAdContinue" hidden>▶ Watch ad — continue the run</button>
+            <button class="btn btn-ghost" id="btnWatchAdBoost" hidden>▶ Watch ad — boost score</button>
           </div>
           <p id="winNextHint" style="font-size:12px;color:var(--dim-text);margin:4px 0;" hidden></p>
           <p id="winScoreSubmit" style="font-size:12px;color:var(--gold);margin:4px 0;" hidden></p>
@@ -863,6 +865,7 @@ footer{
           <div class="btn-row" id="loseBtnRow">
             <button class="btn btn-primary" id="btnRetry">Retry</button>
             <button class="btn btn-ghost" id="btnLoseMap">World map</button>
+            <button class="btn btn-ghost" id="btnWatchAdRevive" hidden>▶ Watch ad — extra life</button>
           </div>
           <p class="net-hint" id="loseWaitHint" hidden>Waiting for the host to choose what&rsquo;s next&hellip;</p>
         </div>
@@ -881,7 +884,7 @@ footer{
     </div>
   </section>
 
-  <footer>More of the world is on its way &mdash; each landing site gets its own creatures and collectibles.</footer>
+  <footer>More of the world is on its way &mdash; each landing site gets its own creatures and collectibles.<br><a href="privacy.html" style="color:inherit; text-decoration:underline;">Privacy</a></footer>
 </div>
 
 <!-- Portrait warning (mobile only) -->

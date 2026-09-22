@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Babble — Privacy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="src/style.css">
+<style>
+  .privacy-wrap{ max-width:640px; margin:0 auto; padding:32px 20px 60px; }
+  .privacy-wrap h1{ font-size:28px; margin-bottom:4px; }
+  .privacy-wrap .updated{ color:var(--dim-text); font-size:13px; margin-bottom:24px; }
+  .privacy-card{ background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px 26px; margin-bottom:16px; }
+  .privacy-card h2{ font-size:17px; margin:0 0 8px; }
+  .privacy-card p, .privacy-card li{ color:var(--dim-text); font-size:14px; line-height:1.6; }
+  .privacy-card ul{ margin:6px 0; padding-left:20px; }
+  .privacy-card a{ color:var(--sky); }
+  .back-link{ display:inline-block; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="privacy-wrap">
+  <h1>Privacy</h1>
+  <p class="updated">Last updated: 2026-09-22</p>
+
+  <div class="privacy-card">
+    <h2>What Babble itself stores</h2>
+    <p>Babble is a client-side game — everything below lives only in your browser's <code>localStorage</code>, on your own device. There is no account, no sign-in, and no Babble-run server or analytics.</p>
+    <ul>
+      <li>Your progress, best scores and mastery stars for each location</li>
+      <li>A display name, only if you've typed one in to appear on a leaderboard</li>
+      <li>Unlocked skins/cosmetics</li>
+      <li>Preferences: volume, whether you've seen the tutorial, daily-challenge and streak status, achievements</li>
+    </ul>
+    <p>None of this is sent anywhere by Babble itself. Clearing your browser data, or using the in-game Reset button, removes all of it.</p>
+  </div>
+
+  <div class="privacy-card">
+    <h2>The platform you're playing on</h2>
+    <p>If you're playing Babble on <a href="https://www.crazygames.com/privacy-policy" target="_blank" rel="noopener">CrazyGames</a> or <a href="https://poki.com/en/privacy-policy" target="_blank" rel="noopener">Poki</a>, that platform's own SDK may show ads and collect data about your visit, per its own privacy policy (linked above). Babble doesn't control what those platforms collect — please check their policies directly for specifics.</p>
+  </div>
+
+  <div class="privacy-card">
+    <h2>Optional online features</h2>
+    <p><strong>Leaderboard:</strong> if a leaderboard is configured, submitting a score sends your typed display name and score to a database Babble uses for that purpose. No other personal data is collected by it.</p>
+    <p><strong>"Two phones" multiplayer:</strong> this connects two browsers directly to each other (peer-to-peer, no game server in between) using WebRTC. Setting up that direct connection relies on a public signaling/tracker service, which — as an inherent part of how WebRTC connections are established — can see the IP addresses of the two browsers while they're pairing. This isn't something Babble adds or controls; it's how the underlying technology works.</p>
+  </div>
+
+  <a class="btn btn-ghost back-link" href="index.html">← Back to Babble</a>
+</div>
+</body>
+</html>

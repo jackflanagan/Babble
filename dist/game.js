@@ -72,6 +72,17 @@
   });
 
   // src/sdk.js
+  function initCG() {
+    try {
+      if (typeof CrazyGames !== "undefined" && CrazyGames.SDK) {
+        CGSDK = CrazyGames.SDK;
+        CGSDK.init();
+        return true;
+      }
+    } catch (e) {
+    }
+    return false;
+  }
   function adGameplayStart() {
     try {
       if (CGSDK) CGSDK.game.gameplayStart();
@@ -105,6 +116,32 @@
       });
     } catch (e) {
       if (cb) cb();
+    }
+  }
+  function showRewardedAd(cb) {
+    if (!CGSDK) {
+      if (cb) cb(false);
+      return;
+    }
+    try {
+      CGSDK.ad.requestAd("rewarded", {
+        adStarted: function() {
+        },
+        adFinished: function() {
+          if (cb) cb(true);
+        },
+        adError: function() {
+          if (cb) cb(false);
+        }
+      });
+    } catch (e) {
+      if (cb) cb(false);
+    }
+  }
+  function happyMoment() {
+    try {
+      if (CGSDK) CGSDK.game.happytime();
+    } catch (e) {
     }
   }
   function lbEnabled() {
@@ -230,21 +267,182 @@
     "src/sdk.js"() {
       init_utils();
       CGSDK = null;
-      (function() {
-        try {
-          if (typeof CrazyGames !== "undefined" && CrazyGames.SDK) {
-            CGSDK = CrazyGames.SDK;
-            CGSDK.init();
-          }
-        } catch (e) {
-        }
-      })();
       LB_URL = "";
       LB_KEY = "";
       LB_TABLE = "scores";
       lbCurrentLocation = null;
       _progress = null;
       LB_NAMES_KEY = "bbl_lb_names_v1";
+    }
+  });
+
+  // src/sdk-poki.js
+  function initPoki() {
+    return new Promise(function(resolve) {
+      try {
+        if (typeof PokiSDK === "undefined") {
+          resolve(false);
+          return;
+        }
+        PKSDK = PokiSDK;
+        PKSDK.init().then(function() {
+          try {
+            PKSDK.gameLoadingFinished();
+          } catch (e) {
+          }
+          resolve(true);
+        }).catch(function() {
+          resolve(false);
+        });
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  }
+  function pkGameplayStart() {
+    try {
+      if (PKSDK) PKSDK.gameplayStart();
+    } catch (e) {
+    }
+  }
+  function pkGameplayStop() {
+    try {
+      if (PKSDK) PKSDK.gameplayStop();
+    } catch (e) {
+    }
+  }
+  function pkShowMidroll(cb) {
+    pkGameplayStop();
+    if (!PKSDK) {
+      if (cb) cb();
+      return;
+    }
+    try {
+      PKSDK.commercialBreak().then(function() {
+        pkGameplayStart();
+        if (cb) cb();
+      });
+    } catch (e) {
+      if (cb) cb();
+    }
+  }
+  function pkShowRewarded(cb, pauseCb) {
+    if (!PKSDK) {
+      if (cb) cb(false);
+      return;
+    }
+    try {
+      PKSDK.rewardedBreak(function() {
+        if (pauseCb) pauseCb();
+      }).then(function(withReward) {
+        if (withReward) pkGameplayStart();
+        if (cb) cb(!!withReward);
+      });
+    } catch (e) {
+      if (cb) cb(false);
+    }
+  }
+  var PKSDK;
+  var init_sdk_poki = __esm({
+    "src/sdk-poki.js"() {
+      PKSDK = null;
+    }
+  });
+
+  // src/ads.js
+  function detectPortal() {
+    try {
+      var qp = new URLSearchParams(location.search).get("portal");
+      if (qp === "crazygames" || qp === "poki") return qp;
+    } catch (e) {
+    }
+    var h = (location.hostname || "").toLowerCase();
+    if (h.indexOf("crazygames.com") >= 0) return "crazygames";
+    if (h.indexOf("poki.com") >= 0) return "poki";
+    return null;
+  }
+  function loadPortalScript() {
+    return new Promise(function(resolve) {
+      var url = SCRIPT_URLS[PORTAL];
+      if (!url) {
+        resolve(false);
+        return;
+      }
+      var s = document.createElement("script");
+      s.src = url;
+      s.onload = function() {
+        resolve(true);
+      };
+      s.onerror = function() {
+        resolve(false);
+      };
+      document.head.appendChild(s);
+    });
+  }
+  var PORTAL, SCRIPT_URLS, _sdkOk, ready, Ads;
+  var init_ads = __esm({
+    "src/ads.js"() {
+      init_sdk();
+      init_sdk_poki();
+      PORTAL = detectPortal();
+      SCRIPT_URLS = {
+        crazygames: "https://sdk.crazygames.com/crazygames-sdk-v3.js",
+        poki: "https://game-cdn.poki.com/scripts/v2/poki-sdk.js"
+      };
+      _sdkOk = false;
+      ready = (function() {
+        if (PORTAL === "crazygames") {
+          return loadPortalScript().then(function(ok) {
+            _sdkOk = ok && initCG();
+          });
+        }
+        if (PORTAL === "poki") {
+          return loadPortalScript().then(function(ok) {
+            if (!ok) return;
+            return initPoki().then(function(success) {
+              _sdkOk = success;
+            });
+          });
+        }
+        return Promise.resolve();
+      })();
+      Ads = {
+        notifyLevelStart: function() {
+          if (PORTAL === "crazygames") adGameplayStart();
+          else if (PORTAL === "poki") pkGameplayStart();
+        },
+        notifyLevelEnd: function() {
+          if (PORTAL === "crazygames") adGameplayStop();
+          else if (PORTAL === "poki") pkGameplayStop();
+        },
+        /* Midroll ad on a natural break (level result, retry, back to map). Always
+           calls cb once settled, whether or not an ad actually played. */
+        showMidroll: function(cb) {
+          if (PORTAL === "crazygames") showAdBreak(cb);
+          else if (PORTAL === "poki") pkShowMidroll(cb);
+          else {
+            if (cb) cb();
+          }
+        },
+        /* Rewarded video. cb(gotReward). pauseCb (Poki only) fires right before
+           the ad starts, for callers that want to stop music/etc. */
+        showRewarded: function(cb, pauseCb) {
+          if (PORTAL === "crazygames") showRewardedAd(cb);
+          else if (PORTAL === "poki") pkShowRewarded(cb, pauseCb);
+          else if (cb) cb(false);
+        },
+        /* Best-effort only — true means "a portal SDK is live", not "an ad is
+           guaranteed to fill". Use to decide whether to show a rewarded-ad button
+           at all; still handle cb(false) from showRewarded for the unfilled case. */
+        rewardedAvailable: function() {
+          return _sdkOk;
+        },
+        /* CrazyGames-only "happy moment" signal — no Poki equivalent exists.
+           Use sparingly, for genuinely special moments only. */
+        happyMoment: function() {
+          if (PORTAL === "crazygames") happyMoment();
+        }
+      };
     }
   });
 
@@ -1258,6 +1456,18 @@
   function setNetLivePlayers(fn) {
     _livePlayers = fn;
   }
+  function setNetFallbackToSingle(fn) {
+    _fallbackToSingle = fn;
+  }
+  function netWebRTCSupported() {
+    return typeof RTCPeerConnection !== "undefined";
+  }
+  function netClearConnectTimer() {
+    if (netConnectTimer) {
+      clearTimeout(netConnectTimer);
+      netConnectTimer = null;
+    }
+  }
   function setNetStateAccum(v) {
     netStateAccum = v;
   }
@@ -1340,6 +1550,7 @@
     };
     netActions = actions;
     netRoom.onPeerJoin = function(peerId) {
+      netClearConnectTimer();
       netPeerId = peerId;
       netConnected = true;
       netUiRefresh();
@@ -1377,7 +1588,28 @@
       };
     }
   }
+  function netStartConnectTimer() {
+    netClearConnectTimer();
+    netConnectTimer = setTimeout(function() {
+      netConnectTimer = null;
+      if (netConnected) return;
+      netFallbackToSingleplayer("Couldn't connect \u2014 falling back to single player.");
+    }, NET_CONNECT_TIMEOUT_MS);
+  }
+  function netFallbackToSingleplayer(message) {
+    netClearConnectTimer();
+    netTeardown();
+    try {
+      _fallbackToSingle();
+    } catch (e) {
+    }
+    netSetStatus(message || "Online play isn't available here \u2014 switched to single player.", "warn");
+  }
   async function netHostStart() {
+    if (!netWebRTCSupported()) {
+      netSetStatus("Online play isn't available in this browser/embed.", "warn");
+      return;
+    }
     netRole = "host";
     netRoomCode = netRandCode();
     netConnected = false;
@@ -1386,12 +1618,17 @@
       var joinRoom = await netLoadJoinRoom();
       netRoom = joinRoom({ appId: NET_APP_ID }, "gh-" + netRoomCode);
       netSetupRoomHandlers();
+      netStartConnectTimer();
     } catch (err) {
-      netSetStatus("Couldn\u2019t start online play here \u2014 this only works once the game is hosted on the open web, not from this in-chat preview.", "warn");
+      netFallbackToSingleplayer("Couldn\u2019t start online play here \u2014 this only works once the game is hosted on the open web, not from this in-chat preview.");
       console.error("netHostStart failed", err);
     }
   }
   async function netJoinStart(code) {
+    if (!netWebRTCSupported()) {
+      netSetStatus("Online play isn't available in this browser/embed.", "warn");
+      return;
+    }
     netRole = "guest";
     netRoomCode = code;
     netConnected = false;
@@ -1400,12 +1637,14 @@
       var joinRoom = await netLoadJoinRoom();
       netRoom = joinRoom({ appId: NET_APP_ID }, "gh-" + code);
       netSetupRoomHandlers();
+      netStartConnectTimer();
     } catch (err) {
-      netSetStatus("Couldn\u2019t connect here \u2014 this only works once the game is hosted on the open web, not from this in-chat preview.", "warn");
+      netFallbackToSingleplayer("Couldn\u2019t connect here \u2014 this only works once the game is hosted on the open web, not from this in-chat preview.");
       console.error("netJoinStart failed", err);
     }
   }
   function netTeardown() {
+    netClearConnectTimer();
     if (netRoom) {
       try {
         netRoom.leave();
@@ -1551,7 +1790,7 @@
     var p = _livePlayers()[0];
     if (p) _tryShoot(p);
   }
-  var _state, _enterLocation, _backToMap, _playSound, _tryJump, _tryShoot, _keys, _updateHud, _livePlayers, NET_APP_ID, NET_IMPORT_URL, netJoinRoomFn, netRole, netRoomCode, netRoom, netActions, netConnected, netPeerId, netLastSentInput, netStateAccum;
+  var _state, _enterLocation, _backToMap, _playSound, _tryJump, _tryShoot, _keys, _updateHud, _livePlayers, _fallbackToSingle, NET_CONNECT_TIMEOUT_MS, netConnectTimer, NET_APP_ID, NET_IMPORT_URL, netJoinRoomFn, netRole, netRoomCode, netRoom, netActions, netConnected, netPeerId, netLastSentInput, netStateAccum;
   var init_net = __esm({
     "src/net.js"() {
       init_utils();
@@ -1570,6 +1809,10 @@
       _livePlayers = function() {
         return [];
       };
+      _fallbackToSingle = function() {
+      };
+      NET_CONNECT_TIMEOUT_MS = 25e3;
+      netConnectTimer = null;
       NET_APP_ID = "globehopper-jack-gift-v1";
       NET_IMPORT_URL = "https://esm.run/trystero";
       netJoinRoomFn = null;
@@ -5409,6 +5652,7 @@
       init_utils();
       init_canvas();
       init_sdk();
+      init_ads();
       init_starfield();
       init_audio();
       init_music();
@@ -5472,6 +5716,14 @@
           b.classList.toggle("active", b.dataset.players === modeStr);
         });
         if (modeStr === "net") {
+          if (!netWebRTCSupported()) {
+            document.querySelectorAll(".mode-btn").forEach(function(b) {
+              b.classList.toggle("active", b.dataset.players === "1");
+            });
+            selectMode("1");
+            netSetStatus("Online play isn't available in this browser/embed.", "warn");
+            return;
+          }
           state.numPlayers = 2;
           document.getElementById("localControls").hidden = true;
           document.getElementById("localControlsHint").hidden = true;
@@ -5492,6 +5744,9 @@
         btn.addEventListener("click", function() {
           selectMode(btn.dataset.players);
         });
+      });
+      setNetFallbackToSingle(function() {
+        selectMode("1");
       });
       function enterLocation(loc, opts) {
         if (opts && opts.replay) {
@@ -5569,7 +5824,7 @@
           winNextTimer = null;
         }
         var wasHost = netRole === "host";
-        adGameplayStop();
+        Ads.notifyLevelEnd();
         stopGame();
         replayMode = false;
         sceneGame.hidden = true;
@@ -6210,7 +6465,7 @@
         state.gameState = "playing";
         state.startTime = performance.now();
         startMusic();
-        adGameplayStart();
+        Ads.notifyLevelStart();
         netBroadcastScene("start");
       });
       document.getElementById("btnRetry").addEventListener("click", function() {
@@ -6218,6 +6473,7 @@
         resetGame();
         state.gameState = "playing";
         startMusic();
+        Ads.notifyLevelStart();
         netBroadcastScene("retry");
       });
       document.getElementById("btnWinNext").addEventListener("click", function() {
@@ -6244,12 +6500,79 @@
           resetGame();
           state.gameState = "playing";
           startMusic();
+          Ads.notifyLevelStart();
           return;
         }
         resetGame();
         state.gameState = "playing";
         startMusic();
+        Ads.notifyLevelStart();
         netBroadcastScene("winAgain");
+      });
+      function updateRewardedButtons(opts) {
+        opts = opts || {};
+        var avail = Ads.rewardedAvailable();
+        var revive = document.getElementById("btnWatchAdRevive");
+        var cont = document.getElementById("btnWatchAdContinue");
+        var boost = document.getElementById("btnWatchAdBoost");
+        if (revive) revive.hidden = !(avail && opts.revive);
+        if (cont) cont.hidden = !(avail && opts.cont);
+        if (boost) boost.hidden = !(avail && opts.boost);
+      }
+      function watchAdThen(btn, onReward) {
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        Ads.showRewarded(function(gotReward) {
+          btn.disabled = false;
+          if (gotReward) onReward();
+        }, function() {
+          stopMusic();
+        });
+      }
+      var btnWatchAdRevive = document.getElementById("btnWatchAdRevive");
+      if (btnWatchAdRevive) btnWatchAdRevive.addEventListener("click", function() {
+        watchAdThen(btnWatchAdRevive, function() {
+          document.getElementById("overlayLose").hidden = true;
+          resetGame(true);
+          state.gameState = "playing";
+          state.startTime = performance.now();
+          startMusic();
+          Ads.notifyLevelStart();
+        });
+      });
+      var btnWatchAdContinue = document.getElementById("btnWatchAdContinue");
+      if (btnWatchAdContinue) btnWatchAdContinue.addEventListener("click", function() {
+        watchAdThen(btnWatchAdContinue, function() {
+          document.getElementById("overlayWin").hidden = true;
+          campaignMode = true;
+          adventureComplete = false;
+          resetGame(true);
+          state.gameState = "playing";
+          state.startTime = performance.now();
+          startMusic();
+          Ads.notifyLevelStart();
+        });
+      });
+      var btnWatchAdBoost = document.getElementById("btnWatchAdBoost");
+      if (btnWatchAdBoost) btnWatchAdBoost.addEventListener("click", function() {
+        watchAdThen(btnWatchAdBoost, function() {
+          var id = _lastWinLevelId;
+          if (!id) return;
+          var target = levelPerfTarget(id);
+          var boostAmt = Math.max(0, target - _lastWinLevelScore);
+          if (boostAmt > 0) {
+            state.score += boostAmt;
+            _lastWinLevelScore += boostAmt;
+            recordLevelResult(id, _lastWinLevelScore);
+          }
+          recordLevelStars(id, { performance: true });
+          var starsNow = levelStarCount(id);
+          document.getElementById("winStars").textContent = "\u2605".repeat(starsNow) + "\u2606".repeat(3 - starsNow);
+          document.getElementById("winSummary").textContent = "Score " + state.score + " \xB7 boosted to the performance target!";
+          document.getElementById("hudBest").textContent = levelBestScore(id);
+          btnWatchAdBoost.hidden = true;
+          pushKillFeed("\u{1F3AC} Ad reward: score boosted!", "#ffd700");
+        });
       });
       document.getElementById("btnSurvival").addEventListener("click", function() {
         survivalMode = true;
@@ -7677,6 +8000,7 @@
                 state.gameState = "playing";
                 state.startTime = performance.now();
                 startMusic();
+                Ads.notifyLevelStart();
               }, 1200);
               return;
             }
@@ -7684,13 +8008,16 @@
             return;
           }
           var loseSummaryText = survivalMode ? "Reached wave " + survivalWave + " \xB7 Score: " + state.score : "Score " + state.score + " \xB7 try trapping enemies before they reach you.";
-          showAdBreak(function() {
+          Ads.showMidroll(function() {
             document.getElementById("loseSummary").textContent = loseSummaryText;
+            updateRewardedButtons({ revive: true });
             document.getElementById("overlayLose").hidden = false;
           });
         }
       }
       var winNextTimer = null;
+      var _lastWinLevelId = null;
+      var _lastWinLevelScore = 0;
       function getNextLocation() {
         var idx = -1;
         for (var i = 0; i < LOCATIONS.length; i++) {
@@ -7717,6 +8044,7 @@
         document.getElementById("howto").hidden = true;
         state.gameState = "playing";
         startMusic();
+        Ads.notifyLevelStart();
       }
       function getNextCampaignItem() {
         campaignStep++;
@@ -7765,7 +8093,9 @@
           nameEntryRow.hidden = true;
         }
         spawnCelebrationRain("#ffd700", "#7fe3ff");
-        showAdBreak(function() {
+        if (won) Ads.happyMoment();
+        Ads.showMidroll(function() {
+          updateRewardedButtons({ cont: !won });
           document.getElementById("overlayWin").hidden = false;
         });
       }
@@ -7805,6 +8135,7 @@
             state.gameState = "playing";
             state.startTime = performance.now();
             startMusic();
+            Ads.notifyLevelStart();
           } else {
             campaignLastType = "minigame";
             startMiniGame(item.id);
@@ -8195,6 +8526,7 @@
         state.gameState = "minigame";
         stopMusic();
         startMiniGameMusic(id);
+        Ads.notifyLevelStart();
         document.querySelector(".hud").style.visibility = "hidden";
         if (id === "mediterranean") {
           miniGameData = { boatX: 80, oarSide: "left", oarAnimL: 0, oarAnimR: 0, needed: 34, clicks: 0, wavePhase: 0 };
@@ -9492,10 +9824,17 @@
             t: 0
           });
         }
-        showAdBreak(function() {
+        if (stars === 3) Ads.happyMoment();
+        Ads.showMidroll(function() {
           if (campaignMode) return;
-          if (replayMode) document.getElementById("overlayReplayResult").hidden = false;
-          else document.getElementById("overlayWin").hidden = false;
+          if (replayMode) {
+            document.getElementById("overlayReplayResult").hidden = false;
+            return;
+          }
+          _lastWinLevelId = state.currentLocationId;
+          _lastWinLevelScore = levelScore;
+          updateRewardedButtons({ boost: stars < 3 });
+          document.getElementById("overlayWin").hidden = false;
         });
         if (campaignMode) {
           document.getElementById("btnWinNext").hidden = true;

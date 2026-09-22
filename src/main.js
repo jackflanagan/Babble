@@ -1,14 +1,15 @@
 
 import { TAU, clamp, lerp, rand, safeGet, safeSet, escHtml, haptic } from './utils.js';
 import { ctx, W, H, initCanvas } from './canvas.js';
-import { adGameplayStart, adGameplayStop, showAdBreak, lbEnabled, submitScore, fetchLeaderboard, openLeaderboard, setProgress, getLbName, setLbName } from './sdk.js';
+import { lbEnabled, submitScore, fetchLeaderboard, openLeaderboard, setProgress, getLbName, setLbName } from './sdk.js';
+import { Ads } from './ads.js';
 import { initStarfield } from './starfield.js';
 import { playSound, ac, getMasterGain, setMasterVolume, setMutedGetter, suspendAudio, resumeAudio, announce } from './audio.js';
 import { bgmAudio, startMusic, stopMusic, setMusicMutedGetter } from './music.js';
 import { updateStreak, getDailyLocationId, refreshDailyUI, ACHIEVEMENTS, achievementQueue, achievementToast, achievementToastT, setAchievementToast, setAchievementToastT, unlockAchievement, renderAchievements, setLocationsGetter, setRunAchievements } from './features.js';
 import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation, setCanReplay, setLevelStars, setLbName as setGlobeLbNameGetter } from './globe.js';
 import { drawGround, drawPlatform, drawFox, drawChicken, drawBubble, drawPowerup, drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawBuckfastRef, drawParmesanRef, drawLukeKellyRef, drawArtistRef, drawMotorbikeRef, drawPaintBlobs, setDrawState, getLOC_POWERUP_META } from './draw.js';
-import { netRole, netConnected, netStateAccum, setNetStateAccum, netUiRefresh, netHudRefresh, netTeardown, netBroadcastScene, netBroadcastState, netSendInputIfChanged, localJumpPress, localBubblePress, setNetState, setNetEnterLocation, setNetBackToMap, setNetPlaySound, setNetTryJump, setNetTryShoot, setNetKeys, setNetUpdateHud, setNetLivePlayers } from './net.js';
+import { netRole, netConnected, netStateAccum, setNetStateAccum, netUiRefresh, netHudRefresh, netTeardown, netBroadcastScene, netBroadcastState, netSendInputIfChanged, localJumpPress, localBubblePress, setNetState, setNetEnterLocation, setNetBackToMap, setNetPlaySound, setNetTryJump, setNetTryShoot, setNetKeys, setNetUpdateHud, setNetLivePlayers, setNetFallbackToSingle, netWebRTCSupported, netSetStatus } from './net.js';
 import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete, recordLevelResult, recordLevelStars, levelStarCount, levelBestScore, levelCompletions, isLevelCleared } from './progression.js';
 
@@ -72,6 +73,16 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       b.classList.toggle('active', b.dataset.players===modeStr);
     });
     if(modeStr==='net'){
+      if(!netWebRTCSupported()){
+        // Sandboxed/restricted embeds can strip WebRTC entirely — don't even
+        // show the host/join panel, just fall straight back to 1-player.
+        document.querySelectorAll('.mode-btn').forEach(function(b){
+          b.classList.toggle('active', b.dataset.players==='1');
+        });
+        selectMode('1');
+        netSetStatus("Online play isn't available in this browser/embed.", 'warn');
+        return;
+      }
       state.numPlayers = 2;
       document.getElementById('localControls').hidden = true;
       document.getElementById('localControlsHint').hidden = true;
@@ -91,6 +102,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   document.querySelectorAll('.mode-btn').forEach(function(btn){
     btn.addEventListener('click', function(){ selectMode(btn.dataset.players); });
   });
+  setNetFallbackToSingle(function(){ selectMode('1'); });
 
   function enterLocation(loc, opts){
     // Additional world-map path: replay an already-completed location on its
@@ -163,7 +175,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   function backToMap(){
     if(winNextTimer){ clearTimeout(winNextTimer); winNextTimer = null; }
     var wasHost = (netRole==='host');
-    adGameplayStop();
+    Ads.notifyLevelEnd();
     stopGame();
     replayMode = false;
     sceneGame.hidden = true;
@@ -612,7 +624,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     state.gameState = 'playing';
     state.startTime = performance.now();
     startMusic();
-    adGameplayStart();
+    Ads.notifyLevelStart();
     netBroadcastScene('start');
   });
   document.getElementById('btnRetry').addEventListener('click', function(){
@@ -621,6 +633,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     resetGame();
     state.gameState = 'playing';
     startMusic();
+    Ads.notifyLevelStart();
     netBroadcastScene('retry');
   });
   document.getElementById('btnWinNext').addEventListener('click', function(){
@@ -645,13 +658,88 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       resetGame();                 // fresh cumulative score
       state.gameState = 'playing';
       startMusic();
+      Ads.notifyLevelStart();
       return;
     }
     resetGame();
     state.gameState = 'playing';
     startMusic();
+    Ads.notifyLevelStart();
     netBroadcastScene('winAgain');
   });
+
+  /* Rewarded-ad buttons — hidden by default, shown per-context by
+     updateRewardedButtons() right before the lose/win overlay reveals.
+     Purely optional/beneficial: cb(false) (unfilled/error) just leaves the
+     overlay as-is, no penalty, no partial reward. */
+  function updateRewardedButtons(opts){
+    opts = opts || {};
+    var avail = Ads.rewardedAvailable();
+    var revive = document.getElementById('btnWatchAdRevive');
+    var cont = document.getElementById('btnWatchAdContinue');
+    var boost = document.getElementById('btnWatchAdBoost');
+    if(revive) revive.hidden = !(avail && opts.revive);
+    if(cont) cont.hidden = !(avail && opts.cont);
+    if(boost) boost.hidden = !(avail && opts.boost);
+  }
+
+  function watchAdThen(btn, onReward){
+    if(!btn || btn.disabled) return;
+    btn.disabled = true;
+    Ads.showRewarded(function(gotReward){
+      btn.disabled = false;
+      if(gotReward) onReward();
+    }, function(){ stopMusic(); });
+  }
+
+  var btnWatchAdRevive = document.getElementById('btnWatchAdRevive');
+  if(btnWatchAdRevive) btnWatchAdRevive.addEventListener('click', function(){
+    watchAdThen(btnWatchAdRevive, function(){
+      document.getElementById('overlayLose').hidden = true;
+      resetGame(true);            // keep cumulative score; lives back to 3
+      state.gameState = 'playing';
+      state.startTime = performance.now();
+      startMusic();
+      Ads.notifyLevelStart();
+    });
+  });
+
+  var btnWatchAdContinue = document.getElementById('btnWatchAdContinue');
+  if(btnWatchAdContinue) btnWatchAdContinue.addEventListener('click', function(){
+    watchAdThen(btnWatchAdContinue, function(){
+      document.getElementById('overlayWin').hidden = true;
+      campaignMode = true;        // finishAdventure(false) cleared these two —
+      adventureComplete = false;  // we're resuming the run in place, not starting fresh
+      resetGame(true);            // keep cumulative score; lives back to 3
+      state.gameState = 'playing';
+      state.startTime = performance.now();
+      startMusic();
+      Ads.notifyLevelStart();
+    });
+  });
+
+  var btnWatchAdBoost = document.getElementById('btnWatchAdBoost');
+  if(btnWatchAdBoost) btnWatchAdBoost.addEventListener('click', function(){
+    watchAdThen(btnWatchAdBoost, function(){
+      var id = _lastWinLevelId;
+      if(!id) return;
+      var target = levelPerfTarget(id);
+      var boostAmt = Math.max(0, target - _lastWinLevelScore);
+      if(boostAmt > 0){
+        state.score += boostAmt;
+        _lastWinLevelScore += boostAmt;
+        recordLevelResult(id, _lastWinLevelScore);
+      }
+      recordLevelStars(id, {performance:true});
+      var starsNow = levelStarCount(id);
+      document.getElementById('winStars').textContent = '★'.repeat(starsNow) + '☆'.repeat(3-starsNow);
+      document.getElementById('winSummary').textContent = 'Score ' + state.score + ' · boosted to the performance target!';
+      document.getElementById('hudBest').textContent = levelBestScore(id);
+      btnWatchAdBoost.hidden = true;
+      pushKillFeed('🎬 Ad reward: score boosted!', '#ffd700');
+    });
+  });
+
   document.getElementById('btnSurvival').addEventListener('click', function(){
     survivalMode = true;
     resetGame();
@@ -1808,6 +1896,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
             state.gameState = 'playing';
             state.startTime = performance.now();
             startMusic();
+            Ads.notifyLevelStart();
           }, 1200);
           return;
         }
@@ -1818,14 +1907,16 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       var loseSummaryText = survivalMode
         ? 'Reached wave ' + survivalWave + ' · Score: ' + state.score
         : 'Score ' + state.score + ' · try trapping enemies before they reach you.';
-      showAdBreak(function(){
+      Ads.showMidroll(function(){
         document.getElementById('loseSummary').textContent = loseSummaryText;
+        updateRewardedButtons({revive:true});
         document.getElementById('overlayLose').hidden = false;
       });
     }
   }
 
   var winNextTimer = null;
+  var _lastWinLevelId = null, _lastWinLevelScore = 0;   // for the rewarded score-boost button
 
   function getNextLocation(){
     var idx = -1;
@@ -1851,6 +1942,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     resetGame();
     state.gameState = 'playing';
     startMusic();
+    Ads.notifyLevelStart();
   }
 
   function endlessNextLevel(){
@@ -1867,6 +1959,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     resetGame();
     state.gameState = 'playing';
     startMusic();
+    Ads.notifyLevelStart();
   }
 
   function startNextLevel(loc){
@@ -1879,6 +1972,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     document.getElementById('howto').hidden = true;
     state.gameState = 'playing';
     startMusic();
+    Ads.notifyLevelStart();
   }
 
   // ── Campaign & mini-game system ──────────────────────────────────────────
@@ -1935,7 +2029,8 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     }
 
     spawnCelebrationRain('#ffd700', '#7fe3ff');
-    showAdBreak(function(){ document.getElementById('overlayWin').hidden = false; });
+    if(won) Ads.happyMoment();
+    Ads.showMidroll(function(){ updateRewardedButtons({cont: !won}); document.getElementById('overlayWin').hidden = false; });
   }
 
   function startCampaignTransition(){
@@ -1975,6 +2070,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         state.gameState = 'playing';
         state.startTime = performance.now();
         startMusic();
+        Ads.notifyLevelStart();
       } else {
         campaignLastType = 'minigame';
         startMiniGame(item.id);
@@ -2233,6 +2329,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     state.gameState = 'minigame';
     stopMusic();
     startMiniGameMusic(id);
+    Ads.notifyLevelStart();
     document.querySelector('.hud').style.visibility = 'hidden';
     if(id === 'mediterranean'){
       miniGameData = {boatX:80, oarSide:'left', oarAnimL:0, oarAnimR:0, needed:34, clicks:0, wavePhase:0};
@@ -3136,11 +3233,15 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         r: rand(4,9), rot: rand(0,TAU), rotV: rand(-3,3), life:3, t:0
       });
     }
-    showAdBreak(function(){
+    if(stars === 3) Ads.happyMoment();
+    Ads.showMidroll(function(){
       if(campaignMode) return;
       // Replays get the compact result card; standalone/campaign-final use #overlayWin.
-      if(replayMode) document.getElementById('overlayReplayResult').hidden = false;
-      else document.getElementById('overlayWin').hidden = false;
+      if(replayMode){ document.getElementById('overlayReplayResult').hidden = false; return; }
+      _lastWinLevelId = state.currentLocationId;
+      _lastWinLevelScore = levelScore;
+      updateRewardedButtons({boost: stars < 3});
+      document.getElementById('overlayWin').hidden = false;
     });
 
     if(campaignMode){

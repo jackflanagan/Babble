@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  html,body{ margin:0; width:100vw; height:100vh; overflow:hidden; }
+  body{
+    background: radial-gradient(120% 140% at 50% -10%, #16215a 0%, #0a1128 55%, #060915 100%);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .globe{
+    width:78vmin; height:78vmin; border-radius:50%; position:relative;
+    background: radial-gradient(circle at 38% 32%, #3a5fc9 0%, #1d3a8a 55%, #0f2258 100%);
+    box-shadow: 0 0 10vmin rgba(127,184,255,0.4), inset -5vmin -5vmin 9vmin rgba(0,0,0,0.35);
+  }
+  .land{ position:absolute; background:#3fae8a; opacity:0.9; }
+  .l1{ width:34%; height:22%; top:20%; left:12%; border-radius:60% 40% 50% 50%; }
+  .l2{ width:22%; height:16%; top:52%; left:48%; border-radius:50% 60% 40% 50%; }
+  .l3{ width:16%; height:14%; top:22%; left:58%; border-radius:50%; }
+  .pin{ position:absolute; width:9%; height:9%; border-radius:50%; background:#ff6b4a; box-shadow:0 0 6vmin 2vmin rgba(255,107,74,0.65); }
+  .p1{ top:24%; left:44%; } .p2{ top:58%; left:60%; } .p3{ top:38%; left:70%; }
+</style>
+</head><body>
+  <div class="globe">
+    <div class="land l1"></div><div class="land l2"></div><div class="land l3"></div>
+    <div class="pin p1"></div><div class="pin p2"></div><div class="pin p3"></div>
+  </div>
+</body></html>

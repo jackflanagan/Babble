@@ -24,6 +24,20 @@ var _updateHud = function(){};
 export function setNetUpdateHud(fn){ _updateHud = fn; }
 var _livePlayers = function(){ return []; };
 export function setNetLivePlayers(fn){ _livePlayers = fn; }
+/* Injected by main.js — switches the mode UI back to 1-player (equivalent of
+   selectMode('1')) when WebRTC isn't usable or a peer never connects. */
+var _fallbackToSingle = function(){};
+export function setNetFallbackToSingle(fn){ _fallbackToSingle = fn; }
+/* Sandboxed/restricted embeds (portal iframes) can strip WebRTC entirely —
+   check before ever attempting joinRoom. */
+export function netWebRTCSupported(){
+  return typeof RTCPeerConnection !== 'undefined';
+}
+var NET_CONNECT_TIMEOUT_MS = 25000;
+var netConnectTimer = null;
+function netClearConnectTimer(){
+  if(netConnectTimer){ clearTimeout(netConnectTimer); netConnectTimer = null; }
+}
 var NET_APP_ID = 'globehopper-jack-gift-v1';
 var NET_IMPORT_URL = 'https://esm.run/trystero';
 var netJoinRoomFn = null;
@@ -120,6 +134,7 @@ export function netSetupRoomHandlers(){
   netActions = actions;
 
   netRoom.onPeerJoin = function(peerId){
+    netClearConnectTimer();
     netPeerId = peerId;
     netConnected = true;
     netUiRefresh();
@@ -155,7 +170,31 @@ export function netSetupRoomHandlers(){
   }
 }
 
+/* Sandboxed/restricted portal embeds, or a peer that just never shows up,
+   both look identical from here: joinRoom() resolves fine but onPeerJoin
+   never fires. Give it NET_CONNECT_TIMEOUT_MS, then fall back gracefully
+   instead of leaving the "waiting…" status up forever. */
+function netStartConnectTimer(){
+  netClearConnectTimer();
+  netConnectTimer = setTimeout(function(){
+    netConnectTimer = null;
+    if(netConnected) return;
+    netFallbackToSingleplayer("Couldn't connect — falling back to single player.");
+  }, NET_CONNECT_TIMEOUT_MS);
+}
+
+export function netFallbackToSingleplayer(message){
+  netClearConnectTimer();
+  netTeardown();
+  try{ _fallbackToSingle(); }catch(e){}
+  netSetStatus(message || "Online play isn't available here — switched to single player.", 'warn');
+}
+
 export async function netHostStart(){
+  if(!netWebRTCSupported()){
+    netSetStatus("Online play isn't available in this browser/embed.", 'warn');
+    return;
+  }
   netRole = 'host';
   netRoomCode = netRandCode();
   netConnected = false;
@@ -164,13 +203,18 @@ export async function netHostStart(){
     var joinRoom = await netLoadJoinRoom();
     netRoom = joinRoom({appId: NET_APP_ID}, 'gh-' + netRoomCode);
     netSetupRoomHandlers();
+    netStartConnectTimer();
   }catch(err){
-    netSetStatus('Couldn’t start online play here — this only works once the game is hosted on the open web, not from this in-chat preview.', 'warn');
+    netFallbackToSingleplayer('Couldn’t start online play here — this only works once the game is hosted on the open web, not from this in-chat preview.');
     console.error('netHostStart failed', err);
   }
 }
 
 export async function netJoinStart(code){
+  if(!netWebRTCSupported()){
+    netSetStatus("Online play isn't available in this browser/embed.", 'warn');
+    return;
+  }
   netRole = 'guest';
   netRoomCode = code;
   netConnected = false;
@@ -179,13 +223,15 @@ export async function netJoinStart(code){
     var joinRoom = await netLoadJoinRoom();
     netRoom = joinRoom({appId: NET_APP_ID}, 'gh-' + code);
     netSetupRoomHandlers();
+    netStartConnectTimer();
   }catch(err){
-    netSetStatus('Couldn’t connect here — this only works once the game is hosted on the open web, not from this in-chat preview.', 'warn');
+    netFallbackToSingleplayer('Couldn’t connect here — this only works once the game is hosted on the open web, not from this in-chat preview.');
     console.error('netJoinStart failed', err);
   }
 }
 
 export function netTeardown(){
+  netClearConnectTimer();
   if(netRoom){ try{ netRoom.leave(); }catch(e){} }
   netRoom = null;
   netActions = null;
