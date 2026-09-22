@@ -1027,7 +1027,7 @@
   }
   function announce(text, locId) {
     try {
-      if (!text || typeof window === "undefined" || !window.speechSynthesis) return;
+      if (!text || !_announceOk) return;
       if (_getMuted()) return;
       var now = performance.now();
       if (window.speechSynthesis.speaking || now < _announceUntil) return;
@@ -1042,7 +1042,7 @@
     } catch (e) {
     }
   }
-  var _getMuted, audioCtx, masterGain, _voices, _announceUntil;
+  var _getMuted, audioCtx, masterGain, _voices, _announceUntil, _announceOk;
   var init_audio = __esm({
     "src/audio.js"() {
       _getMuted = function() {
@@ -1056,6 +1056,7 @@
         window.speechSynthesis.onvoiceschanged = _loadVoices;
       }
       _announceUntil = 0;
+      _announceOk = typeof window !== "undefined" && !!window.speechSynthesis && !("ontouchstart" in window) && !(navigator && navigator.maxTouchPoints > 0);
     }
   });
 

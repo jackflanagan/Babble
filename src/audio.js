@@ -432,12 +432,17 @@ function _hashStr(s){
   return Math.abs(h);
 }
 var _announceUntil = 0;
+/* speechSynthesis is unreliable on mobile (iOS Safari commonly leaves
+   .speaking stuck true; Android WebView TTS can hang/jank the render thread) —
+   restrict the announcer to non-touch devices to avoid freezing mobile play. */
+var _announceOk = typeof window !== 'undefined' && !!window.speechSynthesis &&
+  !('ontouchstart' in window) && !(navigator && navigator.maxTouchPoints > 0);
 /* Speaks a short announcement using the browser's speech synth. Pitch, rate and
    (when available) voice are derived from locId so each level's announcer sounds
    like a distinct character without needing any audio assets. */
 export function announce(text, locId){
   try{
-    if(!text || typeof window === 'undefined' || !window.speechSynthesis) return;
+    if(!text || !_announceOk) return;
     if(_getMuted()) return;
     var now = performance.now();
     if(window.speechSynthesis.speaking || now < _announceUntil) return;
