@@ -48,8 +48,8 @@ export function showRewardedAd(cb){
 export function happyMoment(){ try{ if(CGSDK) CGSDK.game.happytime(); }catch(e){} }
 
 /* ---------- Leaderboard config (fill in after Supabase setup) ---------- */
-var LB_URL  = '';   // e.g. 'https://xyzxyz.supabase.co'
-var LB_KEY  = '';   // your project's anon/public key
+var LB_URL  = 'https://cguzwgffoszofgkpqdtf.supabase.co';
+var LB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNndXp3Z2Zmb3N6b2Zna3BxZHRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwOTEzMzMsImV4cCI6MjEwNTY2NzMzM30.iZRJpSFAgiLxYpakh83EYojf8vBEWWir2VKSRl5TsHA';   // anon/public key — safe to commit, RLS is the real boundary
 var LB_TABLE = 'scores';
 
 export function lbEnabled(){ return LB_URL && LB_KEY; }

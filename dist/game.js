@@ -267,8 +267,8 @@
     "src/sdk.js"() {
       init_utils();
       CGSDK = null;
-      LB_URL = "";
-      LB_KEY = "";
+      LB_URL = "https://cguzwgffoszofgkpqdtf.supabase.co";
+      LB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNndXp3Z2Zmb3N6b2Zna3BxZHRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwOTEzMzMsImV4cCI6MjEwNTY2NzMzM30.iZRJpSFAgiLxYpakh83EYojf8vBEWWir2VKSRl5TsHA";
       LB_TABLE = "scores";
       lbCurrentLocation = null;
       _progress = null;
