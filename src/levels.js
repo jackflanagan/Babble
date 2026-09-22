@@ -88,7 +88,12 @@ paris: {
   movingPlatformDefs: [
     {ox:280, oy:215, w:110, h:18, axis:'x', amplitude:80, speed:0.8}
   ],
-  enemyVariety: {specialType:'artist', waveRatio:0.4}
+  enemyVariety: {specialType:'artist', waveRatio:0.4},
+  /* A little rat hole down at street level tunnels up to the high platform
+     across the map — a two-way shortcut. */
+  teleporters: [
+    {x1:55, y1:440, x2:610, y2:190}
+  ]
 },
 ireland: {
   platforms: [
@@ -369,7 +374,7 @@ export var LEVELS = {
   },
   kenya:{
     name:'Amboseli',
-    blurb:'Trap every wasp in a bubble, then bump it to pop it. Grab a coffee bean, Maasai bead, and befriend the baby elephant for a companion! Walk off either edge to wrap around the map.',
+    blurb:'Trap every wasp in a bubble, then bump it to pop it. Grab a coffee bean, Maasai bead, and befriend the baby elephant — then ride it straight through enemies to trample them into a bubble! Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#c05a10', skyMid:'#e88a30', skyBottom:'#f5c98a',
@@ -422,7 +427,7 @@ export var LEVELS = {
   },
   paris:{
     name:'Paris',
-    blurb:'Trap every mime in a bubble, then bump it to pop it. Grab a baguette, croissant and a beret for bonus points. Walk off either edge to wrap around the map.',
+    blurb:'Trap every mime in a bubble, then bump it to pop it. Grab a baguette, croissant and a beret for bonus points. There’s a little rat hole down at street level — hop in for a tunnel shortcut across the map. Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#7ab2e8', skyMid:'#b8d4f0', skyBottom:'#f0e8d8',
@@ -467,7 +472,7 @@ export var LEVELS = {
   },
   ireland:{
     name:'Galway',
-    blurb:'A gentler stop — the banshees here won’t chase you. Take your time and grab all six treasures (shamrock, golden harp, pot of gold) for the collection star. Walk off either edge to wrap around the map.',
+    blurb:'A gentler stop — the banshees here won’t chase you. Take your time and grab all six treasures (shamrock, golden harp, guitar) for the collection star — and the guitar kicks off a dance party! Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#4a7a9a', skyMid:'#7ab0c0', skyBottom:'#c8e0cc',
@@ -641,7 +646,7 @@ export var LEVELS = {
   },
   athens:{
     name:'Athens',
-    blurb:'Trap every gorgon in a bubble, then bump it to pop it. Grab an olive branch, amphora and a mini Parthenon for bonus points. Watch out — these stone-faced enemies move fast!',
+    blurb:'Trap every gorgon in a bubble, then bump it to pop it. Grab an olive branch, amphora and a mini Parthenon for bonus points. Watch out — these stone-faced enemies move fast, and their gaze can turn you to stone for a moment!',
     values:{ a:120, b:80, c:300, pop:200 },
     theme:{
       skyTop:'#3a7ab8', skyMid:'#6eb0d8', skyBottom:'#f2e8c8',

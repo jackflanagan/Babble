@@ -31,6 +31,29 @@ export function drawPlatform(p, theme){
   }
 }
 
+/* Shared flame halo + rising embers drawn under/around a character while
+   fireBonus is active — same look for both players regardless of body shape. */
+function drawOnFireGlow(){
+  var t = performance.now()*0.001;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  var glow = ctx.createRadialGradient(0,4,2,0,4,26);
+  glow.addColorStop(0,'rgba(255,220,120,0.55)');
+  glow.addColorStop(0.5,'rgba(255,120,30,0.35)');
+  glow.addColorStop(1,'rgba(255,60,0,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(0,4,26,0,TAU); ctx.fill();
+  for(var i=0;i<3;i++){
+    var ang = t*3 + i*2.1;
+    var fx = Math.sin(ang)*11, fy = 14 - ((t*90 + i*40) % 34);
+    var fa = 1 - ((t*90 + i*40) % 34)/34;
+    ctx.globalAlpha = Math.max(0,fa)*0.85;
+    var flick = 3.4 + Math.sin(ang*2.3)*1.1;
+    ctx.fillStyle = i%2===0 ? '#ff8a1e' : '#ffd24a';
+    ctx.beginPath(); ctx.ellipse(fx, fy, flick*0.6, flick, Math.sin(ang)*0.4, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
 export function drawFox(p){
   var pal = p.palette;
   ctx.save();
@@ -38,53 +61,84 @@ export function drawFox(p){
   ctx.scale(p.facing<0?-1:1, 1);
   var bob = p.onGround ? Math.sin(p.walkPhase)*2 : 0;
   ctx.translate(0,bob);
-  ctx.fillStyle = pal.body;
+  if(p.dancing) ctx.rotate(Math.sin(performance.now()*0.018)*0.28);
+  if(p.onFire) drawOnFireGlow();
+  var bodyGrad = ctx.createRadialGradient(-4,-4,2,0,4,16);
+  bodyGrad.addColorStop(0, pal.highlight || '#ffffff');
+  bodyGrad.addColorStop(0.35, pal.body);
+  bodyGrad.addColorStop(1, pal.shadow || pal.body);
+  ctx.strokeStyle = pal.ear; ctx.lineWidth = 1.2;
+  ctx.fillStyle = pal.shadow || pal.body;
   ctx.beginPath();
   ctx.ellipse(-14, 2, 10, 6, -0.5, 0, TAU);
   ctx.fill();
   ctx.fillStyle = pal.tailTip;
   ctx.beginPath(); ctx.ellipse(-20,0,4,3,-0.5,0,TAU); ctx.fill();
-  ctx.fillStyle = pal.body;
+  ctx.fillStyle = bodyGrad;
   ctx.beginPath();
   ctx.ellipse(0,4,11,13,0,0,TAU);
-  ctx.fill();
+  ctx.fill(); ctx.stroke();
   ctx.fillStyle = pal.belly;
   ctx.beginPath();
   ctx.ellipse(1,9,6,7,0,0,TAU);
   ctx.fill();
-  ctx.fillStyle = pal.body;
-  ctx.beginPath(); ctx.moveTo(-9,-10); ctx.lineTo(-13,-19); ctx.lineTo(-3,-13); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(9,-10); ctx.lineTo(13,-19); ctx.lineTo(3,-13); ctx.fill();
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath(); ctx.moveTo(-9,-10); ctx.lineTo(-13,-19); ctx.lineTo(-3,-13); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(9,-10); ctx.lineTo(13,-19); ctx.lineTo(3,-13); ctx.fill(); ctx.stroke();
   ctx.fillStyle = pal.ear;
   ctx.beginPath(); ctx.moveTo(-8,-11); ctx.lineTo(-10,-16); ctx.lineTo(-5,-13); ctx.fill();
   ctx.beginPath(); ctx.moveTo(8,-11); ctx.lineTo(10,-16); ctx.lineTo(5,-13); ctx.fill();
   ctx.fillStyle = pal.belly;
   ctx.beginPath(); ctx.ellipse(4,0,6,5,0,0,TAU); ctx.fill();
+  // whiskers
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.moveTo(8,1); ctx.lineTo(15,-1); ctx.moveTo(8,3); ctx.lineTo(15,4); ctx.stroke();
   ctx.fillStyle = '#1c1330';
   ctx.beginPath(); ctx.arc(2,-2,1.6,0,TAU); ctx.fill();
   ctx.beginPath(); ctx.arc(8,-1,1.6,0,TAU); ctx.fill();
+  // eye shine
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.beginPath(); ctx.arc(2.6,-2.6,0.5,0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(8.6,-1.6,0.5,0,TAU); ctx.fill();
   ctx.fillStyle = pal.ear;
   ctx.beginPath(); ctx.moveTo(9,1); ctx.lineTo(13,2); ctx.lineTo(9,4); ctx.fill();
+  // tiny paws
+  ctx.fillStyle = pal.shadow || pal.body;
+  ctx.beginPath(); ctx.ellipse(-4,15,3.4,2.6,0,0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(5,15,3.4,2.6,0,0,TAU); ctx.fill();
   ctx.restore();
 }
 
 export function drawChicken(p){
+  var pal = p.palette;
+  var bodyCol = pal ? pal.body : '#f5c842';
+  var wingCol = pal ? pal.ear : '#e0a800';
+  var combCol = pal ? pal.tailTip==='#fff' ? '#e83030' : pal.tailTip : '#e83030';
   ctx.save();
   ctx.translate(p.x+p.w/2, p.y+p.h/2);
   ctx.scale(p.facing<0?-1:1, 1);
   var bob = p.onGround ? Math.sin(p.walkPhase)*2 : 0;
   ctx.translate(0,bob);
+  if(p.dancing) ctx.rotate(Math.sin(performance.now()*0.018+1.2)*0.28);
+  if(p.onFire) drawOnFireGlow();
+  var bodyGrad = ctx.createRadialGradient(-3,-2,2,0,5,15);
+  bodyGrad.addColorStop(0, '#fff6d8');
+  bodyGrad.addColorStop(0.4, bodyCol);
+  bodyGrad.addColorStop(1, wingCol);
+  ctx.strokeStyle = wingCol; ctx.lineWidth = 1.1;
   // body
-  ctx.fillStyle = '#f5c842';
-  ctx.beginPath(); ctx.ellipse(0,5,11,12,0,0,TAU); ctx.fill();
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath(); ctx.ellipse(0,5,11,12,0,0,TAU); ctx.fill(); ctx.stroke();
   // wing
-  ctx.fillStyle = '#e0a800';
+  ctx.fillStyle = wingCol;
   ctx.beginPath(); ctx.ellipse(-4,6,5,8,-0.3,0,TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(-4,10); ctx.moveTo(-2,-1); ctx.lineTo(-1,11); ctx.stroke();
   // head
-  ctx.fillStyle = '#f5c842';
+  ctx.fillStyle = bodyGrad;
   ctx.beginPath(); ctx.arc(5,-10,8,0,TAU); ctx.fill();
   // comb (red)
-  ctx.fillStyle = '#e83030';
+  ctx.fillStyle = combCol;
   ctx.beginPath(); ctx.arc(4,-20,4,0,TAU); ctx.fill();
   ctx.beginPath(); ctx.arc(8,-19,3,0,TAU); ctx.fill();
   ctx.beginPath(); ctx.arc(0,-19,3,0,TAU); ctx.fill();
@@ -93,14 +147,22 @@ export function drawChicken(p){
   // beak
   ctx.fillStyle = '#f0a020';
   ctx.beginPath(); ctx.moveTo(13,-10); ctx.lineTo(18,-8); ctx.lineTo(13,-6); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 0.6;
+  ctx.beginPath(); ctx.moveTo(13,-8); ctx.lineTo(18,-8); ctx.stroke();
   // eye
   ctx.fillStyle = '#1c1330';
   ctx.beginPath(); ctx.arc(8,-11,1.6,0,TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.beginPath(); ctx.arc(8.6,-11.6,0.5,0,TAU); ctx.fill();
   // tail feathers
-  ctx.fillStyle = '#e0a800';
+  ctx.fillStyle = wingCol;
   ctx.beginPath(); ctx.moveTo(-9,-4); ctx.lineTo(-18,-10); ctx.lineTo(-10,2); ctx.fill();
-  ctx.fillStyle = '#f5c842';
+  ctx.fillStyle = bodyCol;
   ctx.beginPath(); ctx.moveTo(-9,-2); ctx.lineTo(-18,-4); ctx.lineTo(-10,4); ctx.fill();
+  // tiny feet
+  ctx.fillStyle = '#f0a020';
+  ctx.beginPath(); ctx.ellipse(-3,16,2.6,2,0,0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(4,16,2.6,2,0,0,TAU); ctx.fill();
   ctx.restore();
 }
 
@@ -567,12 +629,21 @@ export function drawIrelandCollectibleRef(c){
       ctx.moveTo(-10,-4+i*3); ctx.lineTo(5+Math.sin(i*0.6)*2,-7+i*5);
       ctx.stroke();
     });
-  } else { // pot of gold
-    ctx.fillStyle = '#2a2a2a';
-    ctx.beginPath(); ctx.ellipse(0,4,9,7,0,0,TAU); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(-8,-2,16,6,2); ctx.fill();
-    ctx.fillStyle = '#f0c020';
-    [-4,0,4].forEach(function(cx){ ctx.beginPath(); ctx.arc(cx,-1,2.5,0,TAU); ctx.fill(); });
+  } else { // guitar — pick it up and the whole crew starts dancing
+    ctx.save(); ctx.rotate(-0.35);
+    ctx.fillStyle = '#a06828';
+    ctx.beginPath(); ctx.ellipse(0,4,8,9,0,0,TAU); ctx.fill();
+    ctx.fillStyle = '#c88840';
+    ctx.beginPath(); ctx.ellipse(0,4,5.5,6.5,0,0,TAU); ctx.fill();
+    ctx.fillStyle = '#3a2410';
+    ctx.beginPath(); ctx.arc(0,4,2,0,TAU); ctx.fill();
+    ctx.fillStyle = '#5a3a1a';
+    ctx.fillRect(-1.4,-11,2.8,8);
+    ctx.fillStyle = '#e8d8a0';
+    [0,1,2].forEach(function(i){ ctx.fillRect(-1.2+i*1.2,-11,0.35,8); });
+    ctx.fillStyle = '#2a1808';
+    ctx.beginPath(); ctx.ellipse(0,-11,2.2,1.6,0,0,TAU); ctx.fill();
+    ctx.restore();
   }
   ctx.restore();
 }

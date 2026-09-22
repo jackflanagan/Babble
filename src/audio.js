@@ -374,7 +374,81 @@ export function playSound(type){
         wo.start(now); wo.stop(now+dur+0.02);
         lfo.start(now); lfo.stop(now+dur+0.02);
       });
+    } else if(type==='guitar_riff'){
+      // Irish jig — quick ascending/descending triangle riff
+      [392,440,494,523,587,523,494,440].forEach(function(freq,i){
+        var po=c.createOscillator(), pg=c.createGain(); po.connect(pg); pg.connect(getMasterGain());
+        po.type='triangle'; po.frequency.value=freq;
+        var t=i*0.09;
+        pg.gain.setValueAtTime(0,now+t); pg.gain.linearRampToValueAtTime(0.22,now+t+0.02);
+        pg.gain.linearRampToValueAtTime(0,now+t+0.1);
+        po.start(now+t); po.stop(now+t+0.11);
+      });
+    } else if(type==='stone_gaze'){
+      // Low ominous rumble sweep — gorgon charging a petrifying glare
+      o.type='sawtooth'; o.frequency.setValueAtTime(140,now); o.frequency.linearRampToValueAtTime(60,now+0.4);
+      g.gain.setValueAtTime(0.22,now); g.gain.linearRampToValueAtTime(0,now+0.42);
+      o.start(now); o.stop(now+0.42);
+      var po=c.createOscillator(), pg=c.createGain(); po.connect(pg); pg.connect(getMasterGain());
+      po.type='sine'; po.frequency.setValueAtTime(900,now); po.frequency.linearRampToValueAtTime(1400,now+0.3);
+      pg.gain.setValueAtTime(0.05,now); pg.gain.linearRampToValueAtTime(0,now+0.32);
+      po.start(now); po.stop(now+0.33);
+    } else if(type==='stone_crack'){
+      // Shattering stone — noise burst + low crack thud
+      o.type='sine'; o.frequency.setValueAtTime(160,now); o.frequency.linearRampToValueAtTime(50,now+0.15);
+      g.gain.setValueAtTime(0.3,now); g.gain.linearRampToValueAtTime(0,now+0.17);
+      o.start(now); o.stop(now+0.17);
+      var buf=c.createBuffer(1,Math.ceil(c.sampleRate*0.12),c.sampleRate);
+      var d=buf.getChannelData(0); for(var ni=0;ni<d.length;ni++) d[ni]=Math.random()*2-1;
+      var ns=c.createBufferSource(); ns.buffer=buf;
+      var nf=c.createBiquadFilter(); nf.type='highpass'; nf.frequency.value=1200;
+      var ng=c.createGain(); ng.gain.setValueAtTime(0.28,now); ng.gain.linearRampToValueAtTime(0,now+0.12);
+      ns.connect(nf); nf.connect(ng); ng.connect(getMasterGain()); ns.start(now); ns.stop(now+0.12);
+    } else if(type==='teleport'){
+      // Whoosh down then sparkle up — rat-hole tunnel
+      o.type='sine'; o.frequency.setValueAtTime(700,now); o.frequency.linearRampToValueAtTime(120,now+0.16);
+      g.gain.setValueAtTime(0.24,now); g.gain.linearRampToValueAtTime(0,now+0.18);
+      o.start(now); o.stop(now+0.18);
+      var po=c.createOscillator(), pg=c.createGain(); po.connect(pg); pg.connect(getMasterGain());
+      po.type='sine'; po.frequency.setValueAtTime(300,now+0.14); po.frequency.linearRampToValueAtTime(1200,now+0.3);
+      pg.gain.setValueAtTime(0.2,now+0.14); pg.gain.linearRampToValueAtTime(0,now+0.34);
+      po.start(now+0.14); po.stop(now+0.35);
     }
+  } catch(e){}
+}
+
+/* ---------- voice announcer ---------- */
+var _voices = [];
+function _loadVoices(){
+  try{ _voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : []; } catch(e){ _voices = []; }
+}
+if(typeof window !== 'undefined' && window.speechSynthesis){
+  _loadVoices();
+  window.speechSynthesis.onvoiceschanged = _loadVoices;
+}
+function _hashStr(s){
+  var h = 0;
+  for(var i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+var _announceUntil = 0;
+/* Speaks a short announcement using the browser's speech synth. Pitch, rate and
+   (when available) voice are derived from locId so each level's announcer sounds
+   like a distinct character without needing any audio assets. */
+export function announce(text, locId){
+  try{
+    if(!text || typeof window === 'undefined' || !window.speechSynthesis) return;
+    if(_getMuted()) return;
+    var now = performance.now();
+    if(window.speechSynthesis.speaking || now < _announceUntil) return;
+    var u = new SpeechSynthesisUtterance(text);
+    var h = _hashStr(locId || 'default');
+    if(_voices.length) u.voice = _voices[h % _voices.length];
+    u.pitch = 0.75 + (h % 100) / 100 * 0.7;
+    u.rate = 0.92 + ((h >> 3) % 100) / 100 * 0.35;
+    u.volume = 0.85;
+    _announceUntil = now + 500 + text.length * 40;
+    window.speechSynthesis.speak(u);
   } catch(e){}
 }
 

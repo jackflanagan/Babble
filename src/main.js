@@ -3,7 +3,7 @@ import { TAU, clamp, lerp, rand, safeGet, safeSet, escHtml, haptic } from './uti
 import { ctx, W, H, initCanvas } from './canvas.js';
 import { adGameplayStart, adGameplayStop, showAdBreak, lbEnabled, submitScore, fetchLeaderboard, openLeaderboard, setProgress, getLbName, setLbName } from './sdk.js';
 import { initStarfield } from './starfield.js';
-import { playSound, ac, getMasterGain, setMasterVolume, setMutedGetter, suspendAudio, resumeAudio } from './audio.js';
+import { playSound, ac, getMasterGain, setMasterVolume, setMutedGetter, suspendAudio, resumeAudio, announce } from './audio.js';
 import { bgmAudio, startMusic, stopMusic, setMusicMutedGetter } from './music.js';
 import { updateStreak, getDailyLocationId, refreshDailyUI, ACHIEVEMENTS, achievementQueue, achievementToast, achievementToastT, setAchievementToast, setAchievementToastT, unlockAchievement, renderAchievements, setLocationsGetter, setRunAchievements } from './features.js';
 import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation, setCanReplay, setLevelStars, setLbName as setGlobeLbNameGetter } from './globe.js';
@@ -42,15 +42,15 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   var activeEvent = null, eventTimer = 0, nextEventIn = rand(20,35);
 
   var PALETTES_P1 = [
-    { body:'#ff7a45', belly:'#fff3e6', ear:'#2a0d05', tailTip:'#fff' },   // 0: default orange
-    { body:'#e0eeff', belly:'#fff', ear:'#8090c0', tailTip:'#c0d8ff' },   // 1: arctic (unlock glasgow)
-    { body:'#cc2020', belly:'#ffd0d0', ear:'#6a0000', tailTip:'#fff' },   // 2: crimson (unlock modena)
-    { body:'#1a1a2e', belly:'#3a3a5e', ear:'#0a0a1e', tailTip:'#888' }    // 3: midnight (unlock kenya)
+    { body:'#ff7a45', belly:'#fff3e6', ear:'#2a0d05', tailTip:'#fff', highlight:'#ffcaa0', shadow:'#c9531f' },   // 0: default orange
+    { body:'#e0eeff', belly:'#fff', ear:'#8090c0', tailTip:'#c0d8ff', highlight:'#ffffff', shadow:'#a8c0e8' },   // 1: arctic (unlock glasgow)
+    { body:'#cc2020', belly:'#ffd0d0', ear:'#6a0000', tailTip:'#fff', highlight:'#ff8a6a', shadow:'#8a1010' },   // 2: crimson (unlock modena)
+    { body:'#1a1a2e', belly:'#3a3a5e', ear:'#0a0a1e', tailTip:'#888', highlight:'#5a5a8e', shadow:'#0a0a18' }    // 3: midnight (unlock kenya)
   ];
   var PALETTES_P2 = [
-    { body:'#7a93ff', belly:'#eef1ff', ear:'#141c4d', tailTip:'#fff' },   // 0: default blue
-    { body:'#f5c842', belly:'#fff8e0', ear:'#8a7000', tailTip:'#fff' },   // 1: golden (unlock paris)
-    { body:'#3a8a3a', belly:'#d0f0d0', ear:'#1a4a1a', tailTip:'#fff' }    // 2: forest (unlock ireland)
+    { body:'#7a93ff', belly:'#eef1ff', ear:'#141c4d', tailTip:'#fff', highlight:'#c0ccff', shadow:'#4a5ecf' },   // 0: default blue
+    { body:'#f5c842', belly:'#fff8e0', ear:'#8a7000', tailTip:'#fff', highlight:'#ffe89a', shadow:'#c49a1a' },   // 1: golden (unlock paris)
+    { body:'#3a8a3a', belly:'#d0f0d0', ear:'#1a4a1a', tailTip:'#fff', highlight:'#8fd88f', shadow:'#1f5a1f' }    // 2: forest (unlock ireland)
   ];
   var selectedSkins = safeGet('gh_skins_v1', {p1:0, p2:0});
 
@@ -421,6 +421,9 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
 
   var shakeT = 0, comboTimer = 0, waveFlash = 0, screenFlash = 0, allClearFired = false, allClearDelay = 0;
   var freezeT = 0, slowT = 0, doubleScoreT = 0, smokeLevel = 0; var paintBlobs = [];
+  var stoneGazes = [];   // Athens gorgon petrifying-gaze projectiles
+  var danceT = 0;        // Galway guitar pickup — brief all-players dance party
+  var teleporters = [];  // per-level teleporter pairs (currently: Paris rat hole)
   var magnetT = 0;
   var puFlash = 0, puFlashLabel = '', puFlashColor = '#fff';
   var screenFlashColor = '#ff1040';
@@ -485,7 +488,8 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   function makePlayer(id, x, palette){
     return { id:id, x:x, y:400, w:30, h:34, vx:0, vy:0, onGround:false, facing:1,
       walkPhase:Math.random()*TAU, invuln:0, shootCooldown:0, palette:palette,
-      speedBoost:0, rapidFire:0, shield:0, hasRat:false, ratPhase:0, hasElephant:false, elephantPhase:0 };
+      speedBoost:0, rapidFire:0, shield:0, hasRat:false, ratPhase:0, hasElephant:false, elephantPhase:0,
+      fireTrailT:0, petrified:0, teleportCd:0, onFire:false, dancing:false };
   }
 
   function resetGame(keepScore){
@@ -505,6 +509,9 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     movingPlatforms = (layout.movingPlatformDefs || []).map(function(d){
       return {x:d.ox, y:d.oy, w:d.w, h:d.h, ox:d.ox, oy:d.oy, axis:d.axis, amplitude:d.amplitude, speed:d.speed};
     });
+    teleporters = layout.teleporters || [];
+    stoneGazes = [];
+    danceT = 0;
     var currentEnemySpawns = layout.enemySpawns;
     var currentCollectibleSpots = layout.collectibleSpots;
 
@@ -798,6 +805,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     spawnPopup(W/2, H/2 - 30, 'TRAP BLAST!', '#7fe3ff', 34);
     pushKillFeed('⚡ TRAP BLAST — ' + targets.length + ' caught', '#7fe3ff');
     playSound('powerup_big');
+    announce('Trap blast!', state.currentLocationId);
     haptic(45);
     updatePowerHud();
   }
@@ -960,6 +968,28 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       if(p.speedBoost>0) p.speedBoost -= dt;
       if(p.rapidFire>0) p.rapidFire -= dt;
       if(p.shield>0) p.shield -= dt;
+      if(p.teleportCd>0) p.teleportCd -= dt;
+      p.onFire = fireBonus > 0;
+      p.dancing = danceT > 0;
+      // Athens petrify: frozen solid, no input, until it wears off
+      if(p.petrified > 0){
+        p.petrified -= dt;
+        var s0 = Math.sign(p.vx);
+        p.vx -= s0*Math.min(Math.abs(p.vx), fric*dt);
+        var prevVy0 = p.vy;
+        p.vy += GRAVITY*dt;
+        p.x += p.vx*dt;
+        p.y += p.vy*dt;
+        resolvePlatformCollision(p);
+        if(p.onGround && prevVy0 > 160) playSound('land');
+        p.y = clamp(p.y, -100, H-p.h);
+        if(p.invuln>0) p.invuln -= dt;
+        if(p.petrified <= 0){
+          playSound('stone_crack');
+          spawnParticles(p.x+p.w/2, p.y+p.h/2, '#9a9488', 10);
+        }
+        return;
+      }
       var maxSpeed = p.speedBoost>0 ? 340 : 220;
       if(activeEvent && activeEvent.id==='speed_boost') maxSpeed += 80;
       var left, right, jump, bubble;
@@ -996,6 +1026,38 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       if(p.invuln>0) p.invuln -= dt;
       p.shootCooldown -= dt;
       if(bubble) tryShoot(p);
+
+      // On-fire ember trail — trickles off the character while the combo bonus lasts
+      if(p.onFire){
+        p.fireTrailT -= dt;
+        if(p.fireTrailT <= 0){
+          p.fireTrailT = 0.035;
+          state.particles.push({x:p.x+p.w/2+rand(-4,4), y:p.y+p.h-4, vx:rand(-20,20), vy:rand(-60,-10),
+            life:rand(0.3,0.5), t:0, color:Math.random()<0.5?'#ff8a1e':'#ffd24a', r:rand(2,4)});
+        }
+      }
+
+      // Paris rat hole — two-way teleport shortcut
+      if(teleporters.length && p.teleportCd<=0){
+        for(var tpi=0; tpi<teleporters.length; tpi++){
+          var tp = teleporters[tpi];
+          var pcx = p.x+p.w/2, pcy = p.y+p.h;
+          var d1 = Math.hypot(pcx-tp.x1, pcy-tp.y1);
+          var d2 = Math.hypot(pcx-tp.x2, pcy-tp.y2);
+          var dest = null;
+          if(d1 < 20) dest = {x:tp.x2, y:tp.y2};
+          else if(d2 < 20) dest = {x:tp.x1, y:tp.y1};
+          if(dest){
+            spawnParticles(p.x+p.w/2, p.y+p.h, '#7a5a3a', 10);
+            p.x = dest.x - p.w/2;
+            p.y = dest.y - p.h;
+            p.teleportCd = 0.8;
+            spawnParticles(p.x+p.w/2, p.y+p.h, '#7a5a3a', 10);
+            playSound('teleport');
+            break;
+          }
+        }
+      }
     });
 
     // state.collectibles bob + pickup (either player can collect)
@@ -1034,6 +1096,14 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
           if(state.currentLocationId==='kenya' && c.slot==='c'){
             state.players[pi].hasElephant = true;
             unlockAchievement('elephant_friend');
+          }
+          // guitar (Galway slot c) — everybody breaks into a dance
+          if(state.currentLocationId==='ireland' && c.slot==='c'){
+            danceT = 3.5;
+            spawnPopup(W/2, H/2-50, '🎸 DANCE PARTY!', '#7fff7f', 30);
+            pushKillFeed('🎸 The whole crew is dancing!', '#7fff7f');
+            playSound('guitar_riff');
+            announce('Dance party!', state.currentLocationId);
           }
           break;
         }
@@ -1189,6 +1259,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
             pushKillFeed('ON FIRE!','#ff4400');
             spawnPopup(W/2, H/2-60, 'ON FIRE!', '#ff4400', 44);
             playSound('achievement');
+            announce("You're on fire!", state.currentLocationId);
           }
           // 35% chance to drop a power-up; 40% of drops are location-specific
           if(Math.random()<0.35){
@@ -1489,7 +1560,16 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
 
       if(state.gameState === 'playing'){
         state.players.forEach(function(p){
-          if(p.invuln<=0 && (en.stunT||0)<=0 && rectsOverlap(p, en)){
+          if((en.stunT||0)>0 || !rectsOverlap(p, en)) return;
+          if(p.hasElephant && en.state==='free'){
+            // Ride the elephant straight through — tramples the enemy into a bubble instead of hurting the player
+            en.state = 'trapped'; en.bubbleTimer = 4.5; en.stunT = 0;
+            state.bubbles.push({ x:en.x+en.w/2, y:en.y+en.h/2, r:20, age:0,
+              state:'carrying', trapped:en, vx:0, vy:0, t:0, grown:true });
+            spawnParticles(en.x+en.w/2, en.y+en.h/2, '#c49090', 12);
+            playSound('trap'); haptic(20);
+            shakeT = Math.max(shakeT, 0.2);
+          } else if(p.invuln<=0){
             loseLife(p, en.x + en.w/2 < p.x + p.w/2 ? -1 : 1);
           }
         });
@@ -1526,6 +1606,44 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     // fire meter decay + on-fire bonus tick
     if(fireMeter>0 && comboTimer<=0) fireMeter=Math.max(0,fireMeter-dt*0.06);
     if(fireBonus>0){ fireBonus-=dt; state.players.forEach(function(fp){ fp.speedBoost=Math.max(fp.speedBoost,0.12); fp.rapidFire=Math.max(fp.rapidFire,0.12); }); }
+    if(danceT>0) danceT -= dt;
+    // Athens gorgons: periodic petrifying gaze at the nearest player
+    if(state.currentLocationId==='athens' && state.gameState==='playing' && state.players.length>0){
+      state.enemies.forEach(function(en){
+        if(en.state!=='free') return;
+        en.gazeT = ((en.gazeT!==undefined) ? en.gazeT : rand(2.5,5)) - dt;
+        if(en.gazeT <= 0){
+          en.gazeT = rand(4.5, 7.5);
+          var gtgt = state.players[Math.floor(Math.random()*state.players.length)];
+          var gbx = en.x+en.w/2, gby = en.y+en.h/2;
+          var gdx = gtgt.x+gtgt.w/2-gbx, gdy = gtgt.y+gtgt.h/2-gby;
+          var gdist = Math.sqrt(gdx*gdx+gdy*gdy) || 1;
+          var gspd = 230;
+          stoneGazes.push({x:gbx, y:gby, vx:(gdx/gdist)*gspd, vy:(gdy/gdist)*gspd, r:7, life:2.5, t:0});
+          playSound('stone_gaze');
+        }
+      });
+    }
+    for(var sgi=stoneGazes.length-1; sgi>=0; sgi--){
+      var sg = stoneGazes[sgi];
+      sg.t += dt; sg.x += sg.vx*dt; sg.y += sg.vy*dt;
+      var sgHit = false;
+      if(sg.t <= sg.life){
+        for(var sgpi=0; sgpi<state.players.length; sgpi++){
+          var sgp = state.players[sgpi];
+          if(sgp.invuln<=0 && sgp.petrified<=0 && Math.abs(sg.x-(sgp.x+sgp.w/2))<18 && Math.abs(sg.y-(sgp.y+sgp.h/2))<20){
+            sgp.petrified = 1.6;
+            sgp.vx = 0;
+            spawnPopup(sgp.x+sgp.w/2, sgp.y-10, 'PETRIFIED!', '#9a9488', 16);
+            spawnParticles(sgp.x+sgp.w/2, sgp.y+sgp.h/2, '#9a9488', 12);
+            haptic(25);
+            announce('Turned to stone!', 'athens');
+            sgHit = true; break;
+          }
+        }
+      }
+      if(sg.t > sg.life || sg.x<-20 || sg.x>W+20 || sg.y<-20 || sg.y>H+20 || sgHit) stoneGazes.splice(sgi,1);
+    }
     // platform shake
     if(platShake>0){ platShakeX=(Math.random()-0.5)*platShake*8; platShakeY=(Math.random()-0.5)*platShake*4; platShake=Math.max(0,platShake-dt*5); } else { platShakeX=0; platShakeY=0; }
     // panda charge timer + cooldown
@@ -1588,6 +1706,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
           var puColMap = {speed:'#ffd700', rapid:'#ff7800', shield:'#4499ff', magnet:'#ff44ff', ghost:'#aaffee'};
           var puCol = puColMap[pu.type] || ((lvlPU2 && pu.type===lvlPU2.type) ? lvlPU2.color : '#b0f0ff');
           pushKillFeed(puLabel+' ACTIVATED', puCol);
+          announce(puLabel, state.currentLocationId);
           spawnPopup(W/2, H/2-20, puLabel, puCol, 38);
           spawnParticles(pu.x, pu.y, puCol, 18);
           shakeT = 0.35; screenFlash = 0.7; screenFlashColor = puCol;
@@ -1671,6 +1790,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       spawnPopup(p.x+p.w/2, p.y-24, 'FIGHT BACK!', '#ff6644', 15);
       spawnParticles(p.x+p.w/2, p.y+p.h/2, '#ff8855', 8);
       pushKillFeed('LIFE LOST - '+state.lives+' LEFT', '#ff6644');
+      announce('Ouch!', state.currentLocationId);
     }
     if(state.lives<=0){
       state.gameState = 'lost';
@@ -2252,8 +2372,10 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         pushKillFeed('⚡ ' + def.power + ' earned — press E to unleash it', '#7fe3ff');
       }
       playSound('win'); haptic(30);
+      announce(def.rewardLabel + ' unlocked!', miniGameId);
     } else {
       playSound('lose');
+      announce('Better luck next time!', miniGameId);
     }
     setTimeout(function(){
       var finId = miniGameId;
@@ -2752,21 +2874,34 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
 
   function drawSailingHat(p){
     ctx.save(); ctx.translate(p.x+p.w/2, p.y+1);
-    ctx.fillStyle='#1a3a8a'; ctx.beginPath(); ctx.ellipse(0,0,13,5,0,0,TAU); ctx.fill();
-    ctx.fillStyle='#2255cc'; ctx.fillRect(-9,-9,18,9);
+    ctx.fillStyle='rgba(10,20,50,0.3)'; ctx.beginPath(); ctx.ellipse(1,1.5,13,5,0,0,TAU); ctx.fill();
+    ctx.fillStyle='#12245e'; ctx.beginPath(); ctx.ellipse(0,0,13,5,0,0,TAU); ctx.fill();
+    var brimShine=ctx.createLinearGradient(-13,0,13,0);
+    brimShine.addColorStop(0,'#3a5ad0'); brimShine.addColorStop(0.5,'#5a80ff'); brimShine.addColorStop(1,'#2540a0');
+    ctx.fillStyle=brimShine; ctx.beginPath(); ctx.ellipse(0,-0.5,12,3.6,0,0,TAU); ctx.fill();
+    var capGrad=ctx.createLinearGradient(-9,-9,-9,0);
+    capGrad.addColorStop(0,'#3868e0'); capGrad.addColorStop(1,'#16309a');
+    ctx.fillStyle=capGrad; ctx.fillRect(-9,-9,18,9);
     ctx.fillStyle='#fff'; ctx.fillRect(-9,-10,18,2);
     ctx.fillStyle='#ffd700'; ctx.fillRect(-6,-4,12,2);
+    ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=0.8; ctx.strokeRect(-9,-9,18,9);
     ctx.restore();
   }
 
   function drawBeetrootJacket(p){
     ctx.save(); ctx.translate(p.x+p.w/2, p.y+p.h/2+2);
-    ctx.globalAlpha=0.38; ctx.fillStyle='#7a1a3a';
+    ctx.globalAlpha=0.34; ctx.fillStyle='#7a1a3a';
     ctx.beginPath(); ctx.ellipse(0,2,10,12,0,0,TAU); ctx.fill();
     ctx.globalAlpha=1;
-    ctx.fillStyle='#7a1a3a'; ctx.beginPath(); ctx.arc(8,-5,4,0,TAU); ctx.fill();
-    ctx.strokeStyle='#3a8a2a'; ctx.lineWidth=1.5; ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(8,-9); ctx.quadraticCurveTo(10,-13,8,-15); ctx.stroke();
+    var beetGrad=ctx.createRadialGradient(6,-8,1,8,-5,6);
+    beetGrad.addColorStop(0,'#c85a80'); beetGrad.addColorStop(0.5,'#9a1e4a'); beetGrad.addColorStop(1,'#5a0f28');
+    ctx.fillStyle=beetGrad; ctx.beginPath(); ctx.arc(8,-5,4.4,0,TAU); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=0.7; ctx.stroke();
+    ctx.strokeStyle='#4a9a2a'; ctx.lineWidth=1.6; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(8,-9); ctx.quadraticCurveTo(11,-14,8,-16); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(9,-9); ctx.quadraticCurveTo(6,-13,8,-15); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.4)';
+    ctx.beginPath(); ctx.arc(6.5,-6.5,1,0,TAU); ctx.fill();
     ctx.restore();
   }
 
@@ -2774,47 +2909,68 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     var gsx = (p.facing||1) < 0 ? p.w+6 : -10;
     ctx.save(); ctx.translate(p.x+gsx, p.y+p.h/2-1);
     var gc='#88ff44';
-    ctx.globalAlpha=0.28+Math.sin(performance.now()*0.008)*0.12;
-    var gg=ctx.createRadialGradient(0,0,0,0,0,14);
-    gg.addColorStop(0,gc); gg.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(0,0,14,0,TAU); ctx.fill();
-    ctx.globalAlpha=1; ctx.fillStyle=gc;
+    var flick = 0.3+Math.sin(performance.now()*0.01)*0.14;
+    ctx.globalAlpha=0.3+flick;
+    var gg=ctx.createRadialGradient(0,0,0,0,0,16);
+    gg.addColorStop(0,gc); gg.addColorStop(0.5,'rgba(136,255,68,0.4)'); gg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(0,0,16,0,TAU); ctx.fill();
+    ctx.globalAlpha=1;
+    var tubeGrad=ctx.createLinearGradient(-3,-11,3,11);
+    tubeGrad.addColorStop(0,'#c8ffb0'); tubeGrad.addColorStop(0.5,gc); tubeGrad.addColorStop(1,'#2a7a10');
+    ctx.fillStyle=tubeGrad;
     ctx.beginPath(); ctx.ellipse(0,0,3,11,0.18,0,TAU); ctx.fill();
-    ctx.fillStyle='rgba(200,255,150,0.7)';
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=0.6; ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.75)';
     ctx.beginPath(); ctx.ellipse(-1,-2,1.2,5,0.18,0,TAU); ctx.fill();
     ctx.restore();
   }
 
   function drawCrown(p){
     ctx.save(); ctx.translate(p.x + p.w/2, p.y - 2);
+    var sway = Math.sin(performance.now()*0.004)*0.04;
+    ctx.rotate(sway);
+    var goldGrad=ctx.createLinearGradient(0,-13,0,6);
+    goldGrad.addColorStop(0,'#fff3b0'); goldGrad.addColorStop(0.5,'#ffd700'); goldGrad.addColorStop(1,'#c8960a');
     // Crown base band
-    ctx.fillStyle='#ffd700';
+    ctx.fillStyle=goldGrad;
     ctx.fillRect(-11,0,22,6);
+    ctx.strokeStyle='#8a6a08'; ctx.lineWidth=0.8; ctx.strokeRect(-11,0,22,6);
     // Three points
     ctx.beginPath();
     ctx.moveTo(-11,0); ctx.lineTo(-11,-10);
     ctx.lineTo(-5,-5); ctx.lineTo(0,-13);
     ctx.lineTo(5,-5); ctx.lineTo(11,-10);
-    ctx.lineTo(11,0); ctx.closePath(); ctx.fill();
+    ctx.lineTo(11,0); ctx.closePath();
+    ctx.fillStyle=goldGrad; ctx.fill();
     ctx.strokeStyle='#b8960a'; ctx.lineWidth=1; ctx.stroke();
     // Gems
+    var gemShine = 0.6+Math.sin(performance.now()*0.006)*0.4;
     ctx.fillStyle='#ff2222'; ctx.beginPath(); ctx.arc(-5,-6,2.5,0,TAU); ctx.fill();
     ctx.fillStyle='#4488ff'; ctx.beginPath(); ctx.arc(5,-6,2.5,0,TAU); ctx.fill();
     ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,-10,2.5,0,TAU); ctx.fill();
+    ctx.globalAlpha = gemShine;
+    ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.arc(-5.8,-6.8,0.8,0,TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(4.2,-6.8,0.8,0,TAU); ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
   function drawBandana(p){
     ctx.save(); ctx.translate(p.x + p.w/2, p.y + p.h*0.3);
     // Red bandana tied around neck
-    ctx.fillStyle='#cc1111';
+    var bandGrad=ctx.createLinearGradient(-9,-2,7,7);
+    bandGrad.addColorStop(0,'#ff4444'); bandGrad.addColorStop(1,'#9a0d0d');
+    ctx.fillStyle=bandGrad;
     ctx.beginPath();
     ctx.moveTo(-9,-2); ctx.lineTo(9,-2); ctx.lineTo(7,7); ctx.lineTo(0,4); ctx.lineTo(-7,7); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=0.7; ctx.stroke();
     // Knot
     ctx.fillStyle='#ff2222';
     ctx.beginPath(); ctx.arc(0,4,3.5,0,TAU); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.2)'; ctx.lineWidth=0.6; ctx.stroke();
     // White polka dots
-    ctx.fillStyle='rgba(255,255,255,0.55)';
+    ctx.fillStyle='rgba(255,255,255,0.6)';
     ctx.beginPath(); ctx.arc(-4,1,1.5,0,TAU); ctx.fill();
     ctx.beginPath(); ctx.arc(4,1,1.5,0,TAU); ctx.fill();
     ctx.beginPath(); ctx.arc(0,-0.5,1.5,0,TAU); ctx.fill();
@@ -2870,6 +3026,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     state.gameState = 'won';
     stopMusic();
     playSound('win');
+    announce(state.currentLocationId==='boss' ? 'Champion!' : 'Level clear!', state.currentLocationId);
     var totalElapsed = (performance.now()-state.startTime)/1000;
     var elapsed = totalElapsed; // kept for star rating compat
     var collected = state.collectibles.filter(function(c){return c.taken;}).length;
@@ -3144,6 +3301,34 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       else pb.drawFn(fakeEn);
       ctx.restore();
     });
+    // Paris rat holes — little dirt-mound tunnels, drawn at both ends
+    if(teleporters.length){
+      teleporters.forEach(function(tp){
+        [[tp.x1,tp.y1],[tp.x2,tp.y2]].forEach(function(pt){
+          ctx.save(); ctx.translate(pt[0], pt[1]);
+          ctx.fillStyle = 'rgba(60,40,20,0.4)';
+          ctx.beginPath(); ctx.ellipse(0,2,17,7,0,0,TAU); ctx.fill();
+          ctx.fillStyle = '#5a3f22';
+          ctx.beginPath(); ctx.ellipse(0,0,15,6,0,0,TAU); ctx.fill();
+          ctx.fillStyle = '#1a1008';
+          ctx.beginPath(); ctx.ellipse(0,-1,10,4.2,0,0,TAU); ctx.fill();
+          var twitch = Math.sin(performance.now()*0.006)*1.5;
+          ctx.fillStyle = '#7a5a3a';
+          ctx.beginPath(); ctx.ellipse(8+twitch,-2,3,1.4,0.3,0,TAU); ctx.fill();
+          ctx.restore();
+        });
+      });
+    }
+    stoneGazes.forEach(function(sg){
+      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - sg.t/sg.life);
+      var sgg = ctx.createRadialGradient(sg.x,sg.y,1,sg.x,sg.y,sg.r+6);
+      sgg.addColorStop(0,'rgba(220,255,220,0.9)'); sgg.addColorStop(0.5,'rgba(140,180,120,0.6)'); sgg.addColorStop(1,'rgba(80,100,70,0)');
+      ctx.fillStyle = sgg;
+      ctx.beginPath(); ctx.arc(sg.x, sg.y, sg.r+6, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#c8d8b0';
+      ctx.beginPath(); ctx.arc(sg.x, sg.y, sg.r, 0, TAU); ctx.fill();
+      ctx.restore();
+    });
     state.powerups.forEach(drawPowerup);
     state.players.forEach(function(p){
       var visible = p.invuln<=0 || Math.floor(performance.now()/80)%2===0;
@@ -3157,7 +3342,12 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
           ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(p.x+p.w/2,p.y+p.h/2,28,0,TAU); ctx.fill();
           ctx.globalAlpha=1; ctx.restore();
         }
-        if(p.id===0){ drawFox(p); } else { drawChicken(p); }
+        if(p.petrified>0){
+          ctx.save();
+          ctx.filter = 'grayscale(1) brightness(0.65) contrast(1.15)';
+          if(p.id===0){ drawFox(p); } else { drawChicken(p); }
+          ctx.restore();
+        } else if(p.id===0){ drawFox(p); } else { drawChicken(p); }
         if(unlockedCosmetics.sailingHat) drawSailingHat(p);
         if(unlockedCosmetics.beetrootJacket) drawBeetrootJacket(p);
         if(unlockedCosmetics.glowstick) drawGlowstick(p);
