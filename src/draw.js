@@ -31,6 +31,29 @@ export function drawPlatform(p, theme){
   }
 }
 
+/* Tokyo's rising elevator platform — a skyscraper riding up into view, its
+   base always drawn down to the bottom of the canvas so it reads as a
+   building rather than a floating slab. */
+export function drawSkyscraperPlatform(p){
+  ctx.save();
+  var bodyBottom = H + 20;
+  ctx.fillStyle = '#2a3050';
+  ctx.fillRect(p.x, p.y, p.w, bodyBottom - p.y);
+  ctx.fillStyle = '#3c4a70';
+  ctx.fillRect(p.x, p.y-6, p.w, 6);
+  // lit windows
+  var winCols = ['#ffd23a','#5ad1ff','#ff5aa8'];
+  for(var row=p.y+16; row<bodyBottom-10; row+=18){
+    for(var col=p.x+8; col<p.x+p.w-8; col+=16){
+      ctx.globalAlpha = 0.55 + Math.sin((row+col)*0.3 + performance.now()*0.002)*0.25;
+      ctx.fillStyle = winCols[Math.floor((row+col)/18)%winCols.length];
+      ctx.fillRect(col, row, 8, 10);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 /* Shared flame halo + rising embers drawn under/around a character while
    fireBonus is active — same look for both players regardless of body shape. */
 function drawOnFireGlow(){
@@ -1195,5 +1218,75 @@ export function drawPaintBlobs(paintBlobs){
     ctx.beginPath(); ctx.ellipse(pb.x, pb.y+pb.r*0.7, pb.r*0.4, pb.r*0.8, 0, 0, TAU); ctx.fill();
     ctx.globalAlpha=1; ctx.restore();
   });
+}
+
+/* ---------- drawing: Svalbard arctic fox / collectibles ---------- */
+export function drawArcticFoxRef(en){
+  ctx.save();
+  var wob = Math.sin(performance.now()*0.01 + en.x*0.05)*1.5;
+  ctx.translate(en.x+en.w/2, en.y+en.h/2+wob);
+  ctx.scale(en.dir<0?-1:1, 1);
+  var flash = en.angry>0 && Math.floor(performance.now()/90)%2===0;
+  var trapped = en.state==='trapped';
+  var fur = trapped ? '#d8dce8' : (flash ? '#ff8080' : '#f4f8ff');
+  var shade = trapped ? '#b8bcc8' : (flash ? '#dd5050' : '#c8d4e8');
+  // tail
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.ellipse(-11,3,7,4,-0.4,0,TAU); ctx.fill();
+  ctx.fillStyle = shade;
+  ctx.beginPath(); ctx.ellipse(-15,1,3,2.2,-0.4,0,TAU); ctx.fill();
+  // body
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.ellipse(0,3,10,7,0,0,TAU); ctx.fill();
+  // head
+  ctx.beginPath(); ctx.ellipse(10,-2,7,6,0,0,TAU); ctx.fill();
+  // ears
+  ctx.fillStyle = shade;
+  ctx.beginPath(); ctx.moveTo(6,-7); ctx.lineTo(5,-14); ctx.lineTo(10,-8); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(13,-7); ctx.lineTo(15,-14); ctx.lineTo(16,-8); ctx.fill();
+  // snout
+  ctx.fillStyle = fur;
+  ctx.beginPath(); ctx.moveTo(15,-1); ctx.lineTo(20,0); ctx.lineTo(15,2); ctx.fill();
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath(); ctx.arc(19,0,1,0,TAU); ctx.fill();
+  // eyes
+  ctx.fillStyle = trapped ? '#8a90a0' : '#1c1330';
+  ctx.beginPath(); ctx.arc(9,-3,1.5,0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(13,-3,1.5,0,TAU); ctx.fill();
+  // paws
+  ctx.fillStyle = shade;
+  ctx.beginPath(); ctx.ellipse(-4,9,2.6,2,0,0,TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(5,9,2.6,2,0,0,TAU); ctx.fill();
+  ctx.restore();
+}
+
+export function drawSvalbardCollectibleRef(c){
+  if(c.taken) return;
+  var y = c.y + Math.sin(c.bob)*4;
+  ctx.save(); ctx.translate(c.x,y);
+  if(c.slot==='a'){ // ice crystal
+    ctx.fillStyle = 'rgba(180,230,255,0.9)';
+    ctx.beginPath(); ctx.moveTo(0,-11); ctx.lineTo(6,0); ctx.lineTo(0,11); ctx.lineTo(-6,0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath(); ctx.moveTo(0,-11); ctx.lineTo(2,0); ctx.lineTo(0,11); ctx.lineTo(-1,0); ctx.closePath(); ctx.fill();
+  } else if(c.slot==='b'){ // thermos flask
+    ctx.fillStyle = '#c8322a';
+    ctx.beginPath(); ctx.roundRect(-5,-9,10,20,3); ctx.fill();
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillRect(-3,-11,6,4);
+    ctx.fillStyle = '#8a1a15';
+    ctx.fillRect(-5,-1,10,3);
+  } else { // golden compass
+    ctx.fillStyle = '#e8b820';
+    ctx.beginPath(); ctx.arc(0,0,9,0,TAU); ctx.fill();
+    ctx.fillStyle = '#3a2a08';
+    ctx.beginPath(); ctx.arc(0,0,6.5,0,TAU); ctx.fill();
+    ctx.fillStyle = '#ff4040';
+    ctx.beginPath(); ctx.moveTo(0,-5); ctx.lineTo(2,0); ctx.lineTo(0,1); ctx.lineTo(-2,0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#e8e8e8';
+    ctx.beginPath(); ctx.moveTo(0,5); ctx.lineTo(2,0); ctx.lineTo(0,-1); ctx.lineTo(-2,0); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
 }
 

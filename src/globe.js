@@ -53,7 +53,8 @@ export var LOCATIONS = [
   { id:'tokyo',   name:'Tokyo',   lat:35.68, lon:139.69,unlocked:false, region:'asia'   },
   { id:'brazil',  name:'Brazil',  lat:-22.90,lon:-43.17,unlocked:false, region:'americas'},
   { id:'newyork', name:'New York',lat:40.71, lon:-74.00,unlocked:false, region:'americas'},
-  { id:'boss',    name:'Beijing', lat:39.90, lon:116.41,unlocked:false, region:'asia'   }
+  { id:'boss',    name:'Beijing', lat:39.90, lon:116.41,unlocked:false, region:'asia'   },
+  { id:'svalbard',name:'Svalbard',lat:78.22, lon:15.65, unlocked:false, region:'arctic' }
 ];
 
 // Real, simplified world coastlines (Natural Earth 110m land polygons,
@@ -502,6 +503,13 @@ export function refreshClearedPin(){
   if(pCleared('brazil')) unlockLocation('newyork');
   // New York → Boss (China)
   if(pCleared('newyork')) unlockLocation('boss');
+
+  // Secret bonus stop: Svalbard unlocks once every action level has all 3
+  // mastery stars — a completionist reward, not part of the fixed campaign.
+  var ALL_ACTION_LEVELS = ['glasgow','modena','paris','ireland','athens','kenya','tokyo','brazil','newyork','boss'];
+  if(ALL_ACTION_LEVELS.every(function(id){ return (_levelStars(id)||0) === 3; })){
+    unlockLocation('svalbard');
+  }
 
   // Also keep old Africa → Asia path if someone had legacy save
   var africaDone = pCleared('kenya');

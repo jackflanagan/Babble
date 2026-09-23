@@ -82,6 +82,32 @@ export function fetchLeaderboard(locationId, cb){
     .catch(function(){ cb([]); });
 }
 
+/* Cheap server-side count via PostgREST's exact-count Prefer header + the
+   Content-Range response header — avoids fetching every row just to rank one. */
+function lbCount(locationId, extraFilter, cb){
+  var url = LB_URL + '/rest/v1/' + LB_TABLE +
+    '?select=id&location_id=eq.' + encodeURIComponent(locationId) +
+    (extraFilter || '') + '&limit=1';
+  fetch(url, { headers: Object.assign(lbHeaders(), {'Prefer':'count=exact'}) })
+    .then(function(r){
+      var range = r.headers.get('content-range'); // "0-0/42"
+      var total = range ? parseInt(range.split('/')[1], 10) : NaN;
+      cb(isNaN(total) ? null : total);
+    })
+    .catch(function(){ cb(null); });
+}
+
+/* Best-effort rank + board size for a just-submitted score. cb(rank, total) —
+   both null if unavailable; never blocks the "submitted" confirmation. */
+export function fetchRank(locationId, scoreVal, cb){
+  if(!lbEnabled()){ cb(null, null); return; }
+  lbCount(locationId, '&score=gt.' + encodeURIComponent(scoreVal), function(above){
+    lbCount(locationId, '', function(total){
+      cb(above===null ? null : above+1, total);
+    });
+  });
+}
+
 var lbCurrentLocation = null;
 
 export function openLeaderboard(locationId, LOCATIONS){

@@ -1,14 +1,14 @@
 
 import { TAU, clamp, lerp, rand, safeGet, safeSet, escHtml, haptic } from './utils.js';
 import { ctx, W, H, initCanvas } from './canvas.js';
-import { lbEnabled, submitScore, fetchLeaderboard, openLeaderboard, setProgress, getLbName, setLbName } from './sdk.js';
+import { lbEnabled, submitScore, fetchRank, fetchLeaderboard, openLeaderboard, setProgress, getLbName, setLbName } from './sdk.js';
 import { Ads } from './ads.js';
 import { initStarfield } from './starfield.js';
 import { playSound, ac, getMasterGain, setMasterVolume, setMutedGetter, suspendAudio, resumeAudio, announce } from './audio.js';
 import { bgmAudio, startMusic, stopMusic, setMusicMutedGetter } from './music.js';
 import { updateStreak, getDailyLocationId, refreshDailyUI, ACHIEVEMENTS, achievementQueue, achievementToast, achievementToastT, setAchievementToast, setAchievementToastT, unlockAchievement, renderAchievements, setLocationsGetter, setRunAchievements } from './features.js';
 import { LOCATIONS, refreshClearedPin, renderBestScores, globeRunning, setGlobeRunning, positionPins, unlockLocation, project, globeR, globeLoop, setGlobeProgress, setEnterLocation, setCanReplay, setLevelStars, setLbName as setGlobeLbNameGetter } from './globe.js';
-import { drawGround, drawPlatform, drawFox, drawChicken, drawBubble, drawPowerup, drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawBuckfastRef, drawParmesanRef, drawLukeKellyRef, drawArtistRef, drawMotorbikeRef, drawPaintBlobs, setDrawState, getLOC_POWERUP_META } from './draw.js';
+import { drawGround, drawPlatform, drawSkyscraperPlatform, drawFox, drawChicken, drawBubble, drawPowerup, drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawBuckfastRef, drawParmesanRef, drawLukeKellyRef, drawArtistRef, drawMotorbikeRef, drawPaintBlobs, setDrawState, getLOC_POWERUP_META } from './draw.js';
 import { netRole, netConnected, netStateAccum, setNetStateAccum, netUiRefresh, netHudRefresh, netTeardown, netBroadcastScene, netBroadcastState, netSendInputIfChanged, localJumpPress, localBubblePress, setNetState, setNetEnterLocation, setNetBackToMap, setNetPlaySound, setNetTryJump, setNetTryShoot, setNetKeys, setNetUpdateHud, setNetLivePlayers, setNetFallbackToSingle, netWebRTCSupported, netSetStatus } from './net.js';
 import { LEVELS, LEVEL_LAYOUTS, drawSkylineRow } from './levels.js';
 import { loadProgression, getProgression, markLocationVisited, recordAdventureComplete, recordLevelResult, recordLevelStars, levelStarCount, levelBestScore, levelCompletions, isLevelCleared } from './progression.js';
@@ -20,7 +20,18 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   setGlobeProgress(progression);   // globe.js: reads visitedLocations / levelRecords
   // A globe location is replayable once it has been completed at least once
   // (campaign or replay both mark it visited). Mini-games are never in LOCATIONS.
+  var ALL_ACTION_LEVEL_IDS = ['glasgow','modena','paris','ireland','athens','kenya','tokyo','brazil','newyork','boss'];
+  function svalbardUnlocked(){
+    return ALL_ACTION_LEVEL_IDS.every(function(lid){ return levelStarCount(lid) === 3; });
+  }
   setCanReplay(function(id){
+    // Svalbard is a bonus stop outside the fixed campaign — it's never part of
+    // CAMPAIGN/visitedLocations on its own, so once its pin is unlocked (all
+    // other levels 3-starred) it always enters via the replay path instead.
+    // Must actually check the unlock condition here, not just "does the level
+    // data exist" — that data is always present, so that alone would make the
+    // pin show as cleared/visited from the very start of a fresh profile.
+    if(id === 'svalbard') return svalbardUnlocked() && !!LEVELS[id] && !!LEVEL_LAYOUTS[id];
     return getProgression().visitedLocations.indexOf(id) !== -1 && !!LEVELS[id] && !!LEVEL_LAYOUTS[id];
   });
   // Mastery star count for a location, for the world-map / info-card UI.
@@ -429,13 +440,17 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
   var PLATFORMS = [];
   var movingPlatforms = [];
 
-  var BOSS_SPAWN = [{x:330, y:390, w:54, h:46, vx:100, hits:3}];
+  var BOSS_SPAWN = [{x:330, y:390, w:54, h:46, vx:100, hits:6}];
 
   var shakeT = 0, comboTimer = 0, waveFlash = 0, screenFlash = 0, allClearFired = false, allClearDelay = 0;
   var freezeT = 0, slowT = 0, doubleScoreT = 0, smokeLevel = 0; var paintBlobs = [];
   var stoneGazes = [];   // Athens gorgon petrifying-gaze projectiles
   var danceT = 0;        // Galway guitar pickup — brief all-players dance party
   var teleporters = [];  // per-level teleporter pairs (currently: Paris rat hole)
+  var carnivalDancers = [];  // Brazil — sweep across the screen, bump (no damage) on contact
+  var carnivalWaveT = rand(4,6);
+  var nyCameoT = rand(10,15), nyCameo = null;  // New York — cafe-regulars walk-on cameo
+  var coffeePuddles = []; // New York — brief slow-on-contact floor hazard
   var magnetT = 0;
   var puFlash = 0, puFlashLabel = '', puFlashColor = '#fff';
   var screenFlashColor = '#ff1040';
@@ -501,7 +516,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     return { id:id, x:x, y:400, w:30, h:34, vx:0, vy:0, onGround:false, facing:1,
       walkPhase:Math.random()*TAU, invuln:0, shootCooldown:0, palette:palette,
       speedBoost:0, rapidFire:0, shield:0, hasRat:false, ratPhase:0, hasElephant:false, elephantPhase:0,
-      fireTrailT:0, petrified:0, teleportCd:0, onFire:false, dancing:false };
+      fireTrailT:0, petrified:0, teleportCd:0, onFire:false, dancing:false, slipCd:0 };
   }
 
   function resetGame(keepScore){
@@ -519,11 +534,15 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     freezeT = 0; slowT = 0; doubleScoreT = 0;
     PLATFORMS = layout.platforms;
     movingPlatforms = (layout.movingPlatformDefs || []).map(function(d){
-      return {x:d.ox, y:d.oy, w:d.w, h:d.h, ox:d.ox, oy:d.oy, axis:d.axis, amplitude:d.amplitude, speed:d.speed};
+      return {x:d.ox, y:d.oy, w:d.w, h:d.h, ox:d.ox, oy:d.oy, axis:d.axis, amplitude:d.amplitude, speed:d.speed, skyscraper:!!d.skyscraper};
     });
     teleporters = layout.teleporters || [];
     stoneGazes = [];
     danceT = 0;
+    carnivalDancers = [];
+    carnivalWaveT = rand(3,5);
+    nyCameoT = rand(6,10); nyCameo = null;
+    coffeePuddles = [];
     var currentEnemySpawns = layout.enemySpawns;
     var currentCollectibleSpots = layout.collectibleSpots;
 
@@ -768,7 +787,11 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         winScoreSubmit.hidden = false;
         winScoreSubmit.textContent = 'Submitting score…';
         submitScore(boardId, val, scoreForBoard, function(ok){
-          winScoreSubmit.textContent = ok ? '✓ On the leaderboard!' : '✗ Could not submit score';
+          if(!ok){ winScoreSubmit.textContent = '✗ Could not submit score'; return; }
+          winScoreSubmit.textContent = '✓ On the leaderboard!';
+          fetchRank(boardId, scoreForBoard, function(rank, total){
+            if(rank && total) winScoreSubmit.textContent = '✓ On the leaderboard! #' + rank + ' of ' + total;
+          });
         });
       }
     }
@@ -1057,6 +1080,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       if(p.rapidFire>0) p.rapidFire -= dt;
       if(p.shield>0) p.shield -= dt;
       if(p.teleportCd>0) p.teleportCd -= dt;
+      if(p.slipCd>0) p.slipCd -= dt;
       p.onFire = fireBonus > 0;
       p.dancing = danceT > 0;
       // Athens petrify: frozen solid, no input, until it wears off
@@ -1319,6 +1343,21 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
             spawnParticles(b.x,b.y,'#ff3030',14);
             playSound('trap');
             shakeT = 0.2;
+            // Beijing boss: each landed hit that doesn't finish it off calls in
+            // two smaller dragons as reinforcements (capped so adds don't spiral).
+            if(state.currentLocationId === 'boss' && state.enemies.length < 6){
+              for(var mbi=0; mbi<2; mbi++){
+                var mbDir = mbi===0 ? -1 : 1;
+                state.enemies.push({
+                  x: en2.x + en2.w/2 - 12, y: en2.y, w:24, h:20, vx: 90*mbDir, vy:0,
+                  dir: mbDir, platform: en2.platform,
+                  state:'free', bubbleTimer:0, hopT: rand(1,3), angry:2, onGround:false,
+                  type:'normal', hits:1, wanderX: rand(40,680), wanderT: rand(3,9)
+                });
+              }
+              spawnPopup(en2.x+en2.w/2, en2.y-20, 'REINFORCEMENTS!', '#ff8800', 20);
+              playSound('wave2');
+            }
             continue;
           }
           state.comboCount++;
@@ -1732,6 +1771,78 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       }
       if(sg.t > sg.life || sg.x<-20 || sg.x>W+20 || sg.y<-20 || sg.y>H+20 || sgHit) stoneGazes.splice(sgi,1);
     }
+
+    // Brazil: waves of carnival dancers sweep across the screen — contact
+    // never costs a life, it just bumps the player hard across the map.
+    if(state.currentLocationId==='brazil' && state.gameState==='playing'){
+      carnivalWaveT -= dt;
+      if(carnivalWaveT <= 0){
+        carnivalWaveT = rand(4,6.5);
+        var waveSize = Math.floor(rand(4,7));
+        var waveDir = Math.random()<0.5 ? 1 : -1;
+        for(var cdi=0; cdi<waveSize; cdi++){
+          var cdDir = waveDir * (Math.random()<0.8 ? 1 : -1);
+          carnivalDancers.push({
+            x: cdDir>0 ? -40-cdi*60 : W+40+cdi*60,
+            y: rand(120,390), vx: cdDir*rand(160,240), dir:cdDir, phase: rand(0,TAU)
+          });
+        }
+        playSound('guitar_riff');
+      }
+    }
+    for(var cdi2=carnivalDancers.length-1; cdi2>=0; cdi2--){
+      var cd = carnivalDancers[cdi2];
+      cd.x += cd.vx*dt; cd.phase += dt*6;
+      if(cd.x < -60 || cd.x > W+60){ carnivalDancers.splice(cdi2,1); continue; }
+      var cdBox = {x:cd.x-14,y:cd.y-16,w:28,h:32};
+      for(var cdpi=0; cdpi<state.players.length; cdpi++){
+        var cdp = state.players[cdpi];
+        if(cdp.invuln<=0 && cdp.petrified<=0 && rectsOverlap(cdp, cdBox)){
+          var awayDir = (cdp.x+cdp.w/2) < cd.x ? -1 : 1;
+          cdp.vx = 480*awayDir; cdp.vy = -260; cdp.invuln = 0.8; cdp.facing = -awayDir;
+          spawnPopup(cdp.x+cdp.w/2, cdp.y-10, 'BUMPED!', '#ff9c1a', 20);
+          spawnParticles(cdp.x+cdp.w/2, cdp.y+cdp.h/2, '#ff9c1a', 12);
+          haptic(20);
+          playSound('bump_dance');
+          break;
+        }
+      }
+    }
+
+    // New York: an original cafe-regulars cameo walks across every so often
+    // and leaves a coffee spill behind — cosmetic + a brief, harmless slip.
+    if(state.currentLocationId==='newyork' && state.gameState==='playing'){
+      nyCameoT -= dt;
+      if(nyCameoT <= 0 && !nyCameo){
+        nyCameoT = rand(12,18);
+        var camY = rand(150,380);
+        var camDir = Math.random()<0.5 ? 1 : -1;
+        nyCameo = {x: camDir>0 ? -30 : W+30, y:camY, vx: camDir*70, dir:camDir, t:0, life:5, spilled:false};
+      }
+      if(nyCameo){
+        nyCameo.t += dt; nyCameo.x += nyCameo.vx*dt;
+        if(!nyCameo.spilled && nyCameo.t > nyCameo.life*0.5){
+          nyCameo.spilled = true;
+          coffeePuddles.push({x:nyCameo.x, y:nyCameo.y+16, r:15, life:6, t:0});
+        }
+        if(nyCameo.t > nyCameo.life || nyCameo.x<-60 || nyCameo.x>W+60) nyCameo = null;
+      }
+    }
+    for(var cpi=coffeePuddles.length-1; cpi>=0; cpi--){
+      var cp2 = coffeePuddles[cpi];
+      cp2.t += dt;
+      if(cp2.t > cp2.life){ coffeePuddles.splice(cpi,1); continue; }
+      for(var cppi=0; cppi<state.players.length; cppi++){
+        var cpp = state.players[cppi];
+        if(cpp.slipCd<=0 && Math.abs(cp2.x-(cpp.x+cpp.w/2))<cp2.r && Math.abs(cp2.y-(cpp.y+cpp.h))<12){
+          cpp.vx *= 0.15; cpp.slipCd = 1.2;
+          spawnPopup(cpp.x+cpp.w/2, cpp.y-10, 'SLIP!', '#8a5a2a', 14);
+          spawnParticles(cpp.x+cpp.w/2, cpp.y+cpp.h, '#6a4020', 8);
+          playSound('paint_splat');
+        }
+      }
+    }
+
     // platform shake
     if(platShake>0){ platShakeX=(Math.random()-0.5)*platShake*8; platShakeY=(Math.random()-0.5)*platShake*4; platShake=Math.max(0,platShake-dt*5); } else { platShakeX=0; platShakeY=0; }
     // panda charge timer + cooldown
@@ -3217,8 +3328,13 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         if(savedName && lbEnabled()){
           winScoreSubmit.hidden = false;
           winScoreSubmit.textContent = 'Submitting score…';
-          submitScore(state.currentLocationId, savedName, levelBestScore(state.currentLocationId), function(ok){
-            winScoreSubmit.textContent = ok ? '✓ Score submitted to leaderboard' : '✗ Could not submit score';
+          var lvlScoreForBoard = levelBestScore(state.currentLocationId);
+          submitScore(state.currentLocationId, savedName, lvlScoreForBoard, function(ok){
+            if(!ok){ winScoreSubmit.textContent = '✗ Could not submit score'; return; }
+            winScoreSubmit.textContent = '✓ Score submitted to leaderboard';
+            fetchRank(state.currentLocationId, lvlScoreForBoard, function(rank, total){
+              if(rank && total) winScoreSubmit.textContent = '✓ Score submitted! #' + rank + ' of ' + total;
+            });
           });
         }
       }
@@ -3318,7 +3434,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     theme.drawCenterpiece(360,262);
     ctx.save(); if(platShakeX||platShakeY) ctx.translate(platShakeX, platShakeY);
     for(var i=1;i<PLATFORMS.length;i++) drawPlatform(PLATFORMS[i], theme);
-    movingPlatforms.forEach(function(mp){ drawPlatform(mp, theme); });
+    movingPlatforms.forEach(function(mp){ mp.skyscraper ? drawSkyscraperPlatform(mp) : drawPlatform(mp, theme); });
     ctx.restore();
     drawGround(theme);
 
@@ -3430,6 +3546,54 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       ctx.beginPath(); ctx.arc(sg.x, sg.y, sg.r, 0, TAU); ctx.fill();
       ctx.restore();
     });
+    carnivalDancers.forEach(function(cd){
+      ctx.save();
+      ctx.translate(cd.x, cd.y);
+      var cdCols = ['#ff5470','#ffd166','#7fe3ff','#7fff7f'];
+      // spinning feather arms
+      for(var fi=0; fi<4; fi++){
+        ctx.save();
+        ctx.rotate(cd.phase + fi*(TAU/4));
+        ctx.fillStyle = cdCols[fi%cdCols.length];
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(16,-4); ctx.lineTo(20,0); ctx.lineTo(16,4); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      // body
+      ctx.fillStyle = cdCols[Math.floor(cd.phase)%cdCols.length];
+      ctx.beginPath(); ctx.arc(0,0,13,0,TAU); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(-4,-3,2.4,0,TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(4,-3,2.4,0,TAU); ctx.fill();
+      ctx.fillStyle = '#1c1330';
+      ctx.beginPath(); ctx.arc(-4,-3,1.1,0,TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(4,-3,1.1,0,TAU); ctx.fill();
+      ctx.restore();
+    });
+    coffeePuddles.forEach(function(cp3){
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, cp3.life-cp3.t) * 0.8;
+      ctx.fillStyle = '#4a2c14';
+      ctx.beginPath(); ctx.ellipse(cp3.x, cp3.y, cp3.r, cp3.r*0.4, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath(); ctx.ellipse(cp3.x-cp3.r*0.3, cp3.y-cp3.r*0.1, cp3.r*0.3, cp3.r*0.12, 0, 0, TAU); ctx.fill();
+      ctx.restore();
+    });
+    if(nyCameo){
+      ctx.save();
+      ctx.translate(nyCameo.x, nyCameo.y);
+      ctx.scale(nyCameo.dir<0?-1:1, 1);
+      var walkBob = Math.sin(performance.now()*0.012)*2;
+      ctx.translate(0, walkBob);
+      ctx.fillStyle = '#c8926a';
+      ctx.beginPath(); ctx.arc(0,-16,6,0,TAU); ctx.fill(); // head
+      ctx.fillStyle = '#3a4a7a';
+      ctx.fillRect(-7,-10,14,18); // torso
+      ctx.fillStyle = '#2a2a3a';
+      ctx.fillRect(-6,8,5,10); ctx.fillRect(1,8,5,10); // legs
+      ctx.fillStyle = '#e8e8e8';
+      ctx.beginPath(); ctx.ellipse(9,-4,4,5,0,0,TAU); ctx.fill(); // coffee cup in hand
+      ctx.restore();
+    }
     state.powerups.forEach(drawPowerup);
     state.players.forEach(function(p){
       var visible = p.invuln<=0 || Math.floor(performance.now()/80)%2===0;

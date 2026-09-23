@@ -413,6 +413,15 @@ export function playSound(type){
       po.type='sine'; po.frequency.setValueAtTime(300,now+0.14); po.frequency.linearRampToValueAtTime(1200,now+0.3);
       pg.gain.setValueAtTime(0.2,now+0.14); pg.gain.linearRampToValueAtTime(0,now+0.34);
       po.start(now+0.14); po.stop(now+0.35);
+    } else if(type==='bump_dance'){
+      // Bouncy cartoon "boing" — carnival dancer bump, playful not painful
+      o.type='sawtooth'; o.frequency.setValueAtTime(220,now); o.frequency.linearRampToValueAtTime(660,now+0.14);
+      g.gain.setValueAtTime(0.28,now); g.gain.linearRampToValueAtTime(0,now+0.16);
+      o.start(now); o.stop(now+0.16);
+      var po=c.createOscillator(), pg=c.createGain(); po.connect(pg); pg.connect(getMasterGain());
+      po.type='square'; po.frequency.setValueAtTime(880,now+0.05); po.frequency.linearRampToValueAtTime(440,now+0.2);
+      pg.gain.setValueAtTime(0.14,now+0.05); pg.gain.linearRampToValueAtTime(0,now+0.22);
+      po.start(now+0.05); po.stop(now+0.23);
     }
   } catch(e){}
 }

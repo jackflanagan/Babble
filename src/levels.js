@@ -2,7 +2,7 @@
 
 import { TAU } from './utils.js';
 import { ctx, W, H } from './canvas.js';
-import { drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawTokyoCollectibleRef, drawBrazilCollectibleRef, drawNewyorkCollectibleRef, drawOniRef, drawPigeonRef } from './draw.js';
+import { drawKelpieRef, drawScotCollectibleRef, drawBurglarRef, drawModenaCollectibleRef, drawHyenaRef, drawWaspRef, drawKenyaCollectibleRef, drawMimeRef, drawParisCollectibleRef, drawBansheeRef, drawIrelandCollectibleRef, drawGorgonRef, drawAthensCollectibleRef, drawDragonRef, drawTokyoCollectibleRef, drawBrazilCollectibleRef, drawNewyorkCollectibleRef, drawOniRef, drawPigeonRef, drawArcticFoxRef, drawSvalbardCollectibleRef } from './draw.js';
 export function drawSkylineRow(buildings, color, baseY){
   ctx.fillStyle = color;
   buildings.forEach(function(b){
@@ -168,7 +168,8 @@ tokyo: {
     {x:575, y:170, slot:'a'},{x:130, y:115, slot:'b'},{x:350, y:230, slot:'c'}
   ],
   movingPlatformDefs: [
-    {ox:300, oy:180, w:110, h:18, axis:'x', amplitude:80, speed:1.1}
+    {ox:300, oy:180, w:110, h:18, axis:'x', amplitude:80, speed:1.1},
+    {ox:150, oy:250, w:90, h:18, axis:'y', amplitude:180, speed:0.4, skyscraper:true}
   ],
   enemyVariety: {specialType:'fast', waveRatio:0.55}
 },
@@ -267,6 +268,32 @@ boss: {
   ],
   movingPlatformDefs: [],
   enemyVariety: null
+},
+svalbard: {
+  platforms: [
+    {x:0,   y:440, w:720, h:40, ground:true},
+    {x:25,  y:365, w:150, h:18},
+    {x:545, y:365, w:150, h:18},
+    {x:215, y:280, w:290, h:18},
+    {x:40,  y:190, w:150, h:18},
+    {x:530, y:190, w:150, h:18},
+    {x:290, y:100, w:140, h:18}
+  ],
+  enemySpawns: [
+    {x:70,  y:335, platform:1},
+    {x:600, y:335, platform:2},
+    {x:280, y:250, platform:3},
+    {x:90,  y:160, platform:4},
+    {x:575, y:160, platform:5}
+  ],
+  collectibleSpots: [
+    {x:90,  y:335, slot:'a'},{x:610, y:335, slot:'b'},{x:360, y:250, slot:'c'},
+    {x:110, y:160, slot:'b'},{x:590, y:160, slot:'a'},{x:360, y:70,  slot:'c'}
+  ],
+  movingPlatformDefs: [
+    {ox:290, oy:225, w:130, h:18, axis:'x', amplitude:85, speed:0.8}
+  ],
+  enemyVariety: {specialType:'fast', waveRatio:0.5}
 }
 };
 
@@ -515,7 +542,7 @@ export var LEVELS = {
   },
   tokyo:{
     name:'Tokyo',
-    blurb:'Trap every oni in a bubble, then bump it to pop it. Grab a paper lantern, sushi and a lucky cat for bonus points. These little demons are quick — keep moving. Walk off either edge to wrap around the map.',
+    blurb:'Trap every oni in a bubble, then bump it to pop it. Grab a paper lantern, sushi and a lucky cat for bonus points. These little demons are quick — keep moving. Hop on the rising skyscraper to ride it up. Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#1b1f3a', skyMid:'#4a3a6a', skyBottom:'#e79fb8',
@@ -560,7 +587,7 @@ export var LEVELS = {
   },
   brazil:{
     name:'Brazil',
-    blurb:'Trap every jungle-sprite in a bubble, then bump it to pop it. Grab a carnival feather, football and a toucan for bonus points. Walk off either edge to wrap around the map.',
+    blurb:'Trap every jungle-sprite in a bubble, then bump it to pop it. Grab a carnival feather, football and a toucan for bonus points. Waves of carnival dancers sweep across the screen — they won’t hurt you, but touching one sends you flying! Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#1f8fae', skyMid:'#4fc2c0', skyBottom:'#f3e6a8',
@@ -598,7 +625,7 @@ export var LEVELS = {
   },
   newyork:{
     name:'New York',
-    blurb:'Trap every pigeon in a bubble, then bump it to pop it. Grab a pretzel, yellow taxi and a Liberty torch for bonus points. The flock scatters fast and comes back angrier. Walk off either edge to wrap around the map.',
+    blurb:'Trap every pigeon in a bubble, then bump it to pop it. Grab a pretzel, yellow taxi and a Liberty torch for bonus points. The flock scatters fast and comes back angrier. Watch your step — the cafe regulars wander through and spill their coffee. Walk off either edge to wrap around the map.',
     values:{ a:100, b:60, c:250, pop:150 },
     theme:{
       skyTop:'#3a4a6a', skyMid:'#8a94ac', skyBottom:'#e6b98a',
@@ -709,11 +736,12 @@ export var LEVELS = {
   },
   boss:{
     name:'Beijing',
-    blurb:'A mighty dragon guards the mountains. Three hits to defeat it — each hit makes it faster and angrier. This is the final test.',
+    blurb:'A mighty dragon guards the mountains. Six hits to defeat it — each hit makes it faster and angrier, and calls in a pair of smaller dragons as reinforcements. This is the final test.',
     values:{ a:100, b:60, c:250, pop:500 },
-    // Boss uses a single 3-hit enemy (not 10 spawns), so its performance target
-    // is set explicitly rather than derived: dragon pops + all collectibles.
-    starScore:2600,
+    // Boss uses a single 6-hit enemy plus reinforcement spawns (not 10 spawns),
+    // so its performance target is set explicitly rather than derived: dragon
+    // pops (including reinforcements) + all collectibles.
+    starScore:3400,
     theme:{
       skyTop:'#c0392b', skyMid:'#e74c3c', skyBottom:'#f39c12',
       sunColor:'rgba(255,220,50,0.95)',
@@ -753,6 +781,52 @@ export var LEVELS = {
     },
     enemyDraw:drawDragonRef,
     collectibleDraw:drawScotCollectibleRef
+  },
+  svalbard:{
+    name:'Svalbard',
+    blurb:'A secret stop, unlocked only once every other landing site has all three stars. Trap every arctic fox in a bubble, then bump it to pop it. Grab an ice crystal, thermos and a golden compass for bonus points. Walk off either edge to wrap around the map.',
+    values:{ a:150, b:100, c:350, pop:350 },
+    theme:{
+      skyTop:'#0a1a3a', skyMid:'#1a4a5a', skyBottom:'#dceaf5',
+      sunColor:'rgba(200,240,255,0.9)',
+      groundBase:'#e8f2fa', groundEdge:'#ffffff', detailColor:['#b8d8ec','#8ab8d8'],
+      platformTop:'#e0eef8', platformBody:'#a8c8dc', platformDetail:'#5a8aa8',
+      drawBackdrop:function(){
+        // aurora ribbons
+        ['#7fffa0','#7fe3ff','#b07fff'].forEach(function(col,i){
+          ctx.strokeStyle = col; ctx.globalAlpha = 0.35; ctx.lineWidth = 14;
+          ctx.beginPath();
+          ctx.moveTo(0, 70+i*22);
+          ctx.quadraticCurveTo(180, 20+i*18, 360, 80+i*20);
+          ctx.quadraticCurveTo(540, 140+i*16, 720, 60+i*22);
+          ctx.stroke();
+        });
+        ctx.globalAlpha = 1;
+        // snowy mountain range
+        ctx.fillStyle = 'rgba(160,190,210,0.5)';
+        ctx.beginPath(); ctx.moveTo(0,320); ctx.lineTo(140,210); ctx.lineTo(260,320); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(220,320); ctx.lineTo(400,180); ctx.lineTo(560,320); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(500,320); ctx.lineTo(640,230); ctx.lineTo(720,320); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.beginPath(); ctx.moveTo(140,210); ctx.lineTo(160,240); ctx.lineTo(120,240); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(400,180); ctx.lineTo(424,214); ctx.lineTo(376,214); ctx.fill();
+      },
+      drawCenterpiece:function(x,y){
+        ctx.save(); ctx.translate(x,y);
+        // ice arch
+        ctx.strokeStyle = 'rgba(200,235,255,0.85)'; ctx.lineWidth = 14; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-34,0); ctx.quadraticCurveTo(-34,-60,0,-64);
+        ctx.quadraticCurveTo(34,-60,34,0); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(-34,0); ctx.quadraticCurveTo(-34,-60,0,-64);
+        ctx.quadraticCurveTo(34,-60,34,0); ctx.stroke();
+        ctx.restore();
+      }
+    },
+    enemyDraw:drawArcticFoxRef,
+    collectibleDraw:drawSvalbardCollectibleRef,
+    levelPhysics:{ gravity:1400, enemySpeed:1.2 },
+    locPowerup:{ type:'frost', label:'FROSTBITE!', color:'#7fe3ff', glowColor:'rgba(127,227,255,0.4)', effect:function(p){ freezeT = 4; } }
   }
 };
 
