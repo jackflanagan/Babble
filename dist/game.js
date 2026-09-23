@@ -2618,11 +2618,28 @@
     }
     ctx.restore();
   }
+  function playerSquash(p) {
+    if (p.squashT > 0) {
+      var ease = p.squashT / 0.22;
+      return { sx: 1 + 0.32 * ease, sy: 1 - 0.26 * ease };
+    }
+    if (!p.onGround) {
+      var vyN = Math.max(-1.4, Math.min(1.4, p.vy / 500));
+      if (vyN < 0) return { sx: 1 - Math.min(0.14, -vyN * 0.12), sy: 1 + Math.min(0.22, -vyN * 0.18) };
+      return { sx: 1 - Math.min(0.08, vyN * 0.06), sy: 1 + Math.min(0.12, vyN * 0.1) };
+    }
+    if (Math.abs(p.vx) > 20) {
+      var bounce = Math.abs(Math.sin(p.walkPhase));
+      return { sx: 1 + bounce * 0.04, sy: 1 - bounce * 0.05 };
+    }
+    return { sx: 1, sy: 1 };
+  }
   function drawFox(p) {
     var pal = p.palette;
+    var sq = playerSquash(p);
     ctx.save();
     ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
-    ctx.scale(p.facing < 0 ? -1 : 1, 1);
+    ctx.scale((p.facing < 0 ? -1 : 1) * sq.sx, sq.sy);
     var bob = p.onGround ? Math.sin(p.walkPhase) * 2 : 0;
     ctx.translate(0, bob);
     if (p.dancing) ctx.rotate(Math.sin(performance.now() * 0.018) * 0.28);
@@ -2720,9 +2737,10 @@
     var bodyCol = pal ? pal.body : "#f5c842";
     var wingCol = pal ? pal.ear : "#e0a800";
     var combCol = pal ? pal.tailTip === "#fff" ? "#e83030" : pal.tailTip : "#e83030";
+    var sq = playerSquash(p);
     ctx.save();
     ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
-    ctx.scale(p.facing < 0 ? -1 : 1, 1);
+    ctx.scale((p.facing < 0 ? -1 : 1) * sq.sx, sq.sy);
     var bob = p.onGround ? Math.sin(p.walkPhase) * 2 : 0;
     ctx.translate(0, bob);
     if (p.dancing) ctx.rotate(Math.sin(performance.now() * 0.018 + 1.2) * 0.28);
@@ -6605,7 +6623,8 @@
           teleportCd: 0,
           onFire: false,
           dancing: false,
-          slipCd: 0
+          slipCd: 0,
+          squashT: 0
         };
       }
       function resetGame(keepScore) {
@@ -7284,6 +7303,7 @@
           if (p.shield > 0) p.shield -= dt;
           if (p.teleportCd > 0) p.teleportCd -= dt;
           if (p.slipCd > 0) p.slipCd -= dt;
+          if (p.squashT > 0) p.squashT -= dt;
           p.onFire = fireBonus > 0;
           p.dancing = danceT > 0;
           if (p.petrified > 0) {
@@ -7295,7 +7315,10 @@
             p.x += p.vx * dt;
             p.y += p.vy * dt;
             resolvePlatformCollision(p);
-            if (p.onGround && prevVy0 > 160) playSound("land");
+            if (p.onGround && prevVy0 > 160) {
+              playSound("land");
+              p.squashT = 0.22;
+            }
             p.y = clamp(p.y, -100, H - p.h);
             if (p.invuln > 0) p.invuln -= dt;
             if (p.petrified <= 0) {
@@ -7341,7 +7364,10 @@
           p.x += p.vx * dt;
           p.y += p.vy * dt;
           resolvePlatformCollision(p);
-          if (p.onGround && prevVy > 160) playSound("land");
+          if (p.onGround && prevVy > 160) {
+            playSound("land");
+            p.squashT = 0.22;
+          }
           p.y = clamp(p.y, -100, H - p.h);
           if (p.invuln > 0) p.invuln -= dt;
           p.shootCooldown -= dt;

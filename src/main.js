@@ -516,7 +516,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     return { id:id, x:x, y:400, w:30, h:34, vx:0, vy:0, onGround:false, facing:1,
       walkPhase:Math.random()*TAU, invuln:0, shootCooldown:0, palette:palette,
       speedBoost:0, rapidFire:0, shield:0, hasRat:false, ratPhase:0, hasElephant:false, elephantPhase:0,
-      fireTrailT:0, petrified:0, teleportCd:0, onFire:false, dancing:false, slipCd:0 };
+      fireTrailT:0, petrified:0, teleportCd:0, onFire:false, dancing:false, slipCd:0, squashT:0 };
   }
 
   function resetGame(keepScore){
@@ -1081,6 +1081,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       if(p.shield>0) p.shield -= dt;
       if(p.teleportCd>0) p.teleportCd -= dt;
       if(p.slipCd>0) p.slipCd -= dt;
+      if(p.squashT>0) p.squashT -= dt;
       p.onFire = fireBonus > 0;
       p.dancing = danceT > 0;
       // Athens petrify: frozen solid, no input, until it wears off
@@ -1093,7 +1094,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
         p.x += p.vx*dt;
         p.y += p.vy*dt;
         resolvePlatformCollision(p);
-        if(p.onGround && prevVy0 > 160) playSound('land');
+        if(p.onGround && prevVy0 > 160){ playSound('land'); p.squashT = 0.22; }
         p.y = clamp(p.y, -100, H-p.h);
         if(p.invuln>0) p.invuln -= dt;
         if(p.petrified <= 0){
@@ -1133,7 +1134,7 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
       p.x += p.vx*dt;
       p.y += p.vy*dt;
       resolvePlatformCollision(p);
-      if(p.onGround && prevVy > 160) playSound('land');
+      if(p.onGround && prevVy > 160){ playSound('land'); p.squashT = 0.22; }
       p.y = clamp(p.y, -100, H-p.h);
       if(p.invuln>0) p.invuln -= dt;
       p.shootCooldown -= dt;

@@ -77,11 +77,33 @@ function drawOnFireGlow(){
   }
   ctx.restore();
 }
+/* Squash-and-stretch for the two player characters: a brief squash on
+   landing (p.squashT, set in main.js's update loop), an air stretch tied to
+   vertical speed, and a soft bounce while running — read together these sell
+   weight/impact far better than the flat idle bob alone. */
+function playerSquash(p){
+  if(p.squashT > 0){
+    var ease = p.squashT / 0.22;
+    return { sx: 1 + 0.32*ease, sy: 1 - 0.26*ease };
+  }
+  if(!p.onGround){
+    var vyN = Math.max(-1.4, Math.min(1.4, p.vy/500));
+    if(vyN < 0) return { sx: 1 - Math.min(0.14,-vyN*0.12), sy: 1 + Math.min(0.22,-vyN*0.18) };
+    return { sx: 1 - Math.min(0.08, vyN*0.06), sy: 1 + Math.min(0.12, vyN*0.10) };
+  }
+  if(Math.abs(p.vx) > 20){
+    var bounce = Math.abs(Math.sin(p.walkPhase));
+    return { sx: 1 + bounce*0.04, sy: 1 - bounce*0.05 };
+  }
+  return { sx:1, sy:1 };
+}
+
 export function drawFox(p){
   var pal = p.palette;
+  var sq = playerSquash(p);
   ctx.save();
   ctx.translate(p.x+p.w/2, p.y+p.h/2);
-  ctx.scale(p.facing<0?-1:1, 1);
+  ctx.scale((p.facing<0?-1:1)*sq.sx, sq.sy);
   var bob = p.onGround ? Math.sin(p.walkPhase)*2 : 0;
   ctx.translate(0,bob);
   if(p.dancing) ctx.rotate(Math.sin(performance.now()*0.018)*0.28);
@@ -137,9 +159,10 @@ export function drawChicken(p){
   var bodyCol = pal ? pal.body : '#f5c842';
   var wingCol = pal ? pal.ear : '#e0a800';
   var combCol = pal ? pal.tailTip==='#fff' ? '#e83030' : pal.tailTip : '#e83030';
+  var sq = playerSquash(p);
   ctx.save();
   ctx.translate(p.x+p.w/2, p.y+p.h/2);
-  ctx.scale(p.facing<0?-1:1, 1);
+  ctx.scale((p.facing<0?-1:1)*sq.sx, sq.sy);
   var bob = p.onGround ? Math.sin(p.walkPhase)*2 : 0;
   ctx.translate(0,bob);
   if(p.dancing) ctx.rotate(Math.sin(performance.now()*0.018+1.2)*0.28);
