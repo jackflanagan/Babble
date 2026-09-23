@@ -1,3 +1,4 @@
 node_modules/
 test-results/
 tests/report/
+.capture-scratch/
