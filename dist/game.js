@@ -2637,12 +2637,20 @@
   function drawFox(p) {
     var pal = p.palette;
     var sq = playerSquash(p);
+    var hurt = p.invuln > 0 && p.shield <= 0 && !(p.petrified > 0);
+    var fwdSpeed = p.vx * (p.facing < 0 ? -1 : 1);
+    var lean = Math.max(-1, Math.min(1, fwdSpeed / 220));
+    var running = p.onGround && Math.abs(p.vx) > 20;
+    var wag = Math.sin(p.walkPhase * 1.4) * (running ? 0.12 : 0.05);
+    var earLag = -lean * 0.3 + wag;
+    var tailLag = -lean * 0.38 + Math.sin(p.walkPhase * 1.4 - 0.7) * (running ? 0.16 : 0.05);
     ctx.save();
     ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
     ctx.scale((p.facing < 0 ? -1 : 1) * sq.sx, sq.sy);
     var bob = p.onGround ? Math.sin(p.walkPhase) * 2 : 0;
     ctx.translate(0, bob);
-    if (p.dancing) ctx.rotate(Math.sin(performance.now() * 0.018) * 0.28);
+    if (hurt) ctx.rotate(-0.22);
+    else if (p.dancing) ctx.rotate(Math.sin(performance.now() * 0.018) * 0.28);
     if (p.onFire) drawOnFireGlow();
     var bodyGrad = ctx.createRadialGradient(-4, -4, 2, 0, 4, 16);
     bodyGrad.addColorStop(0, pal.highlight || "#ffffff");
@@ -2650,14 +2658,18 @@
     bodyGrad.addColorStop(1, pal.shadow || pal.body);
     ctx.strokeStyle = pal.ear;
     ctx.lineWidth = 1.2;
+    ctx.save();
+    ctx.translate(-5, 3);
+    ctx.rotate(tailLag);
     ctx.fillStyle = pal.shadow || pal.body;
     ctx.beginPath();
-    ctx.ellipse(-14, 2, 10, 6, -0.5, 0, TAU);
+    ctx.ellipse(-9, -1, 10, 6, -0.5, 0, TAU);
     ctx.fill();
     ctx.fillStyle = pal.tailTip;
     ctx.beginPath();
-    ctx.ellipse(-20, 0, 4, 3, -0.5, 0, TAU);
+    ctx.ellipse(-15, -3, 4, 3, -0.5, 0, TAU);
     ctx.fill();
+    ctx.restore();
     ctx.fillStyle = bodyGrad;
     ctx.beginPath();
     ctx.ellipse(0, 4, 11, 13, 0, 0, TAU);
@@ -2667,30 +2679,27 @@
     ctx.beginPath();
     ctx.ellipse(1, 9, 6, 7, 0, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = bodyGrad;
-    ctx.beginPath();
-    ctx.moveTo(-9, -10);
-    ctx.lineTo(-13, -19);
-    ctx.lineTo(-3, -13);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(9, -10);
-    ctx.lineTo(13, -19);
-    ctx.lineTo(3, -13);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = pal.ear;
-    ctx.beginPath();
-    ctx.moveTo(-8, -11);
-    ctx.lineTo(-10, -16);
-    ctx.lineTo(-5, -13);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(8, -11);
-    ctx.lineTo(10, -16);
-    ctx.lineTo(5, -13);
-    ctx.fill();
+    [-1, 1].forEach(function(sx) {
+      ctx.save();
+      ctx.translate(sx * 9, -10);
+      ctx.rotate(earLag);
+      ctx.fillStyle = bodyGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(sx * 4, -9);
+      ctx.lineTo(-sx * 6, -3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = pal.ear;
+      ctx.beginPath();
+      ctx.moveTo(-sx * 1, -1);
+      ctx.lineTo(sx * 1, -6);
+      ctx.lineTo(-sx * 4, -3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
     ctx.fillStyle = pal.belly;
     ctx.beginPath();
     ctx.ellipse(4, 0, 6, 5, 0, 0, TAU);
@@ -2703,20 +2712,36 @@
     ctx.moveTo(8, 3);
     ctx.lineTo(15, 4);
     ctx.stroke();
-    ctx.fillStyle = "#1c1330";
-    ctx.beginPath();
-    ctx.arc(2, -2, 1.6, 0, TAU);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(8, -1, 1.6, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    ctx.beginPath();
-    ctx.arc(2.6, -2.6, 0.5, 0, TAU);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(8.6, -1.6, 0.5, 0, TAU);
-    ctx.fill();
+    if (hurt) {
+      ctx.strokeStyle = "#1c1330";
+      ctx.lineWidth = 1.3;
+      ctx.lineCap = "round";
+      [[2, -2], [8, -1]].forEach(function(e) {
+        ctx.beginPath();
+        ctx.moveTo(e[0] - 1.8, e[1] - 1.8);
+        ctx.lineTo(e[0] + 1.8, e[1] + 1.8);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(e[0] - 1.8, e[1] + 1.8);
+        ctx.lineTo(e[0] + 1.8, e[1] - 1.8);
+        ctx.stroke();
+      });
+    } else {
+      ctx.fillStyle = "#1c1330";
+      ctx.beginPath();
+      ctx.arc(2, -2, 1.6, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(8, -1, 1.6, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.beginPath();
+      ctx.arc(2.6, -2.6, 0.5, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(8.6, -1.6, 0.5, 0, TAU);
+      ctx.fill();
+    }
     ctx.fillStyle = pal.ear;
     ctx.beginPath();
     ctx.moveTo(9, 1);
@@ -2738,12 +2763,20 @@
     var wingCol = pal ? pal.ear : "#e0a800";
     var combCol = pal ? pal.tailTip === "#fff" ? "#e83030" : pal.tailTip : "#e83030";
     var sq = playerSquash(p);
+    var hurt = p.invuln > 0 && p.shield <= 0 && !(p.petrified > 0);
+    var fwdSpeed = p.vx * (p.facing < 0 ? -1 : 1);
+    var lean = Math.max(-1, Math.min(1, fwdSpeed / 220));
+    var running = p.onGround && Math.abs(p.vx) > 20;
+    var wag = Math.sin(p.walkPhase * 1.4 + 1.2) * (running ? 0.12 : 0.05);
+    var wingLag = -lean * 0.34 + wag;
+    var tailLag = -lean * 0.4 + Math.sin(p.walkPhase * 1.4 - 0.2) * (running ? 0.16 : 0.05);
     ctx.save();
     ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
     ctx.scale((p.facing < 0 ? -1 : 1) * sq.sx, sq.sy);
     var bob = p.onGround ? Math.sin(p.walkPhase) * 2 : 0;
     ctx.translate(0, bob);
-    if (p.dancing) ctx.rotate(Math.sin(performance.now() * 0.018 + 1.2) * 0.28);
+    if (hurt) ctx.rotate(-0.22);
+    else if (p.dancing) ctx.rotate(Math.sin(performance.now() * 0.018 + 1.2) * 0.28);
     if (p.onFire) drawOnFireGlow();
     var bodyGrad = ctx.createRadialGradient(-3, -2, 2, 0, 5, 15);
     bodyGrad.addColorStop(0, "#fff6d8");
@@ -2751,23 +2784,43 @@
     bodyGrad.addColorStop(1, wingCol);
     ctx.strokeStyle = wingCol;
     ctx.lineWidth = 1.1;
+    ctx.save();
+    ctx.translate(-9, -3);
+    ctx.rotate(tailLag);
+    ctx.fillStyle = wingCol;
+    ctx.beginPath();
+    ctx.moveTo(0, -1);
+    ctx.lineTo(-9, -7);
+    ctx.lineTo(-1, 5);
+    ctx.fill();
+    ctx.fillStyle = bodyCol;
+    ctx.beginPath();
+    ctx.moveTo(0, 1);
+    ctx.lineTo(-9, -1);
+    ctx.lineTo(-1, 7);
+    ctx.fill();
+    ctx.restore();
     ctx.fillStyle = bodyGrad;
     ctx.beginPath();
     ctx.ellipse(0, 5, 11, 12, 0, 0, TAU);
     ctx.fill();
     ctx.stroke();
+    ctx.save();
+    ctx.translate(-2, 1);
+    ctx.rotate(wingLag);
     ctx.fillStyle = wingCol;
     ctx.beginPath();
-    ctx.ellipse(-4, 6, 5, 8, -0.3, 0, TAU);
+    ctx.ellipse(-2, 5, 5, 8, -0.3, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.moveTo(-6, 0);
-    ctx.lineTo(-4, 10);
-    ctx.moveTo(-2, -1);
-    ctx.lineTo(-1, 11);
+    ctx.moveTo(-4, -1);
+    ctx.lineTo(-2, 9);
+    ctx.moveTo(0, -2);
+    ctx.lineTo(1, 10);
     ctx.stroke();
+    ctx.restore();
     ctx.fillStyle = bodyGrad;
     ctx.beginPath();
     ctx.arc(5, -10, 8, 0, TAU);
@@ -2798,26 +2851,28 @@
     ctx.moveTo(13, -8);
     ctx.lineTo(18, -8);
     ctx.stroke();
-    ctx.fillStyle = "#1c1330";
-    ctx.beginPath();
-    ctx.arc(8, -11, 1.6, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    ctx.beginPath();
-    ctx.arc(8.6, -11.6, 0.5, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = wingCol;
-    ctx.beginPath();
-    ctx.moveTo(-9, -4);
-    ctx.lineTo(-18, -10);
-    ctx.lineTo(-10, 2);
-    ctx.fill();
-    ctx.fillStyle = bodyCol;
-    ctx.beginPath();
-    ctx.moveTo(-9, -2);
-    ctx.lineTo(-18, -4);
-    ctx.lineTo(-10, 4);
-    ctx.fill();
+    if (hurt) {
+      ctx.strokeStyle = "#1c1330";
+      ctx.lineWidth = 1.2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(6.2, -12.8);
+      ctx.lineTo(9.8, -9.2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(6.2, -9.2);
+      ctx.lineTo(9.8, -12.8);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "#1c1330";
+      ctx.beginPath();
+      ctx.arc(8, -11, 1.6, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.beginPath();
+      ctx.arc(8.6, -11.6, 0.5, 0, TAU);
+      ctx.fill();
+    }
     ctx.fillStyle = "#f0a020";
     ctx.beginPath();
     ctx.ellipse(-3, 16, 2.6, 2, 0, 0, TAU);
@@ -6023,16 +6078,24 @@
         // 1: arctic (unlock glasgow)
         { body: "#cc2020", belly: "#ffd0d0", ear: "#6a0000", tailTip: "#fff", highlight: "#ff8a6a", shadow: "#8a1010" },
         // 2: crimson (unlock modena)
-        { body: "#1a1a2e", belly: "#3a3a5e", ear: "#0a0a1e", tailTip: "#888", highlight: "#5a5a8e", shadow: "#0a0a18" }
+        { body: "#1a1a2e", belly: "#3a3a5e", ear: "#0a0a1e", tailTip: "#888", highlight: "#5a5a8e", shadow: "#0a0a18" },
         // 3: midnight (unlock kenya)
+        { body: "#ffb7c9", belly: "#fff0f4", ear: "#7a3040", tailTip: "#ffe3ea", highlight: "#ffe6ee", shadow: "#d98aa0" },
+        // 4: sakura (unlock tokyo)
+        { body: "#ffd23a", belly: "#fff6d0", ear: "#7a4a00", tailTip: "#fff4c0", highlight: "#fff0a0", shadow: "#c99a10" }
+        // 5: imperial (unlock boss)
       ];
       var PALETTES_P2 = [
         { body: "#7a93ff", belly: "#eef1ff", ear: "#141c4d", tailTip: "#fff", highlight: "#c0ccff", shadow: "#4a5ecf" },
         // 0: default blue
         { body: "#f5c842", belly: "#fff8e0", ear: "#8a7000", tailTip: "#fff", highlight: "#ffe89a", shadow: "#c49a1a" },
         // 1: golden (unlock paris)
-        { body: "#3a8a3a", belly: "#d0f0d0", ear: "#1a4a1a", tailTip: "#fff", highlight: "#8fd88f", shadow: "#1f5a1f" }
+        { body: "#3a8a3a", belly: "#d0f0d0", ear: "#1a4a1a", tailTip: "#fff", highlight: "#8fd88f", shadow: "#1f5a1f" },
         // 2: forest (unlock ireland)
+        { body: "#ff3d81", belly: "#fff0f6", ear: "#ffd23a", tailTip: "#2fd9c4", highlight: "#ffe0ef", shadow: "#c4185f" },
+        // 3: carnival (unlock brazil)
+        { body: "#ffd23a", belly: "#fff6d0", ear: "#1a1a1a", tailTip: "#ff3030", highlight: "#fff3a0", shadow: "#c9a300" }
+        // 4: taxi (unlock newyork)
       ];
       var selectedSkins = safeGet("gh_skins_v1", { p1: 0, p2: 0 });
       initStarfield();
@@ -6960,8 +7023,8 @@
         });
       })();
       function buildSkinDots() {
-        var p1Unlocks = [true, isLevelCleared("glasgow"), isLevelCleared("modena"), isLevelCleared("kenya")];
-        var p2Unlocks = [true, isLevelCleared("paris"), isLevelCleared("ireland")];
+        var p1Unlocks = [true, isLevelCleared("glasgow"), isLevelCleared("modena"), isLevelCleared("kenya"), isLevelCleared("tokyo"), isLevelCleared("boss")];
+        var p2Unlocks = [true, isLevelCleared("paris"), isLevelCleared("ireland"), isLevelCleared("brazil"), isLevelCleared("newyork")];
         var p1Colors = PALETTES_P1.map(function(p) {
           return p.body;
         });

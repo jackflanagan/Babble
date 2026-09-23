@@ -57,12 +57,16 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
     { body:'#ff7a45', belly:'#fff3e6', ear:'#2a0d05', tailTip:'#fff', highlight:'#ffcaa0', shadow:'#c9531f' },   // 0: default orange
     { body:'#e0eeff', belly:'#fff', ear:'#8090c0', tailTip:'#c0d8ff', highlight:'#ffffff', shadow:'#a8c0e8' },   // 1: arctic (unlock glasgow)
     { body:'#cc2020', belly:'#ffd0d0', ear:'#6a0000', tailTip:'#fff', highlight:'#ff8a6a', shadow:'#8a1010' },   // 2: crimson (unlock modena)
-    { body:'#1a1a2e', belly:'#3a3a5e', ear:'#0a0a1e', tailTip:'#888', highlight:'#5a5a8e', shadow:'#0a0a18' }    // 3: midnight (unlock kenya)
+    { body:'#1a1a2e', belly:'#3a3a5e', ear:'#0a0a1e', tailTip:'#888', highlight:'#5a5a8e', shadow:'#0a0a18' },   // 3: midnight (unlock kenya)
+    { body:'#ffb7c9', belly:'#fff0f4', ear:'#7a3040', tailTip:'#ffe3ea', highlight:'#ffe6ee', shadow:'#d98aa0' },// 4: sakura (unlock tokyo)
+    { body:'#ffd23a', belly:'#fff6d0', ear:'#7a4a00', tailTip:'#fff4c0', highlight:'#fff0a0', shadow:'#c99a10' } // 5: imperial (unlock boss)
   ];
   var PALETTES_P2 = [
     { body:'#7a93ff', belly:'#eef1ff', ear:'#141c4d', tailTip:'#fff', highlight:'#c0ccff', shadow:'#4a5ecf' },   // 0: default blue
     { body:'#f5c842', belly:'#fff8e0', ear:'#8a7000', tailTip:'#fff', highlight:'#ffe89a', shadow:'#c49a1a' },   // 1: golden (unlock paris)
-    { body:'#3a8a3a', belly:'#d0f0d0', ear:'#1a4a1a', tailTip:'#fff', highlight:'#8fd88f', shadow:'#1f5a1f' }    // 2: forest (unlock ireland)
+    { body:'#3a8a3a', belly:'#d0f0d0', ear:'#1a4a1a', tailTip:'#fff', highlight:'#8fd88f', shadow:'#1f5a1f' },   // 2: forest (unlock ireland)
+    { body:'#ff3d81', belly:'#fff0f6', ear:'#ffd23a', tailTip:'#2fd9c4', highlight:'#ffe0ef', shadow:'#c4185f' },// 3: carnival (unlock brazil)
+    { body:'#ffd23a', belly:'#fff6d0', ear:'#1a1a1a', tailTip:'#ff3030', highlight:'#fff3a0', shadow:'#c9a300' } // 4: taxi (unlock newyork)
   ];
   var selectedSkins = safeGet('gh_skins_v1', {p1:0, p2:0});
 
@@ -803,8 +807,8 @@ import { loadProgression, getProgression, markLocationVisited, recordAdventureCo
 
   // Skin selector
   function buildSkinDots(){
-    var p1Unlocks = [true, isLevelCleared('glasgow'), isLevelCleared('modena'), isLevelCleared('kenya')];
-    var p2Unlocks = [true, isLevelCleared('paris'), isLevelCleared('ireland')];
+    var p1Unlocks = [true, isLevelCleared('glasgow'), isLevelCleared('modena'), isLevelCleared('kenya'), isLevelCleared('tokyo'), isLevelCleared('boss')];
+    var p2Unlocks = [true, isLevelCleared('paris'), isLevelCleared('ireland'), isLevelCleared('brazil'), isLevelCleared('newyork')];
     var p1Colors = PALETTES_P1.map(function(p){ return p.body; });
     var p2Colors = PALETTES_P2.map(function(p){ return p.body; });
 
